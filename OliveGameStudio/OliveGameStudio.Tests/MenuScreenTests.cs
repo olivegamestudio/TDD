@@ -3,14 +3,27 @@ namespace OliveGameStudio.Tests;
 public sealed class MenuScreenTests
 {
     [Fact]
-    public void MenuScreen_IsTheFirstScreenShown()
+    public void PressingStart_RaisesStartGameRequested()
     {
-        IScreenDirector screenDirector = new ScreenDirector();
-        Game game = new Game(screenDirector);
+        IUIController controller = new UIController();
+        MenuScreen menu = new(controller);
         
-        game.Start();
-        game.Update(TimeSpan.FromSeconds(2));
+        bool started = false;
+        menu.StartGameRequested += (_, _) => started = true;
 
-        Assert.IsType<MenuScreen>(screenDirector.Current);
+        menu.Press();                       // Start is auto-focused
+
+        Assert.True(started);
+    }
+
+    [Fact]
+    public void WithoutAPress_StartGameRequested_DoesNotFire()
+    {
+        IUIController controller = new UIController();
+        MenuScreen menu = new(controller);
+        bool started = false;
+        menu.StartGameRequested += (_, _) => started = true;
+
+        Assert.False(started);              // no phantom fire on construction
     }
 }

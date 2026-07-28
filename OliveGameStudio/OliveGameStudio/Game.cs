@@ -8,7 +8,8 @@ namespace OliveGameStudio;
 public class Game(IScreenDirector screenDirector)
 {
     readonly CompanyScreen _companyScreen = new(TimeSpan.FromSeconds(2));
-    readonly MenuScreen _menuScreen = new();
+    readonly MenuScreen _menuScreen = new(new UIController());
+    readonly GameScreen _gameScreen = new();
 
     /// <summary>
     /// Starts the Game by navigating to the initial screen (CompanyScreen).
@@ -18,6 +19,8 @@ public class Game(IScreenDirector screenDirector)
     {
         _companyScreen.Completed += (_, _) => screenDirector.NavigateTo(_menuScreen);
         screenDirector.NavigateTo(_companyScreen);
+        
+        _menuScreen.StartGameRequested += (_, _) => screenDirector.NavigateTo(_gameScreen);
     }
 
     /// <summary>
