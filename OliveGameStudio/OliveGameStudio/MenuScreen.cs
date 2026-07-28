@@ -13,7 +13,8 @@ namespace OliveGameStudio;
 /// </remarks>
 public sealed class MenuScreen : IScreen
 {
-    readonly UIController _controller = new();
+    readonly IUIController _controller = new UIController();
+    readonly Button _startButton = new("START");
 
     /// <summary>
     /// Represents the main menu screen of the application.
@@ -21,7 +22,12 @@ public sealed class MenuScreen : IScreen
     /// </summary>
     public MenuScreen()
     {
-        _controller.Add(new Button());
+        _controller.Add(_startButton);
+        _controller.OnPressed(_startButton, OnStartPressed);
+    }
+
+    void OnStartPressed()
+    {
     }
 
     /// <summary>

@@ -1,8 +1,10 @@
 namespace OliveGameStudio;
 
 /// <summary>
-/// Represents a button UI component.
-/// This sealed record inherits from the abstract base record `Element`
-/// and is used for creating interactive button elements in a user interface.
+/// Represents a UI button component in the system.
 /// </summary>
-public sealed record Button : Element;
+/// <remarks>
+/// The <see cref="Button"/> class is part of the UI element hierarchy and inherits from the <see cref="Element"/> class.
+/// This class encapsulates the name of the button, which can be used for identification or display purposes within a user interface.
+/// </remarks>
+public sealed record Button(string Name) : Element;
