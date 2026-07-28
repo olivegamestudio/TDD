@@ -1,4 +1,6 @@
-namespace OliveGameStudio.Tests;
+using OliveGameStudio;
+
+namespace BattleForce2249.Tests;
 
 public sealed class CompanyScreenTests
 {

@@ -4,10 +4,7 @@
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <RootNamespace>OliveGameStudio.UI</RootNamespace>
     </PropertyGroup>
-
-    <ItemGroup>
-      <ProjectReference Include="..\OliveGameStudio.UI.Abstractions\OliveGameStudio.UI.Abstractions.csproj" />
-    </ItemGroup>
 
 </Project>

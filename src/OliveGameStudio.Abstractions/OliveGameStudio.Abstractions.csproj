@@ -7,9 +7,4 @@
         <RootNamespace>OliveGameStudio</RootNamespace>
     </PropertyGroup>
 
-    <ItemGroup>
-      <ProjectReference Include="..\OliveGameStudio.Abstractions\OliveGameStudio.Abstractions.csproj" />
-      <ProjectReference Include="..\OliveGameStudio.UI\OliveGameStudio.UI.csproj" />
-    </ItemGroup>
-
 </Project>
