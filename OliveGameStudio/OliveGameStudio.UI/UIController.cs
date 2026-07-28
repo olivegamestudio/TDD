@@ -1,15 +1,18 @@
 namespace OliveGameStudio;
 
 /// <summary>
-/// Manages the user interface (UI) elements and their interactions.
-/// It provides functionality to add elements, manage focus on specific elements,
-/// and handle events like pressing a button or other interactions.
+/// Represents the controller responsible for managing interactions and states
+/// of user interface (UI) elements in the application.
 /// </summary>
+/// <remarks>
+/// Handles addition of elements, focus management, button actions,
+/// enabling or disabling elements, and directional navigation between buttons.
+/// </remarks>
 public sealed class UIController : IUIController
 {
     readonly List<Element> _elements = [];
     readonly List<Node> _nodes = [];
-    
+
     Button? _focusedElement;
 
     /// <summary>
@@ -28,12 +31,63 @@ public sealed class UIController : IUIController
     }
 
     /// <summary>
-    /// Simulates a button press event, triggering the associated action of the currently focused button.
+    /// Associates a specified action with the release event of the given button.
     /// </summary>
-    /// <param name="button">An optional <see cref="Button"/> instance to explicitly focus before triggering the press. If null, the press acts on the current focused button.</param>
+    /// <param name="button">The <see cref="Button"/> instance that triggers the action when released.</param>
+    /// <param name="action">The action to be executed in response to the button release event.</param>
     /// <remarks>
-    /// This method sets the focus to the specified button if provided and triggers its press action.
-    /// If no button is provided and there is no currently focused button, no action is executed.
+    /// This method allows custom behavior to be defined for the release interaction of a specific button
+    /// within the user interface.
+    /// </remarks>
+    public void OnReleased(Button button, Action action)
+    {
+        Node node = Require(button);
+        node.ReleasedAction = action;
+    }
+
+    Button? _pressing;
+
+    /// <summary>
+    /// Gets the currently focused button in the user interface.
+    /// </summary>
+    /// <remarks>
+    /// The <c>Focused</c> property returns the button that is currently
+    /// receiving user interactions or is marked as active in the UI.
+    /// If no button is focused, the property returns <c>null</c>.
+    /// </remarks>
+    public Button? Focused => _focusedElement;
+
+    /// <summary>
+    /// Gets the button currently being held down in the user interface.
+    /// </summary>
+    /// <remarks>
+    /// The <c>Held</c> property represents the button that is actively
+    /// engaged between a press and release action. This property will
+    /// return <c>null</c> if no button is being held at the moment.
+    /// </remarks>
+    public Button? Held => _pressing;
+
+    /// <summary>
+    /// Determines whether the specified button is currently enabled.
+    /// </summary>
+    /// <param name="button">The <see cref="Button"/> instance to check for the enabled state.</param>
+    /// <returns>
+    /// A boolean value indicating whether the button is enabled.
+    /// Returns <c>true</c> if the button is enabled; otherwise, <c>false</c>.
+    /// </returns>
+    /// <remarks>
+    /// This method retrieves the enabled state of a button managed by the UI controller.
+    /// Ensure that the button is properly registered with the controller before invoking this method.
+    /// </remarks>
+    public bool IsEnabled(Button button) => Require(button).Enabled;
+
+    /// <summary>
+    /// Triggers the pressing action for the specified button or the currently focused element.
+    /// </summary>
+    /// <param name="button">The <see cref="Button"/> to be pressed. If null, the action applies to the currently focused element.</param>
+    /// <remarks>
+    /// If a specific button is provided and it is enabled, the focus will move to this button, and its associated action will be processed.
+    /// In the absence of a specified button, the currently focused element is pressed, provided it is enabled.
     /// </remarks>
     public void Press(Button? button = null)
     {
@@ -42,25 +96,58 @@ public sealed class UIController : IUIController
             Node target = Require(button);
             if (!target.Enabled)
             {
-                // click on a disabled button → nothing
-                return; 
+                return;
             }
             
             FocusOn(button);
         }
-
+        
         if (_focusedElement is not null)
         {
             Node node = Require(_focusedElement);
             if (!node.Enabled)
             {
-                // never fire a disabled focus
-                return; 
+                return;
             }
             
             node.PressedAction?.Invoke();
+            _pressing = _focusedElement;
         }
     }
+
+    /// <summary>
+    /// Releases the currently held button and triggers its associated action if enabled.
+    /// </summary>
+    /// <remarks>
+    /// If a button is currently being pressed, this method sets it to null, retrieves its associated node,
+    /// and invokes the node's press action if the node is enabled. No action is performed if no button
+    /// is currently pressed.
+    /// </remarks>
+    public void Release()
+    {
+        if (_pressing is null)
+        {
+            return;
+        }
+        
+        Node node = Require(_pressing);
+        _pressing = null;
+        
+        if (node.Enabled)
+        {
+            node.ReleasedAction?.Invoke();
+        }
+    }
+
+    /// <summary>
+    /// Cancels any currently active button press operation without triggering the associated action.
+    /// </summary>
+    /// <remarks>
+    /// This method resets the state of the pressing operation in the UI controller, ensuring that
+    /// the action linked to the currently held button is not executed. Typically used to handle scenarios
+    /// where an input operation is interrupted or deliberately aborted.
+    /// </remarks>
+    public void Cancel() => _pressing = null;
 
     /// <summary>
     /// Associates a directional link between two buttons within the UI navigation graph.

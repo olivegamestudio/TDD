@@ -11,7 +11,8 @@ public sealed class MenuScreenTests
         bool started = false;
         menu.StartGameRequested += (_, _) => started = true;
 
-        menu.Press();                       // Start is auto-focused
+        menu.Press();
+        menu.Release();
 
         Assert.True(started);
     }

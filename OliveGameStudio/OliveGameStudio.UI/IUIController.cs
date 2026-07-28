@@ -13,10 +13,26 @@ public interface IUIController
     void OnPressed(Button button, Action action);
 
     /// <summary>
+    /// Associates an action to be executed when the specified button is released.
+    /// </summary>
+    /// <param name="button">The <see cref="Button"/> instance that triggers the associated action when released.</param>
+    /// <param name="action">The action to execute in response to the button release event.</param>
+    void OnReleased(Button button, Action action);
+
+    /// <summary>
     /// Simulates a button press event, optionally focusing on the specified button before triggering its associated action.
     /// </summary>
     /// <param name="button">The <see cref="Button"/> to focus and press. If null, the press is executed on the currently focused button, if any.</param>
     void Press(Button? button = null);
+
+    /// <summary>
+    /// Releases the button currently being pressed and executes its associated action if it is enabled.
+    /// </summary>
+    /// <remarks>
+    /// This method stops the ongoing press action by resetting the pressed button to null and,
+    /// if the associated node is enabled, triggers its corresponding action. If no button is currently being pressed, the method performs no operation.
+    /// </remarks>
+    void Release();
 
     /// <summary>
     /// Establishes a directional link between the specified button and a destination button.

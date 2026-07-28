@@ -32,7 +32,7 @@ public sealed class MenuScreen : IScreen
     {
         _controller = controller;
         controller.Add(_startButton);
-        controller.OnPressed(_startButton, OnStartPressed);
+        controller.OnReleased(_startButton, OnStartReleased);
     }
 
     /// <summary>
@@ -40,17 +40,25 @@ public sealed class MenuScreen : IScreen
     /// This method triggers the associated behavior of the currently focused button,
     /// or the specified button, using the provided <see cref="IUIController"/>.
     /// </summary>
-    public void Press()
-    {
-        _controller.Press();
-    }
+    public void Press() => _controller.Press();
+
+    /// <summary>
+    /// Releases the currently pressed button associated with the main menu screen.
+    /// This method interacts with the <see cref="IUIController"/> to stop the press action
+    /// and execute the associated functionality of the button if it is enabled.
+    /// </summary>
+    public void Release() => _controller.Release();
     
     /// <summary>
     /// Handles the event when the start button is pressed in the menu screen.
     /// Invokes the <see cref="StartGameRequested"/> event to signal that the game
     /// should transition from the menu to the gameplay state.
     /// </summary>
-    void OnStartPressed() => StartGameRequested?.Invoke(this, EventArgs.Empty);
+    void OnStartReleased()
+    {
+        _controller.Disable(_startButton);
+        StartGameRequested?.Invoke(this, EventArgs.Empty);
+    }
 
     /// <summary>
     /// Updates the state of the menu screen. This method is called every frame and
