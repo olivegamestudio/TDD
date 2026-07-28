@@ -8,9 +8,9 @@ public sealed class MenuScreenTests
     [Fact]
     public void PressingStart_RaisesStartGameRequested()
     {
-        IUIController controller = new UIController();
+        UIController controller = new();
         MenuScreen menu = new(controller, Mock.Of<ISaveProgressController>());
-        
+
         bool started = false;
         menu.StartGameRequested += (_, _) => started = true;
 
@@ -23,11 +23,55 @@ public sealed class MenuScreenTests
     [Fact]
     public void WithoutAPress_StartGameRequested_DoesNotFire()
     {
-        IUIController controller = new UIController();
+        UIController controller = new();
         MenuScreen menu = new(controller, Mock.Of<ISaveProgressController>());
         bool started = false;
         menu.StartGameRequested += (_, _) => started = true;
 
         Assert.False(started);              // no phantom fire on construction
+    }
+
+    [Fact]
+    public void PressDownAlone_DoesNotRaise()
+    {
+        // the launch is on RELEASE — a held button has not committed
+        UIController controller = new();
+        MenuScreen menu = new(controller, Mock.Of<ISaveProgressController>());
+        bool started = false;
+        menu.StartGameRequested += (_, _) => started = true;
+
+        menu.Press();                       // down, never released
+
+        Assert.False(started);
+    }
+
+    [Fact]
+    public void SecondPress_DoesNotRaiseAgain()
+    {
+        // OnStartReleased disables the start button — pins the double-fire guard
+        UIController controller = new();
+        MenuScreen menu = new(controller, Mock.Of<ISaveProgressController>());
+        int started = 0;
+        menu.StartGameRequested += (_, _) => started++;
+
+        menu.Press();
+        menu.Release();                     // fires + disables start
+        menu.Press();
+        menu.Release();                     // disabled — must be inert
+
+        Assert.Equal(1, started);
+    }
+
+    [Fact]
+    public void Enter_FocusesTheStartButton()
+    {
+        UIController controller = new();
+        MenuScreen menu = new(controller, Mock.Of<ISaveProgressController>());
+        controller.UnFocus();               // knock focus away, as a reentry might
+
+        menu.Enter();
+
+        Assert.NotNull(controller.Focused);
+        Assert.Equal("START", controller.Focused.Name);
     }
 }

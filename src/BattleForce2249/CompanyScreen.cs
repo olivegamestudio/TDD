@@ -57,6 +57,7 @@ public sealed class CompanyScreen(TimeSpan duration) : IScreen, IActivatable
     /// </summary>
     public EnterResult Enter()
     {
+        _hasCompleted = false;
         _countdown.Reset();
         return EnterResult.Stay;
     }

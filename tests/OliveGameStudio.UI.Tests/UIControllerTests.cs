@@ -2,21 +2,19 @@ namespace OliveGameStudio.Tests;
 
 public sealed class UIControllerTests
 {
-    // ---- focus / add ----
+    // ---- focus / add -------------------------------------------------------
+    // Focus is asserted DIRECTLY via Focused — no action wiring needed.
+    // (Previously these observed focus indirectly through press-actions.)
 
     [Fact]
     public void FirstButtonAdded_BecomesFocused()
     {
         UIController controller = new();
         Button start = new("start");
+
         controller.Add(start);
 
-        Button? pressed = null;
-        controller.OnReleased(start, () => pressed = start);
-        controller.Press();
-        controller.Release();
-
-        Assert.Same(start, pressed);
+        Assert.Same(start, controller.Focused);
     }
 
     [Fact]
@@ -24,17 +22,11 @@ public sealed class UIControllerTests
     {
         UIController controller = new();
         Button first = new("first");
-        Button second = new("second");
         controller.Add(first);
-        controller.Add(second);
 
-        Button? pressed = null;
-        controller.OnPressed(first, () => pressed = first);
-        controller.OnPressed(second, () => pressed = second);
-        controller.Press();
-        controller.Release();
+        controller.Add(new Button("second"));
 
-        Assert.Same(first, pressed);
+        Assert.Same(first, controller.Focused);
     }
 
     [Fact]
@@ -45,42 +37,21 @@ public sealed class UIControllerTests
         Button chosen = new("chosen");
         controller.Add(first);
         controller.Add(chosen);
+
         controller.FocusOn(chosen);
 
-        Button? pressed = null;
-        controller.OnReleased(first, () => pressed = first);
-        controller.OnReleased(chosen, () => pressed = chosen);
-        controller.Press();
-        controller.Release();
-
-        Assert.Same(chosen, pressed);
+        Assert.Same(chosen, controller.Focused);
     }
 
     [Fact]
-    public void Press_FiresTheFocused_NotItsSiblings()
+    public void UnFocus_ClearsFocused()
     {
         UIController controller = new();
-        Button start = new("start");
-        Button options = new("options");
-        controller.Add(start);
-        controller.Add(options);
+        controller.Add(new Button("start"));
 
-        Button? pressed = null;
-        controller.OnPressed(start, () => pressed = start);
-        controller.OnPressed(options, () => pressed = options);
-        controller.Press();
-        controller.Release();
+        controller.UnFocus();
 
-        Assert.Same(start, pressed);
-    }
-
-    [Fact]
-    public void PressRelease_OnEmptyController_FiresNothing()
-    {
-        UIController controller = new();
-
-        controller.Press();
-        controller.Release();       // no focus, must not throw or fire
+        Assert.Null(controller.Focused);
     }
 
     [Fact]
@@ -89,14 +60,10 @@ public sealed class UIControllerTests
         UIController controller = new();
         Button start = new("start");
         controller.Add(start);
-        controller.Disable(start);
 
-        bool fired = false;
-        controller.OnPressed(start, () => fired = true);
-        controller.Press();
-        controller.Release();
+        controller.Disable(start);              // focused -> re-home; none enabled -> clears
 
-        Assert.False(fired);
+        Assert.Null(controller.Focused);
     }
 
     [Fact]
@@ -105,31 +72,47 @@ public sealed class UIControllerTests
         UIController controller = new();
         Button start = new("start");
         controller.Add(start);
-        controller.Disable(start);
-        controller.Enable(start);
+        controller.Disable(start);              // waiting on a service...
 
-        Button? pressed = null;
-        controller.OnReleased(start, () => pressed = start);
-        controller.Press();
-        controller.Release();
+        controller.Enable(start);               // service ready
 
-        Assert.Same(start, pressed);
+        Assert.Same(start, controller.Focused);
     }
 
-    // ---- two-phase press / release / cancel ----
-
     [Fact]
-    public void PressDown_Alone_DoesNotFire()
+    public void IsEnabled_TracksDisableAndEnable()
     {
         UIController controller = new();
         Button start = new("start");
         controller.Add(start);
 
-        bool fired = false;
-        controller.OnReleased(start, () => fired = true);
-        controller.Press();
+        Assert.True(controller.IsEnabled(start));
+        controller.Disable(start);
+        Assert.False(controller.IsEnabled(start));
+        controller.Enable(start);
+        Assert.True(controller.IsEnabled(start));
+    }
 
-        Assert.False(fired);
+    // ---- the two hooks: pressed fires on DOWN, released fires on UP --------
+    // This pinning matters: a test that wires OnPressed and then calls
+    // Press(); Release(); stays green even if Release() is broken — the down
+    // fired it. Commit tests MUST observe through OnReleased.
+
+    [Fact]
+    public void PressDown_FiresThePressedHook_NotTheReleasedHook()
+    {
+        UIController controller = new();
+        Button start = new("start");
+        controller.Add(start);
+
+        bool down = false, up = false;
+        controller.OnPressed(start, () => down = true);
+        controller.OnReleased(start, () => up = true);
+
+        controller.Press();                     // down only
+
+        Assert.True(down);
+        Assert.False(up);                       // the commit has NOT happened yet
     }
 
     [Fact]
@@ -140,7 +123,8 @@ public sealed class UIControllerTests
         controller.Add(start);
 
         bool fired = false;
-        controller.OnPressed(start, () => fired = true);
+        controller.OnReleased(start, () => fired = true);   // observed on the RELEASE hook
+
         controller.Press();
         controller.Release();
 
@@ -148,7 +132,7 @@ public sealed class UIControllerTests
     }
 
     [Fact]
-    public void Cancel_AbortsWithoutFiring()
+    public void PressDown_Alone_DoesNotCommit()
     {
         UIController controller = new();
         Button start = new("start");
@@ -156,8 +140,43 @@ public sealed class UIControllerTests
 
         bool fired = false;
         controller.OnReleased(start, () => fired = true);
+
+        controller.Press();                     // down, never released
+
+        Assert.False(fired);                    // the launch is on release
+    }
+
+    [Fact]
+    public void Release_Commits_TheFocused_NotItsSiblings()
+    {
+        UIController controller = new();
+        Button start = new("start");
+        Button options = new("options");
+        controller.Add(start);                  // auto-focused
+        controller.Add(options);                // sibling — unfocused
+
+        Button? released = null;
+        controller.OnReleased(start, () => released = start);
+        controller.OnReleased(options, () => released = options);
+
         controller.Press();
-        controller.Cancel();
+        controller.Release();
+
+        Assert.Same(start, released);
+    }
+
+    [Fact]
+    public void Cancel_AbortsWithoutCommitting()
+    {
+        UIController controller = new();
+        Button start = new("start");
+        controller.Add(start);
+
+        bool fired = false;
+        controller.OnReleased(start, () => fired = true);
+
+        controller.Press();
+        controller.Cancel();                    // mouse left the button / press aborted
 
         Assert.False(fired);
         Assert.Null(controller.Held);
@@ -174,24 +193,36 @@ public sealed class UIControllerTests
         Assert.Same(start, controller.Held);    // armed while held down
 
         controller.Release();
-        Assert.Null(controller.Held);            // cleared on release
+        Assert.Null(controller.Held);           // cleared on release
     }
 
     [Fact]
-    public void Focused_ExposesTheFocusedButton()
+    public void PressRelease_OnEmptyController_FiresNothing()
+    {
+        UIController controller = new();
+
+        controller.Press();
+        controller.Release();                   // no focus — must not throw or fire
+    }
+
+    [Fact]
+    public void DisabledButton_NeverCommits()
     {
         UIController controller = new();
         Button start = new("start");
-        Button options = new("options");
         controller.Add(start);
-        controller.Add(options);
+        controller.Disable(start);
 
-        Assert.Same(start, controller.Focused);
-        controller.FocusOn(options);
-        Assert.Same(options, controller.Focused);
+        bool fired = false;
+        controller.OnReleased(start, () => fired = true);
+
+        controller.Press();
+        controller.Release();
+
+        Assert.False(fired);
     }
 
-    // ---- mouse / touch through Press(button) ----
+    // ---- mouse / touch through Press(button) -------------------------------
 
     [Fact]
     public void MouseDownUp_OnButton_Commits()
@@ -199,16 +230,17 @@ public sealed class UIControllerTests
         UIController controller = new();
         Button start = new("start");
         Button options = new("options");
-        controller.Add(start);
+        controller.Add(start);                  // start auto-focused
         controller.Add(options);
 
-        Button? pressed = null;
-        controller.OnPressed(start, () => pressed = start);
-        controller.OnPressed(options, () => pressed = options);
-        controller.Press(options);      // down over options
-        controller.Release();           // up over options
+        Button? released = null;
+        controller.OnReleased(start, () => released = start);
+        controller.OnReleased(options, () => released = options);
 
-        Assert.Same(options, pressed);
+        controller.Press(options);              // down over the unfocused one
+        controller.Release();                   // up over it
+
+        Assert.Same(options, released);         // focused + committed options, not start
     }
 
     [Fact]
@@ -222,8 +254,9 @@ public sealed class UIControllerTests
 
         bool fired = false;
         controller.OnReleased(options, () => fired = true);
-        controller.Press(options);
-        controller.Cancel();
+
+        controller.Press(options);              // down over options (armed)
+        controller.Cancel();                    // mapper hit-tests up-off-target
 
         Assert.False(fired);
     }
@@ -239,10 +272,35 @@ public sealed class UIControllerTests
         controller.Disable(locked);
 
         bool fired = false;
-        controller.OnPressed(locked, () => fired = true);
+        controller.OnReleased(locked, () => fired = true);
+
         controller.Press(locked);
         controller.Release();
 
         Assert.False(fired);
+    }
+
+    // ---- graph wiring -------------------------------------------------------
+
+    [Fact]
+    public void Link_UnknownSourceButton_Throws()
+    {
+        UIController controller = new();
+        Button known = new("known");
+        controller.Add(known);
+
+        Assert.Throws<InvalidOperationException>(
+            () => controller.Link(new Button("ghost"), Direction.Down, known));
+    }
+
+    [Fact]
+    public void Link_UnknownDestinationButton_Throws()
+    {
+        UIController controller = new();
+        Button known = new("known");
+        controller.Add(known);
+
+        Assert.Throws<InvalidOperationException>(
+            () => controller.Link(known, Direction.Down, new Button("ghost")));
     }
 }
