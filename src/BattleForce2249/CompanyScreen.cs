@@ -4,14 +4,14 @@ namespace OliveGameStudio;
 /// Represents the initial screen displayed in the application, typically shown for a fixed duration.
 /// Implements the <see cref="IScreen"/> interface.
 /// </summary>
-public sealed class CompanyScreen(TimeSpan duration) : IScreen
+public sealed class CompanyScreen(TimeSpan duration) : IScreen, IActivatable
 {
     /// <summary>
     /// Manages the countdown timer responsible for determining the duration of the current screen.
     /// Tracks the remaining time until the screen's completion and allows the application
     /// to advance to the next stage once the countdown elapses.
     /// </summary>
-    readonly Countdown _countdown = new(duration);
+    readonly Countdown _countdown = new Countdown(duration);
 
     /// <summary>
     /// Indicates whether the associated screen has finished its operation or transition.
@@ -47,5 +47,22 @@ public sealed class CompanyScreen(TimeSpan duration) : IScreen
         
         _hasCompleted = true;
         Completed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Activates and transitions into the company screen of the application.
+    /// This method is responsible for preparing the initial state of the company screen,
+    /// such as displaying logos or animations, and begins the timing for the screen's duration.
+    /// Typically executed as part of the <see cref="IActivatable"/> interface implementation.
+    /// </summary>
+    public void Enter() => _countdown.Reset();
+
+    /// <summary>
+    /// Exits the current screen of the application.
+    /// Handles cleanup, resource deallocation, or any required state transitions
+    /// when the screen is no longer in use. Implements the <see cref="IActivatable"/> interface.
+    /// </summary>
+    public void Exit()
+    {
     }
 }

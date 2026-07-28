@@ -6,7 +6,7 @@ namespace OliveGameStudio;
 /// initial screen where users can interact with the menu options, such as starting the game.
 /// Implements the <see cref="IScreen"/> interface.
 /// </summary>
-public sealed class MenuScreen : IScreen
+public sealed class MenuScreen : IScreen, IActivatable
 {
     readonly IUIController _controller;
     private readonly ISaveProgressController _saveProgressController;
@@ -73,6 +73,26 @@ public sealed class MenuScreen : IScreen
     /// perform time-based updates and ensure consistent behavior across varying frame rates.
     /// </param>
     public void Update(TimeSpan frameTime)
+    {
+    }
+
+    /// <summary>
+    /// Activates and transitions into the main menu screen of the application.
+    /// This method is responsible for setting up the initial state of the menu,
+    /// including focusing on the primary UI elements such as the start button.
+    /// Implements the <see cref="IActivatable"/> interface.
+    /// </summary>
+    public void Enter()
+    {
+        _controller.FocusOn(_startButton);
+    }
+
+    /// <summary>
+    /// Exits the main menu screen of the application.
+    /// This method is responsible for handling the necessary cleanup and state transitions
+    /// when leaving the main menu. Implements the <see cref="IActivatable"/> interface.
+    /// </summary>
+    public void Exit()
     {
     }
 }

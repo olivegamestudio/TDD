@@ -7,7 +7,7 @@ public sealed class GameTests
     [Fact]
     public void Boots_OnCompany_ThenReachesTheMenu()
     {
-        ScreenDirector director = new();
+        LifecycleScreenDirector director = new();
         Game game = new(director);
 
         game.Start();

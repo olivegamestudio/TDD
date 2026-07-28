@@ -18,6 +18,11 @@ public sealed class Countdown(TimeSpan duration)
     public bool IsElapsed => _remainingTime <= TimeSpan.Zero;
 
     /// <summary>
+    /// Resets the countdown timer to its initial duration.
+    /// </summary>
+    public void Reset() => _remainingTime = duration;
+
+    /// <summary>
     /// Decrements the remaining time of the countdown by the specified time interval.
     /// </summary>
     /// <param name="time">The amount of time to decrease from the countdown.</param>
