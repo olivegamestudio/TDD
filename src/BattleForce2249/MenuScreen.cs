@@ -9,6 +9,7 @@ namespace OliveGameStudio;
 public sealed class MenuScreen : IScreen
 {
     readonly IUIController _controller;
+    private readonly ISaveProgressController _saveProgressController;
     readonly Button _startButton = new("START");
     
     /// <summary>
@@ -28,9 +29,11 @@ public sealed class MenuScreen : IScreen
     /// initial screen where users can interact with the menu options, such as starting the game.
     /// Implements the <see cref="IScreen"/> interface.
     /// </summary>
-    public MenuScreen(IUIController controller)
+    public MenuScreen(IUIController controller, ISaveProgressController saveProgressController)
     {
         _controller = controller;
+        _saveProgressController = saveProgressController;
+        
         controller.Add(_startButton);
         controller.OnReleased(_startButton, OnStartReleased);
     }
