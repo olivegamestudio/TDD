@@ -1,12 +1,12 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OliveGameStudio.Tests", "OliveGameStudio.Tests\OliveGameStudio.Tests.csproj", "{84658B75-1D01-44DE-87F4-6D2230768DF4}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OliveGameStudio.Tests", "tests\OliveGameStudio.Tests\OliveGameStudio.Tests.csproj", "{84658B75-1D01-44DE-87F4-6D2230768DF4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OliveGameStudio", "OliveGameStudio\OliveGameStudio.csproj", "{18F864C0-0143-4FE6-9CE3-2B195C65CCA0}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OliveGameStudio", "src\OliveGameStudio\OliveGameStudio.csproj", "{18F864C0-0143-4FE6-9CE3-2B195C65CCA0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OliveGameStudio.UI", "OliveGameStudio.UI\OliveGameStudio.UI.csproj", "{60ABBEC2-6309-47D8-AE71-9A3C33D1EF0C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OliveGameStudio.UI", "src\OliveGameStudio.UI\OliveGameStudio.UI.csproj", "{60ABBEC2-6309-47D8-AE71-9A3C33D1EF0C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OliveGameStudio.UI.Tests", "OliveGameStudio.UI.Tests\OliveGameStudio.UI.Tests.csproj", "{2969B504-C047-4D4B-A853-32B357F7DFC7}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OliveGameStudio.UI.Tests", "tests\OliveGameStudio.UI.Tests\OliveGameStudio.UI.Tests.csproj", "{2969B504-C047-4D4B-A853-32B357F7DFC7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
