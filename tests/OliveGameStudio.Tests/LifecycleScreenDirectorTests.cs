@@ -1,3 +1,6 @@
+using Castle.Core.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+
 namespace OliveGameStudio.Tests;
 
 public sealed class LifecycleScreenDirectorTests
@@ -12,7 +15,7 @@ public sealed class LifecycleScreenDirectorTests
     [Fact]
     public void Navigate_Sets_CurrentScreen()
     {
-        LifecycleScreenDirector director = new();
+        LifecycleScreenDirector director = new(NullLogger<LifecycleScreenDirector>.Instance);
         director.NavigateTo(new TestScreen());
         Assert.IsType<TestScreen>(director.Current);
     }
@@ -20,7 +23,7 @@ public sealed class LifecycleScreenDirectorTests
     [Fact]
     public void Start_With_Empty_Screen()
     {
-        LifecycleScreenDirector director = new();
+        LifecycleScreenDirector director = new(NullLogger<LifecycleScreenDirector>.Instance);
         Assert.Null(director.Current);
     }
 }

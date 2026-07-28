@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using OliveGameStudio;
 
 namespace BattleForce2249.Tests;
@@ -7,7 +8,7 @@ public sealed class CompanyScreenTests
     [Fact]
     public void CompanyScreen_IsTheFirstScreenShown()
     {
-        IScreenDirector screenDirector = new ScreenDirector();
+        IScreenDirector screenDirector = new ScreenDirector(NullLogger<ScreenDirector>.Instance);
         Game game = new Game(screenDirector);
         
         game.Start();

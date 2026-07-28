@@ -7,12 +7,16 @@ namespace OliveGameStudio;
 public interface IActivatable
 {
     /// <summary>
-    /// Activates and transitions into the main menu screen of the application.
-    /// This method is responsible for initializing and setting up the
-    /// main menu screen by focusing on the primary user interface elements,
-    /// such as the start button.
+    /// Enters the current state or screen of the application.
+    /// Responsible for handling the initialization, resource allocation, or state transitions
+    /// required when entering the context in which this method is invoked.
+    /// Implemented as part of the <see cref="IActivatable"/> interface.
     /// </summary>
-    void Enter();
+    /// <returns>
+    /// An <see cref="EnterResult"/> indicating the outcome of the enter operation.
+    /// This result can represent staying in the current state or redirecting to another screen.
+    /// </returns>
+    EnterResult Enter();
 
     /// <summary>
     /// Exits the current state or screen of the application.

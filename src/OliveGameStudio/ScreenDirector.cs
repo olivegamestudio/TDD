@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 namespace OliveGameStudio;
 
 /// <summary>
@@ -5,7 +7,7 @@ namespace OliveGameStudio;
 /// This class maintains the currently active screen and provides methods to update its state
 /// and transition to other screens.
 /// </summary>
-public sealed class ScreenDirector : IScreenDirector
+public sealed class ScreenDirector(ILogger<ScreenDirector> logger) : IScreenDirector
 {
     /// <inheritdoc />
     public IScreen? Current { get; private set; }
@@ -19,6 +21,7 @@ public sealed class ScreenDirector : IScreenDirector
     /// <inheritdoc />
     public void NavigateTo(IScreen screen)
     {
+        logger.LogInformation("Navigate to '{screenName}'.", screen.GetType());
         Current = screen;
     }
 }

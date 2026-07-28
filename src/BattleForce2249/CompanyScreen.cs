@@ -55,7 +55,11 @@ public sealed class CompanyScreen(TimeSpan duration) : IScreen, IActivatable
     /// such as displaying logos or animations, and begins the timing for the screen's duration.
     /// Typically executed as part of the <see cref="IActivatable"/> interface implementation.
     /// </summary>
-    public void Enter() => _countdown.Reset();
+    public EnterResult Enter()
+    {
+        _countdown.Reset();
+        return EnterResult.Stay;
+    }
 
     /// <summary>
     /// Exits the current screen of the application.

@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging.Abstractions;
+
 namespace OliveGameStudio.Tests;
 
 public sealed class ScreenDirectorTests
@@ -12,7 +14,7 @@ public sealed class ScreenDirectorTests
     [Fact]
     public void Navigate_Sets_CurrentScreen()
     {
-        ScreenDirector director = new();
+        ScreenDirector director = new(NullLogger<ScreenDirector>.Instance);
         director.NavigateTo(new TestScreen());
         Assert.IsType<TestScreen>(director.Current);
     }
@@ -20,7 +22,7 @@ public sealed class ScreenDirectorTests
     [Fact]
     public void Start_With_Empty_Screen()
     {
-        ScreenDirector director = new();
+        ScreenDirector director = new(NullLogger<ScreenDirector>.Instance);
         Assert.Null(director.Current);
     }
 }

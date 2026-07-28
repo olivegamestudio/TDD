@@ -82,9 +82,10 @@ public sealed class MenuScreen : IScreen, IActivatable
     /// including focusing on the primary UI elements such as the start button.
     /// Implements the <see cref="IActivatable"/> interface.
     /// </summary>
-    public void Enter()
+    public EnterResult Enter()
     {
         _controller.FocusOn(_startButton);
+        return EnterResult.Stay;
     }
 
     /// <summary>

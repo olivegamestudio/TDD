@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using OliveGameStudio;
 
 namespace BattleForce2249.Tests;
@@ -7,7 +8,7 @@ public sealed class GameTests
     [Fact]
     public void Boots_OnCompany_ThenReachesTheMenu()
     {
-        LifecycleScreenDirector director = new();
+        LifecycleScreenDirector director = new(NullLogger<LifecycleScreenDirector>.Instance);
         Game game = new(director);
 
         game.Start();
