@@ -1,0 +1,17 @@
+namespace OliveGameStudio.Tests;
+
+public sealed class GameTests
+{
+    [Fact]
+    public void Boots_OnCompany_ThenReachesTheMenu()
+    {
+        ScreenDirector director = new();
+        Game game = new(director);
+
+        game.Start();
+        Assert.IsType<CompanyScreen>(director.Current);
+
+        game.Update(TimeSpan.FromDays(1));
+        Assert.IsType<MenuScreen>(director.Current);
+    }
+}
