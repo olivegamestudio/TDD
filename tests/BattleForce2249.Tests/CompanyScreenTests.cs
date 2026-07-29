@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 using OliveGameStudio;
 
 namespace BattleForce2249.Tests;
@@ -9,7 +10,9 @@ public sealed class CompanyScreenTests
     public void CompanyScreen_IsTheFirstScreenShown()
     {
         IScreenDirector screenDirector = new ScreenDirector(NullLogger<ScreenDirector>.Instance);
-        Game game = new Game(screenDirector);
+        IUIController controller = Mock.Of<IUIController>();
+        ISaveProgressService saveProgress = Mock.Of<ISaveProgressService>();
+        Game game = new Game(screenDirector, controller, saveProgress);
 
         game.Start();
 
