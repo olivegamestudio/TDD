@@ -8,7 +8,7 @@ namespace OliveGameStudio;
 public class Game(IScreenDirector screenDirector)
 {
     readonly CompanyScreen _companyScreen = new(TimeSpan.FromSeconds(2));
-    readonly MenuScreen _menuScreen = new(new UIController(), new SaveProgressController());
+    readonly MenuScreen _menuScreen = new(new UIController(), new LocalSaveProgressService());
     readonly GameScreen _gameScreen = new();
 
     /// <summary>

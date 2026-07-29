@@ -9,7 +9,7 @@ namespace OliveGameStudio;
 public sealed class MenuScreen : IScreen, IActivatable
 {
     readonly IUIController _controller;
-    private readonly ISaveProgressController _saveProgressController;
+    readonly ISaveProgressService _saveProgressService;
     readonly Button _startButton = new("START");
     
     /// <summary>
@@ -29,12 +29,16 @@ public sealed class MenuScreen : IScreen, IActivatable
     /// initial screen where users can interact with the menu options, such as starting the game.
     /// Implements the <see cref="IScreen"/> interface.
     /// </summary>
-    public MenuScreen(IUIController controller, ISaveProgressController saveProgressController)
+    public MenuScreen(IUIController controller, ISaveProgressService saveProgressService)
     {
         _controller = controller;
-        _saveProgressController = saveProgressController;
-        
+        _saveProgressService = saveProgressService;
+
+        // button is initially disabled until the save progress service has determined the player state.
         controller.Add(_startButton);
+        controller.Disable(_startButton);
+        
+        // begin game if start button is released
         controller.OnReleased(_startButton, OnStartReleased);
     }
 
@@ -59,7 +63,11 @@ public sealed class MenuScreen : IScreen, IActivatable
     /// </summary>
     void OnStartReleased()
     {
+        // immediately disable to start button to prevent further presses
+        // whilst we wait for screen transition/progressing
         _controller.Disable(_startButton);
+        
+        // request to start game - new one or continuation
         StartGameRequested?.Invoke(this, EventArgs.Empty);
     }
 
@@ -84,8 +92,49 @@ public sealed class MenuScreen : IScreen, IActivatable
     /// </summary>
     public EnterResult Enter()
     {
-        _controller.FocusOn(_startButton);
+        IsReadyForInput = false;
+        _controller.Disable(_startButton);
+        _saveProgressTask = HasSaveProgress();
         return EnterResult.Stay;
+    }
+
+    /// <summary>
+    /// Indicates whether the menu screen is ready to accept user input.
+    /// </summary>
+    /// <remarks>
+    /// This property becomes <c>true</c> once the necessary prerequisites, such as verifying
+    /// the player's save progress, are completed and the user interface elements (e.g., buttons)
+    /// are enabled. It remains <c>false</c> when the menu screen is initializing or transitioning
+    /// into its active state. This flag helps ensure user interactions are processed only when
+    /// the menu screen is fully prepared.
+    /// </remarks>
+    public bool IsReadyForInput { get; private set; }
+
+    /// <summary>
+    /// Represents a task responsible for managing the progress of saving the player's game state.
+    /// </summary>
+    /// <remarks>
+    /// This task is utilized to handle the asynchronous operation of saving player data, initiated during
+    /// specific interactions within the main menu screen. The task ensures that the save process
+    /// is performed without blocking the user interface, maintaining a seamless user experience.
+    /// </remarks>
+    Task _saveProgressTask;
+
+    /// <summary>
+    /// Determines whether the save progress exists in the system.
+    /// This method utilises the <see cref="ISaveProgressService"/> to check for the presence
+    /// of saved progress data asynchronously. Once the check is complete, the method enables
+    /// the start button for user interaction and sets the menu state to ready for input.
+    /// </summary>
+    /// <returns>
+    /// A task representing the asynchronous operation. The task's result is true if save
+    /// progress exists; otherwise, false.
+    /// </returns>
+    async Task HasSaveProgress()
+    {
+        bool result = await _saveProgressService.HasProgress();
+        _controller.Enable(_startButton);
+        IsReadyForInput = true;
     }
 
     /// <summary>
