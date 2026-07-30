@@ -10,6 +10,7 @@ public sealed class MenuScreen : IScreen, IActivatable
 {
     readonly IUIController _controller;
     readonly ISaveProgressService _saveProgressService;
+    readonly Image _background = new("BACKGROUND");
     readonly Button _startButton = new("START");
     
     /// <summary>

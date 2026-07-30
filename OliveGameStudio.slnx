@@ -1,0 +1,11 @@
+<Solution>
+  <Project Path="BattleForce2249.MonoGame/BattleForce2249.MonoGame.csproj" />
+  <Project Path="src/BattleForce2249/BattleForce2249.csproj" />
+  <Project Path="src/OliveGameStudio.Abstractions/OliveGameStudio.Abstractions.csproj" />
+  <Project Path="src/OliveGameStudio.UI.Abstractions/OliveGameStudio.UI.Abstractions.csproj" />
+  <Project Path="src/OliveGameStudio.UI/OliveGameStudio.UI.csproj" />
+  <Project Path="src/OliveGameStudio/OliveGameStudio.csproj" />
+  <Project Path="tests/BattleForce2249.Tests/BattleForce2249.Tests.csproj" />
+  <Project Path="tests/OliveGameStudio.Tests/OliveGameStudio.Tests.csproj" />
+  <Project Path="tests/OliveGameStudio.UI.Tests/OliveGameStudio.UI.Tests.csproj" />
+</Solution>
