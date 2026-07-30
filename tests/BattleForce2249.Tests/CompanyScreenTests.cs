@@ -1,22 +1,15 @@
-using Microsoft.Extensions.Logging.Abstractions;
-using Moq;
 using OliveGameStudio;
 
 namespace BattleForce2249.Tests;
 
-public sealed class CompanyScreenTests
+public sealed class CompanyScreenTests : HostTestBase
 {
     [Fact]
     public void CompanyScreen_IsTheFirstScreenShown()
     {
-        IScreenDirector screenDirector = new ScreenDirector(NullLogger<ScreenDirector>.Instance);
-        IUIController controller = Mock.Of<IUIController>();
-        ISaveProgressService saveProgress = Mock.Of<ISaveProgressService>();
-        BattleForceHost game = new BattleForceHost(screenDirector, controller, saveProgress);
-
+        IHost game = CreateHost();
         game.Start();
-
-        Assert.IsType<CompanyScreen>(screenDirector.Current);
+        Assert.IsType<CompanyScreen>(ScreenDirector.Current);
     }
 
     [Fact]
