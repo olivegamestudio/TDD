@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <RootNamespace>BattleForce2249</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\BattleForce2249.Abstractions\BattleForce2249.Abstractions.csproj" />
+      <ProjectReference Include="..\OliveGameStudio.UI.Abstractions\OliveGameStudio.UI.Abstractions.csproj" />
+    </ItemGroup>
+
+</Project>
