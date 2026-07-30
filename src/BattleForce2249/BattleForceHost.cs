@@ -5,7 +5,7 @@ namespace OliveGameStudio;
 /// The <c>Game</c> class is responsible for starting the game, managing screen transitions,
 /// and updating the game state based on frame time.
 /// </summary>
-public class Game(IScreenDirector screenDirector, IUIController controller, ISaveProgressService saveProgress)
+public class BattleForceHost(IScreenDirector screenDirector, IUIController controller, ISaveProgressService saveProgress)
 {
     readonly CompanyScreen _companyScreen = new(TimeSpan.FromSeconds(2));
     readonly MenuScreen _menuScreen = new(controller, saveProgress);

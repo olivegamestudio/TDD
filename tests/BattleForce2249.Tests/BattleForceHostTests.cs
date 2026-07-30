@@ -4,7 +4,7 @@ using OliveGameStudio;
 
 namespace BattleForce2249.Tests;
 
-public sealed class GameTests
+public sealed class BattleForceHostTests
 {
     [Fact]
     public void Boots_OnCompany_ThenReachesTheMenu()
@@ -12,7 +12,7 @@ public sealed class GameTests
         LifecycleScreenDirector screenDirector = new(NullLogger<LifecycleScreenDirector>.Instance);
         IUIController controller = Mock.Of<IUIController>();
         ISaveProgressService saveProgress = Mock.Of<ISaveProgressService>();
-        Game game = new Game(screenDirector, controller, saveProgress);
+        BattleForceHost game = new BattleForceHost(screenDirector, controller, saveProgress);
 
         game.Start();
         Assert.IsType<CompanyScreen>(screenDirector.Current);

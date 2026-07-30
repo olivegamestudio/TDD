@@ -12,7 +12,7 @@ public sealed class CompanyScreenTests
         IScreenDirector screenDirector = new ScreenDirector(NullLogger<ScreenDirector>.Instance);
         IUIController controller = Mock.Of<IUIController>();
         ISaveProgressService saveProgress = Mock.Of<ISaveProgressService>();
-        Game game = new Game(screenDirector, controller, saveProgress);
+        BattleForceHost game = new BattleForceHost(screenDirector, controller, saveProgress);
 
         game.Start();
 
