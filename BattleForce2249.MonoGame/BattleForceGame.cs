@@ -26,7 +26,7 @@ public class BattleForceGame : Game
 
     protected override void Initialize()
     {
-        // TODO: Add your initialization logic here
+        _host.Start();
 
         base.Initialize();
     }
