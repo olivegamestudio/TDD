@@ -1,27 +1,27 @@
-﻿using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using OliveGameStudio;
 
 namespace BattleForce2249;
 
+/// <summary>
+/// The MonoGame platform host. It owns the window and the frame loop, and drives the game
+/// purely through <see cref="IHost"/>. The host is resolved by the composition root in
+/// <c>Program</c>, so this class decides nothing about which implementations are used.
+/// </summary>
 public class BattleForceGame : Game
 {
-    GraphicsDeviceManager _graphics;
+    readonly GraphicsDeviceManager _graphics;
     //SpriteBatch _spriteBatch;
 
-    readonly LifecycleScreenDirector _screenDirector = new(NullLogger<LifecycleScreenDirector>.Instance);
-    readonly IUIController _controller = new UIController();
-    readonly ISaveProgressService _saveProgress = new LocalSaveProgressService();
-    readonly BattleForceHost _host;
+    readonly IHost _host;
 
-    public BattleForceGame()
+    public BattleForceGame(IHost host)
     {
+        _host = host;
+
         _graphics = new GraphicsDeviceManager(this);
         Content.RootDirectory = "Content";
         IsMouseVisible = true;
-
-        // start game host
-        _host = new BattleForceHost(_screenDirector, _controller, _saveProgress);
     }
 
     protected override void Initialize()

@@ -15,6 +15,19 @@
     <ItemGroup>
         <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.5"/>
         <PackageReference Include="MonoGame.Content.Builder.Task" Version="3.8.*"/>
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.10"/>
+        <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.10"/>
+        <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.10"/>
+        <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.10"/>
+        <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.10"/>
+    </ItemGroup>
+    <ItemGroup>
+        <None Update="appsettings.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="appsettings.Development.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
     </ItemGroup>
     <ItemGroup>
       <ProjectReference Include="..\src\BattleForce2249\BattleForce2249.csproj" />

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using OliveGameStudio;
 
 namespace BattleForce2249.Tests;
@@ -17,7 +18,8 @@ public sealed class CompanyScreenTests : HostTestBase
     {
         // the other side of the boundary Completed_FiresOnce crosses
         int fires = 0;
-        CompanyScreen companyScreen = new(TimeSpan.FromSeconds(1));
+        CompanyScreen companyScreen = new(Options.Create(
+            new CompanyScreenOptions { Duration = TimeSpan.FromSeconds(1) }));
         companyScreen.Completed += (_, _) => fires++;
 
         companyScreen.Update(TimeSpan.FromSeconds(0.5));
@@ -29,7 +31,8 @@ public sealed class CompanyScreenTests : HostTestBase
     public void Completed_FiresOnce_AfterTheDurationElapses()
     {
         int fires = 0;
-        CompanyScreen companyScreen = new(TimeSpan.FromSeconds(1));
+        CompanyScreen companyScreen = new(Options.Create(
+            new CompanyScreenOptions { Duration = TimeSpan.FromSeconds(1) }));
         companyScreen.Completed += (_, _) => fires++;
 
         companyScreen.Update(TimeSpan.FromSeconds(1));
@@ -43,7 +46,8 @@ public sealed class CompanyScreenTests : HostTestBase
     public void Completed_FiresAgain_AfterReentry()
     {
         int fires = 0;
-        CompanyScreen companyScreen = new(TimeSpan.FromSeconds(1));
+        CompanyScreen companyScreen = new(Options.Create(
+            new CompanyScreenOptions { Duration = TimeSpan.FromSeconds(1) }));
         companyScreen.Completed += (_, _) => fires++;
 
         companyScreen.Enter();

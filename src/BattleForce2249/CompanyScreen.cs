@@ -1,17 +1,19 @@
+using Microsoft.Extensions.Options;
+
 namespace OliveGameStudio;
 
 /// <summary>
 /// Represents the initial screen displayed in the application, typically shown for a fixed duration.
 /// Implements the <see cref="IScreen"/> interface.
 /// </summary>
-public sealed class CompanyScreen(TimeSpan duration) : IScreen, IActivatable
+public sealed class CompanyScreen(IOptions<CompanyScreenOptions> options) : IScreen, IActivatable
 {
     /// <summary>
     /// Manages the countdown timer responsible for determining the duration of the current screen.
     /// Tracks the remaining time until the screen's completion and allows the application
     /// to advance to the next stage once the countdown elapses.
     /// </summary>
-    readonly Countdown _countdown = new Countdown(duration);
+    readonly Countdown _countdown = new(options.Value.Duration);
 
     /// <summary>
     /// Indicates whether the associated screen has finished its operation or transition.
