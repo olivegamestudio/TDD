@@ -7,8 +7,6 @@ namespace OliveGameStudio;
 /// </summary>
 public class BattleForceHost(
     IScreenDirector screenDirector,
-    IUIController controller,
-    ISaveProgressService saveProgress,
     IFrameTimeController frameTimeController,
     CompanyScreen companyScreen,
     MenuScreen menuScreen,

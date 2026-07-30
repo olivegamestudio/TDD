@@ -14,6 +14,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\OliveGameStudio.Abstractions\OliveGameStudio.Abstractions.csproj" />
+      <ProjectReference Include="..\OliveGameStudio.FrameRate\OliveGameStudio.FrameRate.csproj" />
       <ProjectReference Include="..\OliveGameStudio.UI\OliveGameStudio.UI.csproj" />
     </ItemGroup>
 
