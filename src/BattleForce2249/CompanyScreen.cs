@@ -1,12 +1,14 @@
+using BattleForce2249;
 using Microsoft.Extensions.Options;
+using OliveGameStudio;
 
-namespace OliveGameStudio;
+namespace BattleForce2249;
 
 /// <summary>
 /// Represents the initial screen displayed in the application, typically shown for a fixed duration.
 /// Implements the <see cref="IScreen"/> interface.
 /// </summary>
-public sealed class CompanyScreen(IOptions<CompanyScreenOptions> options) : IScreen, IActivatable
+public sealed class CompanyScreen(IOptions<CompanyScreenOptions> options) : ICompanyScreen, IActivatable
 {
     /// <summary>
     /// Manages the countdown timer responsible for determining the duration of the current screen.

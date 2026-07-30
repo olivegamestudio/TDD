@@ -1,4 +1,4 @@
-namespace OliveGameStudio;
+namespace BattleForce2249;
 
 /// <summary>
 /// Configures the company splash screen.

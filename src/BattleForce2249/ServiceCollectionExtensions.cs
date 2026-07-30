@@ -1,7 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using OliveGameStudio;
 
-namespace OliveGameStudio;
+namespace BattleForce2249;
 
 /// <summary>
 /// Registers Battle Force 2249 on top of the Olive Game Studio engine services.
@@ -50,9 +51,9 @@ public static class BattleForceServiceCollectionExtensions
 
         services
             .AddOliveGameStudio()
-            .AddSingleton<CompanyScreen>()
-            .AddSingleton<MenuScreen>()
-            .AddSingleton<GameScreen>()
+            .AddSingleton<ICompanyScreen, CompanyScreen>()
+            .AddSingleton<IMenuScreen, MenuScreen>()
+            .AddSingleton<IGameScreen, GameScreen>()
             .AddSingleton<IHost, BattleForceHost>();
 
         return services;

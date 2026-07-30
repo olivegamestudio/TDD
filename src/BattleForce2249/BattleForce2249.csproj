@@ -13,6 +13,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\BattleForce2249.Abstractions\BattleForce2249.Abstractions.csproj" />
       <ProjectReference Include="..\OliveGameStudio.UI\OliveGameStudio.UI.csproj" />
       <ProjectReference Include="..\OliveGameStudio\OliveGameStudio.csproj" />
     </ItemGroup>

@@ -1,4 +1,6 @@
-namespace OliveGameStudio;
+using OliveGameStudio;
+
+namespace BattleForce2249;
 
 /// <summary>
 /// Represents the main class for initializing and managing the overall game flow.
@@ -8,9 +10,9 @@ namespace OliveGameStudio;
 public class BattleForceHost(
     IScreenDirector screenDirector,
     IFrameTimeController frameTimeController,
-    CompanyScreen companyScreen,
-    MenuScreen menuScreen,
-    GameScreen gameScreen) : IHost
+    ICompanyScreen companyScreen,
+    IMenuScreen menuScreen,
+    IGameScreen gameScreen) : IHost
 {
     /// <summary>
     /// Starts the Game by navigating to the initial screen (CompanyScreen).

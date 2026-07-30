@@ -1,4 +1,6 @@
-namespace OliveGameStudio;
+using OliveGameStudio;
+
+namespace BattleForce2249;
 
 /// <summary>
 /// Represents the main menu screen of the application.
@@ -6,7 +8,7 @@ namespace OliveGameStudio;
 /// initial screen where users can interact with the menu options, such as starting the game.
 /// Implements the <see cref="IScreen"/> interface.
 /// </summary>
-public sealed class MenuScreen : IScreen, IActivatable
+public sealed class MenuScreen : IMenuScreen, IActivatable
 {
     readonly IUIController _controller;
     readonly ISaveProgressService _saveProgressService;
