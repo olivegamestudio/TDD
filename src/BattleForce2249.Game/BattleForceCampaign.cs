@@ -3,22 +3,20 @@ using Pilgrimage;
 namespace BattleForce2249;
 
 /// <summary>
-/// The quests Battle Force 2249 ships with, and where a new game starts the player.
+/// The quests Battle Force 2249 ships with.
 /// </summary>
 /// <remarks>
 /// Quest 1 opens the game: the player begins inside the collapsing debris field and gets clear of
-/// it by flying forward. Its start marker sits on <see cref="PlayerStart"/>, which is what makes it
-/// begin on a new game launch without the player doing anything.
+/// it by flying forward. Both its triggers are proximity triggers — the distances live here, and
+/// the markers those distances are measured from live in <see cref="BattleForceWorld"/>.
 /// </remarks>
 public sealed class BattleForceCampaign : ICampaign
 {
     /// <summary>
-    /// The identifier quest 1 is saved under. Save games refer to it, so it must not change.
+    /// The identifier quest 1 is saved under. Save games refer to it, so it must not change, and
+    /// unlike the title it is never translated.
     /// </summary>
     public const string Quest1Id = "quest-1";
-
-    /// <inheritdoc />
-    public Position PlayerStart => new(0, 0);
 
     /// <inheritdoc />
     public IReadOnlyList<QuestDefinition> Quests { get; } =
@@ -27,9 +25,11 @@ public sealed class BattleForceCampaign : ICampaign
             Quest1Id,
             // in the player's language; the id above stays the same in every language
             GameText.Quest1Title,
-            // on the player's starting position, so the quest auto starts on a new game
-            Start: new QuestMarker(new Position(0, 0), 25),
-            // 1000 units forward, clear of the debris field
-            End: new QuestMarker(new Position(0, 1000), 50)),
+            // begins once the player is within 25 units of the start marker, which a new game
+            // spawns them on, so the quest starts without the player doing anything
+            Start: new QuestTrigger(QuestTriggerKind.Proximity, 25),
+            // finishes within 50 units of the exit marker, a wide enough mouth to catch a ship
+            // travelling at speed
+            End: new QuestTrigger(QuestTriggerKind.Proximity, 50)),
     ];
 }

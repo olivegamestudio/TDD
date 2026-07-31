@@ -1,6 +1,6 @@
 using OliveGameStudio;
 
-namespace Pilgrimage.Tests;
+namespace BattleForce2249.Tests;
 
 /// <summary>
 /// An <see cref="ISaveProgressService"/> that keeps the save in memory, so the session tests can

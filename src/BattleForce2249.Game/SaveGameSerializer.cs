@@ -1,7 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Pilgrimage;
 
-namespace Pilgrimage;
+namespace BattleForce2249;
 
 /// <summary>
 /// Turns a <see cref="SaveGame"/> into the text handed to the save progress service, and back.

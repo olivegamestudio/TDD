@@ -1,4 +1,6 @@
-namespace Pilgrimage;
+using Pilgrimage;
+
+namespace BattleForce2249;
 
 /// <summary>
 /// The persisted snapshot of a game in progress: where the player is and how far they have got
@@ -37,10 +39,3 @@ public sealed record SaveGame
     /// <inheritdoc />
     public override int GetHashCode() => HashCode.Combine(PlayerX, PlayerY, Quests.Count);
 }
-
-/// <summary>
-/// One quest's entry in a <see cref="SaveGame"/>.
-/// </summary>
-/// <param name="QuestId">The identifier of the quest, matching <see cref="QuestDefinition.Id"/>.</param>
-/// <param name="State">The state the quest had reached.</param>
-public sealed record QuestProgress(string QuestId, QuestState State);

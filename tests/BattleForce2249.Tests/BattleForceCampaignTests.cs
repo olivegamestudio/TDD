@@ -3,7 +3,8 @@ using Pilgrimage;
 namespace BattleForce2249.Tests;
 
 /// <summary>
-/// Covers the game content itself: the quests Battle Force 2249 ships with.
+/// Covers the quests Battle Force 2249 ships with. Where their markers stand is a world fact,
+/// covered by <see cref="BattleForceWorldTests"/>.
 /// </summary>
 public sealed class BattleForceCampaignTests
 {
@@ -21,7 +22,7 @@ public sealed class BattleForceCampaignTests
     [Fact]
     public void Quest1_HasTheTitleFromTheDesign()
     {
-        // the title is translated now, so pin the language the design line is written in; the
+        // the title is translated, so pin the language the design line is written in; the
         // translations themselves are covered by GameTextTests
         using CultureScope _ = new("en");
 
@@ -35,19 +36,22 @@ public sealed class BattleForceCampaignTests
     }
 
     [Fact]
-    public void Quest1_StartsWhereANewGameStartsThePlayer()
-    {
-        // otherwise nothing would auto start it on a new game launch
-        Assert.True(Quest1(_campaign).Start.IsReachedBy(_campaign.PlayerStart));
-    }
-
-    [Fact]
-    public void Quest1_EndsForwardOfItsStart()
+    public void Quest1_BeginsAndEndsOnProximity()
     {
         QuestDefinition quest = Quest1(_campaign);
 
-        Assert.True(quest.End.Position.Y > quest.Start.Position.Y);
-        Assert.False(quest.End.IsReachedBy(_campaign.PlayerStart));
+        Assert.Equal(QuestTriggerKind.Proximity, quest.Start.Kind);
+        Assert.Equal(QuestTriggerKind.Proximity, quest.End.Kind);
+    }
+
+    [Fact]
+    public void Quest1_TriggersAtAUsableDistance()
+    {
+        // a zero distance would demand an exact position, which a moving ship would fly straight past
+        QuestDefinition quest = Quest1(_campaign);
+
+        Assert.True(quest.Start.Distance > 0);
+        Assert.True(quest.End.Distance > 0);
     }
 
     [Fact]

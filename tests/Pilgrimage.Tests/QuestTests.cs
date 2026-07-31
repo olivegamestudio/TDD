@@ -2,11 +2,13 @@ namespace Pilgrimage.Tests;
 
 public sealed class QuestTests
 {
-    static readonly QuestMarker Start = new(new Position(0, 0), 25);
-    static readonly QuestMarker End = new(new Position(0, 1000), 50);
-
     static Quest CreateQuest(bool autoStarts = true) =>
-        new(new QuestDefinition("quest-under-test", "A title", Start, End, autoStarts));
+        new(new QuestDefinition(
+            "quest-under-test",
+            "A title",
+            new QuestTrigger(QuestTriggerKind.Proximity, 25),
+            new QuestTrigger(QuestTriggerKind.Proximity, 50),
+            autoStarts));
 
     [Fact]
     public void BeginsNotStarted()
@@ -19,79 +21,49 @@ public sealed class QuestTests
     }
 
     [Fact]
-    public void ExposesItsIdentityFromTheDefinition()
+    public void ExposesItsIdentityAndTriggersFromTheDefinition()
     {
         Quest quest = CreateQuest();
 
         Assert.Equal("quest-under-test", quest.Id);
         Assert.Equal("A title", quest.Title);
+        Assert.Equal(25, quest.Definition.Start.Distance);
+        Assert.Equal(50, quest.Definition.End.Distance);
     }
 
     [Fact]
-    public void AutoStarts_WhenThePlayerIsAtTheStartMarker()
+    public void Start_MakesTheQuestActive()
     {
         Quest quest = CreateQuest();
 
-        quest.Update(new Position(0, 0));
+        quest.Start();
 
         Assert.Equal(QuestState.Active, quest.State);
         Assert.True(quest.IsActive);
     }
 
     [Fact]
-    public void DoesNotAutoStart_WhenThePlayerIsAwayFromTheStartMarker()
+    public void Start_RaisesStartedOnce_HoweverOftenItIsCalled()
     {
-        Quest quest = CreateQuest();
-
-        quest.Update(new Position(0, 500));
-
-        Assert.Equal(QuestState.NotStarted, quest.State);
-    }
-
-    [Fact]
-    public void DoesNotAutoStart_WhenTheDefinitionOptsOut()
-    {
-        Quest quest = CreateQuest(autoStarts: false);
-
-        quest.Update(new Position(0, 0));
-
-        Assert.Equal(QuestState.NotStarted, quest.State);
-    }
-
-    [Fact]
-    public void RaisesStartedOnce_HoweverManyFramesPass()
-    {
+        // the caller watching proximity has no memory; it may report arrival every frame
         Quest quest = CreateQuest();
         int started = 0;
         quest.Started += (_, _) => started++;
 
-        quest.Update(new Position(0, 0));
-        quest.Update(new Position(0, 0));
-        quest.Update(new Position(0, 10));
+        quest.Start();
+        quest.Start();
+        quest.Start();
 
         Assert.Equal(1, started);
     }
 
     [Fact]
-    public void StaysInProgress_WhileTheEndMarkerIsNotReached()
+    public void Complete_FinishesAnActiveQuest()
     {
         Quest quest = CreateQuest();
         quest.Start();
 
-        quest.Update(new Position(0, 500));
-        quest.Update(new Position(0, 940));
-
-        Assert.Equal(QuestState.Active, quest.State);
-        Assert.False(quest.IsCompleted);
-    }
-
-    [Fact]
-    public void Completes_WhenTheEndMarkerIsReached()
-    {
-        Quest quest = CreateQuest();
-        quest.Start();
-
-        quest.Update(new Position(0, 960));   // within the 50 unit end radius
+        quest.Complete();
 
         Assert.Equal(QuestState.Completed, quest.State);
         Assert.True(quest.IsCompleted);
@@ -99,58 +71,47 @@ public sealed class QuestTests
     }
 
     [Fact]
-    public void RaisesCompletedOnce_HoweverManyFramesPass()
+    public void Complete_RaisesCompletedOnce_HoweverOftenItIsCalled()
     {
         Quest quest = CreateQuest();
         quest.Start();
         int completed = 0;
         quest.Completed += (_, _) => completed++;
 
-        quest.Update(new Position(0, 1000));
-        quest.Update(new Position(0, 1000));
-        quest.Update(new Position(0, 1010));
+        quest.Complete();
+        quest.Complete();
 
         Assert.Equal(1, completed);
     }
 
     [Fact]
-    public void DoesNotComplete_BeforeItHasStarted()
+    public void Complete_IsIgnored_BeforeTheQuestHasStarted()
     {
         // standing on the end marker without ever starting is not a completion
-        Quest quest = CreateQuest(autoStarts: false);
+        Quest quest = CreateQuest();
+        int completed = 0;
+        quest.Completed += (_, _) => completed++;
 
-        quest.Update(new Position(0, 1000));
+        quest.Complete();
 
         Assert.Equal(QuestState.NotStarted, quest.State);
+        Assert.Equal(0, completed);
     }
 
     [Fact]
-    public void DoesNotRestart_AfterCompleting()
+    public void Start_IsIgnored_AfterTheQuestHasCompleted()
     {
         Quest quest = CreateQuest();
         quest.Start();
-        quest.Update(new Position(0, 1000));
+        quest.Complete();
 
-        quest.Update(new Position(0, 0));     // back at the start marker
+        quest.Start();
 
         Assert.Equal(QuestState.Completed, quest.State);
     }
 
     [Fact]
-    public void Start_IsIgnored_WhenAlreadyStarted()
-    {
-        Quest quest = CreateQuest();
-        int started = 0;
-        quest.Started += (_, _) => started++;
-
-        quest.Start();
-        quest.Start();
-
-        Assert.Equal(1, started);
-    }
-
-    [Fact]
-    public void Restore_PutsTheQuestBackIntoASavedState_WithoutRaisingEvents()
+    public void Restore_PutsTheQuestIntoASavedState_WithoutRaisingEvents()
     {
         Quest quest = CreateQuest();
         int events = 0;
@@ -170,7 +131,7 @@ public sealed class QuestTests
         Quest quest = CreateQuest();
         quest.Restore(QuestState.Active);
 
-        quest.Update(new Position(0, 1000));
+        quest.Complete();
 
         Assert.Equal(QuestState.Completed, quest.State);
     }

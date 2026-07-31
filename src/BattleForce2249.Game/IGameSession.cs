@@ -1,13 +1,20 @@
-namespace Pilgrimage;
+using OliveGameStudio;
+using Pilgrimage;
+
+namespace BattleForce2249;
 
 /// <summary>
 /// A game in progress: the player, their quests, and the save game the two are persisted to.
-/// The screen that owns gameplay begins a session when it is entered and advances it once a frame.
+/// The screen that owns gameplay begins a session when it is entered.
 /// </summary>
+/// <remarks>
+/// The session holds state and persists it; it does not drive quests. Whatever watches the world
+/// starts and completes them, and the session saves when they do.
+/// </remarks>
 public interface IGameSession
 {
     /// <summary>
-    /// Gets the player entity, whose position drives quest progress.
+    /// Gets the player entity.
     /// </summary>
     Player Player { get; }
 
@@ -17,8 +24,8 @@ public interface IGameSession
     QuestLog Quests { get; }
 
     /// <summary>
-    /// Gets a value indicating whether a game has been started or resumed. <see cref="Update"/>
-    /// does nothing until it is <c>true</c>, because frames can arrive while a save is still loading.
+    /// Gets a value indicating whether a game has been started or resumed. Nothing should drive the
+    /// session until it is <c>true</c>, because frames can arrive while a save is still loading.
     /// </summary>
     bool IsReady { get; }
 
@@ -29,8 +36,8 @@ public interface IGameSession
     Task PendingSave { get; }
 
     /// <summary>
-    /// Discards any game in progress and begins a fresh one: the player goes to the campaign start,
-    /// quests that auto start there begin, and the new game is saved.
+    /// Discards any game in progress and begins a fresh one: the player goes to the world's start
+    /// position, the campaign's quests are registered, and the new game is saved.
     /// </summary>
     /// <returns>A task that completes once the new game has been saved.</returns>
     Task StartNewGame();
@@ -39,14 +46,8 @@ public interface IGameSession
     /// Resumes the saved game, falling back to <see cref="StartNewGame"/> when there is no save or
     /// the save cannot be read.
     /// </summary>
-    /// <returns>A task that completes once the session is ready to update.</returns>
+    /// <returns>A task that completes once the session is ready.</returns>
     Task Continue();
-
-    /// <summary>
-    /// Advances the session by one frame, progressing quests against the player's position.
-    /// </summary>
-    /// <param name="frameTime">The time that has elapsed since the last frame.</param>
-    void Update(TimeSpan frameTime);
 
     /// <summary>
     /// Writes the current player position and quest states to the save game.

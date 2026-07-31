@@ -10,6 +10,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\BattleForce2249.Abstractions\BattleForce2249.Abstractions.csproj" />
+      <ProjectReference Include="..\OliveGameStudio.World\OliveGameStudio.World.csproj" />
       <ProjectReference Include="..\Pilgrimage\Pilgrimage.csproj" />
     </ItemGroup>
 

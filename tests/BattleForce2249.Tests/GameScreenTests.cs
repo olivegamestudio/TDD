@@ -5,8 +5,8 @@ using Pilgrimage;
 namespace BattleForce2249.Tests;
 
 /// <summary>
-/// Covers the game screen as the seam between the screen lifecycle and the quest session:
-/// entering the screen begins the game, and each frame advances it.
+/// Covers the game screen as the seam between the screen lifecycle and gameplay: entering the
+/// screen begins the game, and each frame drives the quests from where the player is.
 /// </summary>
 public sealed class GameScreenTests : HostTestBase
 {
@@ -52,15 +52,6 @@ public sealed class GameScreenTests : HostTestBase
     }
 
     [Fact]
-    public void EnteringTheScreen_AutoStartsQuest1()
-    {
-        ((IActivatable)GameScreen).Enter();
-
-        Quest quest = Assert.Single(Session.Quests.Active);
-        Assert.Equal(BattleForceCampaign.Quest1Id, quest.Id);
-    }
-
-    [Fact]
     public void TheGameScreenIsActive_OnceTheMenuRequestsAStart()
     {
         StartTheGame();
@@ -69,31 +60,15 @@ public sealed class GameScreenTests : HostTestBase
     }
 
     [Fact]
-    public void Quest1_IsActive_OnANewGameLaunch()
+    public void Quest1_IsActive_AfterTheFirstFrameOfANewGame()
     {
-        StartTheGame();
+        // the screen, not the quest model, notices the player is on the start marker
+        IHost host = StartTheGame();
+
+        host.Update(TimeSpan.FromSeconds(1 / 60.0));
 
         Quest quest = Assert.Single(Session.Quests.Active);
         Assert.Equal(BattleForceCampaign.Quest1Id, quest.Id);
-        Assert.Equal("Get out. The debris field is collapsing around you.", quest.Title);
-    }
-
-    [Fact]
-    public void MovingForwardAcrossFrames_CompletesQuest1()
-    {
-        IHost host = StartTheGame();
-        QuestDefinition quest1 = Resolve<ICampaign>().Quests.Single(quest => quest.Id == BattleForceCampaign.Quest1Id);
-
-        // travel to the end marker a frame at a time, as the movement system will
-        for (int frame = 0; !quest1.End.IsReachedBy(Session.Player.Position); frame++)
-        {
-            Assert.True(frame < 10_000, "the player never reached the end marker");
-            Session.Player.MoveBy(0, 10);
-            host.Update(TimeSpan.FromSeconds(1 / 60.0));
-        }
-
-        Assert.Single(Session.Quests.Completed);
-        Assert.Empty(Session.Quests.Active);
     }
 
     [Fact]
@@ -105,5 +80,37 @@ public sealed class GameScreenTests : HostTestBase
 
         Assert.Single(Session.Quests.Active);
         Assert.Empty(Session.Quests.Completed);
+    }
+
+    [Fact]
+    public void MovingForwardAcrossFrames_CompletesQuest1()
+    {
+        IHost host = StartTheGame();
+        QuestMarkers markers = Resolve<IWorld>().QuestMarkers
+            .Single(marker => marker.QuestId == BattleForceCampaign.Quest1Id);
+
+        // travel to the end marker a frame at a time, as the movement system will
+        for (int frame = 0; !Session.Quests.Completed.Any(); frame++)
+        {
+            Assert.True(frame < 10_000, "the player never completed the quest");
+            host.Update(TimeSpan.FromSeconds(1 / 60.0));
+            Session.Player.MoveBy(0, 10);
+        }
+
+        Quest quest = Assert.Single(Session.Quests.Completed);
+        Assert.Equal(BattleForceCampaign.Quest1Id, quest.Id);
+        Assert.Empty(Session.Quests.Active);
+        Assert.True(Session.Player.Position.DistanceTo(markers.End) <= 50 + 10);
+    }
+
+    [Fact]
+    public void DoesNotDriveQuests_BeforeTheGameHasStarted()
+    {
+        // frames can arrive while the save is still loading
+        GameScreen screen = (GameScreen)GameScreen;
+
+        screen.Update(TimeSpan.FromSeconds(1));
+
+        Assert.Empty(Session.Quests.Quests);
     }
 }

@@ -1,18 +1,20 @@
 using OliveGameStudio;
-using Pilgrimage;
 
 namespace BattleForce2249;
 
 /// <summary>
-/// The screen the game is played on. It owns no state of its own: entering it begins or resumes
-/// the game session, and every frame it hands the elapsed time to that session so quests progress.
+/// The screen the game is played on. Entering it begins or resumes the game session, and every
+/// frame it measures the player against the quest markers and drives the quest API from what it
+/// finds — proximity is the presentation's job, not the quest model's.
 /// </summary>
 /// <param name="session">The game in progress.</param>
-public sealed class GameScreen(IGameSession session) : IGameScreen, IActivatable
+/// <param name="questProximity">Applies the quests' proximity triggers against the world.</param>
+public sealed class GameScreen(IGameSession session, QuestProximityWatcher questProximity)
+    : IGameScreen, IActivatable
 {
     /// <summary>
     /// Gets the task that begins the game, so a caller can await the save being read. Loading
-    /// happens off the frame loop; the session ignores updates until it has finished.
+    /// happens off the frame loop; nothing drives the session until it has finished.
     /// </summary>
     public Task Started { get; private set; } = Task.CompletedTask;
 
@@ -27,10 +29,18 @@ public sealed class GameScreen(IGameSession session) : IGameScreen, IActivatable
     }
 
     /// <inheritdoc />
-    public void Update(TimeSpan frameTime) => session.Update(frameTime);
+    public void Update(TimeSpan frameTime)
+    {
+        if (!session.IsReady)
+        {
+            return;
+        }
+
+        questProximity.Update(session.Quests, session.Player.Position);
+    }
 
     /// <summary>
-    /// Leaves the game screen. Progress is saved as it is made, so there is nothing to flush here.
+    /// Leaves the game screen. Progress is saved as quests change, so there is nothing to flush here.
     /// </summary>
     public void Exit()
     {

@@ -1,16 +1,17 @@
 using OliveGameStudio;
+using Pilgrimage;
 
-namespace Pilgrimage;
+namespace BattleForce2249;
 
 /// <summary>
-/// The default <see cref="IGameSession"/>. It holds the player and the quest log, drives quests
-/// from the player's position each frame, and persists both through the engine's save progress
-/// service whenever a quest starts or completes.
+/// The default <see cref="IGameSession"/>. It holds the player and the quest log, and persists both
+/// through the engine's save progress service whenever a quest starts or completes.
 /// </summary>
 public sealed class GameSession : IGameSession
 {
     readonly ISaveProgressService _saveProgressService;
     readonly ICampaign _campaign;
+    readonly IWorld _world;
 
     /// <summary>
     /// Whether a quest changing state should write a save. It is turned off while a game is being
@@ -19,14 +20,16 @@ public sealed class GameSession : IGameSession
     bool _autoSave;
 
     /// <summary>
-    /// Creates a session for the given campaign, persisting to the given save progress service.
+    /// Creates a session for the given campaign and world.
     /// </summary>
     /// <param name="saveProgressService">The service the save game is written to and read from.</param>
-    /// <param name="campaign">The content the session plays: the start position and the quests.</param>
-    public GameSession(ISaveProgressService saveProgressService, ICampaign campaign)
+    /// <param name="campaign">The quests the session plays.</param>
+    /// <param name="world">The world it plays them in.</param>
+    public GameSession(ISaveProgressService saveProgressService, ICampaign campaign, IWorld world)
     {
         _saveProgressService = saveProgressService;
         _campaign = campaign;
+        _world = world;
 
         Quests.QuestStarted += OnQuestChanged;
         Quests.QuestCompleted += OnQuestChanged;
@@ -49,10 +52,6 @@ public sealed class GameSession : IGameSession
     {
         Reset();
 
-        // one update at the start position, so a quest whose start marker is there begins
-        // without the player having to do anything
-        Quests.Update(Player.Position);
-
         _autoSave = true;
         IsReady = true;
 
@@ -71,33 +70,17 @@ public sealed class GameSession : IGameSession
 
         Reset();
         Player.MoveTo(new Position(save.PlayerX, save.PlayerY));
-
-        foreach (QuestProgress progress in save.Quests)
-        {
-            // a quest the save knows about but this build no longer ships is simply dropped
-            Quests.Find(progress.QuestId)?.Restore(progress.State);
-        }
+        Quests.Restore(save.Quests);
 
         _autoSave = true;
         IsReady = true;
     }
 
     /// <inheritdoc />
-    public void Update(TimeSpan frameTime)
-    {
-        if (!IsReady)
-        {
-            return;
-        }
-
-        Quests.Update(Player.Position);
-    }
-
-    /// <inheritdoc />
     public Task Save() => _saveProgressService.Save(SaveGameSerializer.Serialize(Capture()));
 
     /// <summary>
-    /// Returns the session to a freshly registered campaign with the player at its start position.
+    /// Returns the session to a freshly registered campaign with the player at the world's start.
     /// </summary>
     void Reset()
     {
@@ -110,7 +93,7 @@ public sealed class GameSession : IGameSession
             Quests.Register(definition);
         }
 
-        Player.MoveTo(_campaign.PlayerStart);
+        Player.MoveTo(_world.PlayerStart);
     }
 
     /// <summary>
@@ -120,7 +103,7 @@ public sealed class GameSession : IGameSession
     {
         PlayerX = Player.Position.X,
         PlayerY = Player.Position.Y,
-        Quests = [.. Quests.Quests.Select(quest => new QuestProgress(quest.Id, quest.State))],
+        Quests = Quests.Capture(),
     };
 
     /// <summary>

@@ -1,4 +1,4 @@
-namespace Pilgrimage.Tests;
+namespace OliveGameStudio.World.Tests;
 
 public sealed class PlayerTests
 {

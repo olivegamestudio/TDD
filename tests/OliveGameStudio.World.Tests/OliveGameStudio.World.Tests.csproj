@@ -19,7 +19,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\src\Pilgrimage\Pilgrimage.csproj" />
+      <ProjectReference Include="..\..\src\OliveGameStudio.World\OliveGameStudio.World.csproj" />
     </ItemGroup>
 
 </Project>

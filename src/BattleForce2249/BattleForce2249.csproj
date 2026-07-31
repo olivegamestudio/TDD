@@ -19,6 +19,7 @@
       <ProjectReference Include="..\BattleForce2249.Menu\BattleForce2249.Menu.csproj" />
       <ProjectReference Include="..\OliveGameStudio.UI\OliveGameStudio.UI.csproj" />
       <ProjectReference Include="..\OliveGameStudio\OliveGameStudio.csproj" />
+      <ProjectReference Include="..\OliveGameStudio.World\OliveGameStudio.World.csproj" />
       <ProjectReference Include="..\Pilgrimage\Pilgrimage.csproj" />
     </ItemGroup>
 

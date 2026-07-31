@@ -1,4 +1,6 @@
-namespace Pilgrimage.Tests;
+using Pilgrimage;
+
+namespace BattleForce2249.Tests;
 
 public sealed class SaveGameSerializerTests
 {

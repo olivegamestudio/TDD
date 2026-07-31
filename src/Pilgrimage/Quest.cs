@@ -2,9 +2,14 @@ namespace Pilgrimage;
 
 /// <summary>
 /// A quest as the player is living it: an authored <see cref="QuestDefinition"/> plus the state it
-/// has reached. The quest is driven by where the player is, so a frame that moves the player onto
-/// a marker is all it takes to start or finish one.
+/// has reached.
 /// </summary>
+/// <remarks>
+/// The quest is driven entirely through this API. It does not watch the world and does not know
+/// what fired its triggers — whatever evaluates them calls <see cref="Start"/> and
+/// <see cref="Complete"/>. Both are safe to call repeatedly, because a caller watching proximity
+/// has no memory and may report the same arrival on every frame.
+/// </remarks>
 /// <param name="definition">The authored quest this instance tracks.</param>
 public sealed class Quest(QuestDefinition definition)
 {
@@ -19,7 +24,8 @@ public sealed class Quest(QuestDefinition definition)
     public string Title => definition.Title;
 
     /// <summary>
-    /// Gets the authored definition this quest was created from.
+    /// Gets the authored definition this quest was created from, including the triggers whoever
+    /// watches the world has to apply.
     /// </summary>
     public QuestDefinition Definition => definition;
 
@@ -39,20 +45,17 @@ public sealed class Quest(QuestDefinition definition)
     public bool IsCompleted => State is QuestState.Completed;
 
     /// <summary>
-    /// Occurs the first time the quest begins. It is raised once per quest, not once per frame the
-    /// player spends on the start marker.
+    /// Occurs the first time the quest begins, once per quest rather than once per call.
     /// </summary>
     public event EventHandler? Started;
 
     /// <summary>
-    /// Occurs the first time the quest completes. It is raised once per quest, not once per frame
-    /// the player spends on the end marker.
+    /// Occurs the first time the quest completes, once per quest rather than once per call.
     /// </summary>
     public event EventHandler? Completed;
 
     /// <summary>
-    /// Begins the quest. A quest that has already started or completed is left alone, so this is
-    /// safe to call from anywhere that thinks the quest should be running.
+    /// Begins the quest. A quest that has already started or completed is left alone.
     /// </summary>
     public void Start()
     {
@@ -66,21 +69,18 @@ public sealed class Quest(QuestDefinition definition)
     }
 
     /// <summary>
-    /// Advances the quest for the player's current position, starting it when the start marker is
-    /// reached and completing it when the end marker is. Called once per frame.
+    /// Completes the quest. Only an active quest can be completed: one that never started has not
+    /// been played, and one already finished cannot finish twice.
     /// </summary>
-    /// <param name="playerPosition">Where the player is this frame.</param>
-    public void Update(Position playerPosition)
+    public void Complete()
     {
-        if (State is QuestState.NotStarted && definition.AutoStarts && definition.Start.IsReachedBy(playerPosition))
+        if (State is not QuestState.Active)
         {
-            Start();
+            return;
         }
 
-        if (State is QuestState.Active && definition.End.IsReachedBy(playerPosition))
-        {
-            Complete();
-        }
+        State = QuestState.Completed;
+        Completed?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>
@@ -89,13 +89,4 @@ public sealed class Quest(QuestDefinition definition)
     /// </summary>
     /// <param name="state">The state the quest was saved in.</param>
     public void Restore(QuestState state) => State = state;
-
-    /// <summary>
-    /// Completes the quest and raises <see cref="Completed"/>.
-    /// </summary>
-    void Complete()
-    {
-        State = QuestState.Completed;
-        Completed?.Invoke(this, EventArgs.Empty);
-    }
 }

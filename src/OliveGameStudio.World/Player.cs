@@ -1,4 +1,4 @@
-namespace Pilgrimage;
+namespace OliveGameStudio;
 
 /// <summary>
 /// The player entity. It owns nothing but where the player is in the world; how the ship gets

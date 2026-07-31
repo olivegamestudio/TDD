@@ -1,4 +1,4 @@
-namespace Pilgrimage;
+namespace OliveGameStudio;
 
 /// <summary>
 /// A point in the game world, in world units. Forward travel is along the positive Y axis.

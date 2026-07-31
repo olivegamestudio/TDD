@@ -2,10 +2,13 @@ namespace Pilgrimage;
 
 /// <summary>
 /// The player's quests: every quest the campaign registered, and the state each has reached. It
-/// forwards a frame's player position to all of them and republishes their events, so anything
-/// that cares about quest progress — saving, the eventual quest display — subscribes here rather
-/// than to each quest.
+/// republishes their events, so anything that cares about quest progress — saving, and eventually
+/// the quest display — subscribes here rather than to each quest.
 /// </summary>
+/// <remarks>
+/// The log holds no world state and is never updated per frame. Whatever watches the world starts
+/// and completes quests through the <see cref="Quest"/> objects it hands out.
+/// </remarks>
 public sealed class QuestLog
 {
     readonly Dictionary<string, Quest> _quests = [];
@@ -67,19 +70,6 @@ public sealed class QuestLog
     public Quest? Find(string id) => _quests.GetValueOrDefault(id);
 
     /// <summary>
-    /// Advances every registered quest for the player's current position. Called once per frame.
-    /// </summary>
-    /// <param name="playerPosition">Where the player is this frame.</param>
-    public void Update(Position playerPosition)
-    {
-        // ToList: a quest event handler may register or clear quests
-        foreach (Quest quest in _quests.Values.ToList())
-        {
-            quest.Update(playerPosition);
-        }
-    }
-
-    /// <summary>
     /// Empties the log, detaching from the quests it held so a discarded quest can no longer
     /// republish through it. Used when a new game replaces the one in progress.
     /// </summary>
@@ -92,6 +82,30 @@ public sealed class QuestLog
         }
 
         _quests.Clear();
+    }
+
+    /// <summary>
+    /// Takes the state of every registered quest, for persisting.
+    /// </summary>
+    /// <returns>One entry per registered quest.</returns>
+    public IReadOnlyList<QuestProgress> Capture() =>
+        [.. _quests.Values.Select(quest => new QuestProgress(quest.Id, quest.State))];
+
+    /// <summary>
+    /// Puts the registered quests back into their saved states, raising no events.
+    /// </summary>
+    /// <remarks>
+    /// Saves and campaigns drift apart over a game's life, and both directions are tolerated: a
+    /// quest the save knows about but this build no longer ships is ignored, and a quest added
+    /// since the save was written simply starts from the beginning.
+    /// </remarks>
+    /// <param name="progress">The saved quest states.</param>
+    public void Restore(IEnumerable<QuestProgress> progress)
+    {
+        foreach (QuestProgress saved in progress)
+        {
+            Find(saved.QuestId)?.Restore(saved.State);
+        }
     }
 
     void OnQuestStarted(object? sender, EventArgs e) =>
