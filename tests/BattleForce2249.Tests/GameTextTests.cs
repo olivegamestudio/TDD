@@ -1,21 +1,22 @@
-using System.Collections;
 using System.Globalization;
-using System.Resources;
+using OliveGameStudio;
 using Pilgrimage;
 
 namespace BattleForce2249.Tests;
 
 /// <summary>
-/// Covers the game's user-facing text and its translations: that every language says something, says
-/// it for every key English has, and reaches the player when their language is set.
+/// Covers the game's user-facing text and its translations: that every language says something,
+/// says it for every key English has, and reaches the player when their language is set.
 /// </summary>
 public sealed class GameTextTests
 {
     /// <summary>
-    /// Reads the resx family directly, so a test can ask for one specific language rather than
-    /// whichever one the machine running the tests happens to be in.
+    /// The shipped language files, read straight from the folder the build copies them into, so a
+    /// test can ask for one specific language rather than whichever one the machine running the
+    /// tests happens to be in — and so a file that fails to ship shows up here.
     /// </summary>
-    static readonly ResourceManager _resources = new(typeof(GameText));
+    static readonly JsonTextProvider _text =
+        new(Path.Combine(AppContext.BaseDirectory, GameText.TextFolderName));
 
     /// <summary>
     /// The English source text. Every translation is measured against this.
@@ -28,27 +29,21 @@ public sealed class GameTextTests
     public static IEnumerable<object[]> TranslatedCultures =>
         new[] { "fr", "it", "de", "es", "pt-BR", "ja" }.Select(culture => new object[] { culture });
 
-    /// <summary>
-    /// Reads the keys a single language defines, without falling back to English — so a language
-    /// that is missing a key shows up as missing rather than borrowing the English one.
-    /// </summary>
-    static IReadOnlyCollection<string> KeysFor(CultureInfo culture)
-    {
-        ResourceSet set =
-            _resources.GetResourceSet(culture, createIfNotExists: true, tryParents: false)
-            ?? throw new InvalidOperationException($"There is no game text at all for '{culture.Name}'.");
-
-        return set.Cast<DictionaryEntry>().Select(entry => (string)entry.Key).ToList();
-    }
-
-    static string StringFor(string culture, string key) =>
-        _resources.GetString(key, new CultureInfo(culture))
-        ?? throw new InvalidOperationException($"No '{key}' for culture '{culture}'.");
-
     [Fact]
     public void EnglishIsTheSourceLanguage()
     {
-        Assert.Equal(Quest1TitleInEnglish, _resources.GetString("Quest1Title", CultureInfo.InvariantCulture));
+        Assert.Equal(JsonTextProvider.DefaultSourceLanguage, _text.SourceLanguage);
+        Assert.Equal(Quest1TitleInEnglish, _text.TextIn("en")["Quest1Title"]);
+    }
+
+    [Fact]
+    public void EveryLanguageTheGameShipsWithIsThere()
+    {
+        // the files are copied next to the game rather than compiled in, so a missing one is a
+        // packaging mistake this catches
+        Assert.Equal(
+            new[] { "de", "en", "es", "fr", "it", "ja", "pt-BR" },
+            _text.Languages.OrderBy(language => language, StringComparer.Ordinal));
     }
 
     [Theory]
@@ -57,8 +52,8 @@ public sealed class GameTextTests
     {
         // a language that is short a key would silently fall back to English in game
         Assert.Equal(
-            KeysFor(CultureInfo.InvariantCulture).OrderBy(key => key),
-            KeysFor(new CultureInfo(culture)).OrderBy(key => key));
+            _text.TextIn("en").Keys.OrderBy(key => key),
+            _text.TextIn(culture).Keys.OrderBy(key => key));
     }
 
     [Theory]
@@ -66,8 +61,8 @@ public sealed class GameTextTests
     public void NoTranslationIsBlank(string culture)
     {
         Assert.All(
-            KeysFor(new CultureInfo(culture)),
-            key => Assert.False(string.IsNullOrWhiteSpace(StringFor(culture, key))));
+            _text.TextIn(culture).Values,
+            translated => Assert.False(string.IsNullOrWhiteSpace(translated)));
     }
 
     [Theory]
@@ -76,10 +71,8 @@ public sealed class GameTextTests
     {
         // catches a language file that was copied from English and never translated
         Assert.All(
-            KeysFor(CultureInfo.InvariantCulture),
-            key => Assert.NotEqual(
-                _resources.GetString(key, CultureInfo.InvariantCulture),
-                StringFor(culture, key)));
+            _text.TextIn("en"),
+            english => Assert.NotEqual(english.Value, _text.TextIn(culture)[english.Key]));
     }
 
     [Fact]
@@ -105,13 +98,13 @@ public sealed class GameTextTests
         // fr-CA has no file of its own, so it reads the French one
         using CultureScope _ = new("fr-CA");
 
-        Assert.Equal(StringFor("fr", "Quest1Title"), GameText.Quest1Title);
+        Assert.Equal(_text.Get("Quest1Title", new CultureInfo("fr")), GameText.Quest1Title);
     }
 
     [Fact]
     public void Get_ThrowsForAKeyThatExistsInNoLanguage()
     {
-        Assert.Throws<MissingManifestResourceException>(() => GameText.Get("not-a-key"));
+        Assert.Throws<MissingTextException>(() => GameText.Get("not-a-key"));
     }
 
     [Fact]
@@ -119,11 +112,31 @@ public sealed class GameTextTests
     {
         using CultureScope _ = new("ja");
 
-        // the campaign reads its title when it is built, so it has to be built inside the scope
         BattleForceCampaign campaign = new();
         QuestDefinition quest1 = campaign.Quests.Single(quest => quest.Id == BattleForceCampaign.Quest1Id);
 
         Assert.Equal("脱出しろ。周囲のデブリ帯が崩壊していく。", quest1.Title);
+    }
+
+    [Fact]
+    public void TheCampaignTitle_FollowsALanguageChange()
+    {
+        // the campaign is a singleton, so a title resolved once at startup would leave the player
+        // reading whichever language the game happened to launch in
+        BattleForceCampaign campaign = new();
+
+        string french;
+        using (CultureScope _ = new("fr"))
+        {
+            french = campaign.Quests.Single().Title;
+        }
+
+        using CultureScope __ = new("de");
+
+        Assert.Equal("Sors de là. Le champ de débris s'effondre autour de toi.", french);
+        Assert.Equal(
+            "Raus hier. Das Trümmerfeld bricht um dich herum zusammen.",
+            campaign.Quests.Single().Title);
     }
 
     [Fact]

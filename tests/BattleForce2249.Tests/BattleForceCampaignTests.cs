@@ -26,7 +26,7 @@ public sealed class BattleForceCampaignTests
         // translations themselves are covered by GameTextTests
         using CultureScope _ = new("en");
 
-        Assert.Equal("Get out. The debris field is collapsing around you.", Quest1(new BattleForceCampaign()).Title);
+        Assert.Equal("Get out. The debris field is collapsing around you.", Quest1(_campaign).Title);
     }
 
     [Fact]

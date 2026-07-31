@@ -19,7 +19,12 @@ public sealed class BattleForceCampaign : ICampaign
     public const string Quest1Id = "quest-1";
 
     /// <inheritdoc />
-    public IReadOnlyList<QuestDefinition> Quests { get; } =
+    /// <remarks>
+    /// Built on each read rather than once, because the titles are translated: the campaign is a
+    /// singleton, so a list built in a field initialiser would freeze the player's language at
+    /// startup. Read only when a game starts or resumes, so building it is not on the frame path.
+    /// </remarks>
+    public IReadOnlyList<QuestDefinition> Quests =>
     [
         new QuestDefinition(
             Quest1Id,
