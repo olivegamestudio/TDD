@@ -4,6 +4,8 @@
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <!-- Matches the code namespace, so the GameText resources are named BattleForce2249.GameText. -->
+        <RootNamespace>BattleForce2249</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>

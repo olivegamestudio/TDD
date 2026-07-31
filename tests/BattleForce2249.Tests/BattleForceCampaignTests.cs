@@ -21,7 +21,11 @@ public sealed class BattleForceCampaignTests
     [Fact]
     public void Quest1_HasTheTitleFromTheDesign()
     {
-        Assert.Equal("Get out. The debris field is collapsing around you.", Quest1(_campaign).Title);
+        // the title is translated now, so pin the language the design line is written in; the
+        // translations themselves are covered by GameTextTests
+        using CultureScope _ = new("en");
+
+        Assert.Equal("Get out. The debris field is collapsing around you.", Quest1(new BattleForceCampaign()).Title);
     }
 
     [Fact]

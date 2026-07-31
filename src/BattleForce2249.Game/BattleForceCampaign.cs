@@ -17,11 +17,6 @@ public sealed class BattleForceCampaign : ICampaign
     /// </summary>
     public const string Quest1Id = "quest-1";
 
-    /// <summary>
-    /// The title of quest 1, as shown to the player.
-    /// </summary>
-    public const string Quest1Title = "Get out. The debris field is collapsing around you.";
-
     /// <inheritdoc />
     public Position PlayerStart => new(0, 0);
 
@@ -30,7 +25,8 @@ public sealed class BattleForceCampaign : ICampaign
     [
         new QuestDefinition(
             Quest1Id,
-            Quest1Title,
+            // in the player's language; the id above stays the same in every language
+            GameText.Quest1Title,
             // on the player's starting position, so the quest auto starts on a new game
             Start: new QuestMarker(new Position(0, 0), 25),
             // 1000 units forward, clear of the debris field
