@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OliveGameStudio;
+using Pilgrimage;
 
 namespace BattleForce2249;
 
@@ -51,6 +52,8 @@ public static class BattleForceServiceCollectionExtensions
 
         services
             .AddOliveGameStudio()
+            .AddPilgrimage()
+            .AddSingleton<ICampaign, BattleForceCampaign>()
             .AddSingleton<ICompanyScreen, CompanyScreen>()
             .AddSingleton<IMenuScreen, MenuScreen>()
             .AddSingleton<IGameScreen, GameScreen>()

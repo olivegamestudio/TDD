@@ -11,10 +11,12 @@
   <Project Path="src/OliveGameStudio.UI.Abstractions/OliveGameStudio.UI.Abstractions.csproj" />
   <Project Path="src/OliveGameStudio.UI/OliveGameStudio.UI.csproj" />
   <Project Path="src/OliveGameStudio/OliveGameStudio.csproj" />
+  <Project Path="src/Pilgrimage/Pilgrimage.csproj" />
   <Project Path="src\BattleForce2249.Menu\BattleForce2249.Menu.csproj" />
   <Project Path="tests/BattleForce2249.Tests/BattleForce2249.Tests.csproj" />
   <Project Path="tests/OliveGameStudio.FrameRate.Tests/OliveGameStudio.FrameRate.Tests.csproj" />
   <Project Path="tests/OliveGameStudio.Screen.Tests/OliveGameStudio.Screen.Tests.csproj" />
   <Project Path="tests/OliveGameStudio.Tests/OliveGameStudio.Tests.csproj" />
   <Project Path="tests/OliveGameStudio.UI.Tests/OliveGameStudio.UI.Tests.csproj" />
+  <Project Path="tests/Pilgrimage.Tests/Pilgrimage.Tests.csproj" />
 </Solution>

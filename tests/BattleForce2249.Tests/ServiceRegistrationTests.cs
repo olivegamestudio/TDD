@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using OliveGameStudio;
+using Pilgrimage;
 
 namespace BattleForce2249.Tests;
 
@@ -44,6 +45,23 @@ public sealed class ServiceRegistrationTests
         Assert.IsType<LifecycleScreenDirector>(provider.GetRequiredService<IScreenDirector>());
         Assert.IsType<UIController>(provider.GetRequiredService<IUIController>());
         Assert.IsType<LocalSaveProgressService>(provider.GetRequiredService<ISaveProgressService>());
+    }
+
+    [Fact]
+    public void ResolvesTheQuestSystem()
+    {
+        using ServiceProvider provider = BuildProvider();
+
+        Assert.IsType<GameSession>(provider.GetRequiredService<IGameSession>());
+        Assert.IsType<BattleForceCampaign>(provider.GetRequiredService<ICampaign>());
+    }
+
+    [Fact]
+    public void SharesOneQuestSession_BetweenTheGameScreenAndAnythingElseThatNeedsIt()
+    {
+        using ServiceProvider provider = BuildProvider();
+
+        Assert.Same(provider.GetRequiredService<IGameSession>(), provider.GetRequiredService<IGameSession>());
     }
 
     [Fact]

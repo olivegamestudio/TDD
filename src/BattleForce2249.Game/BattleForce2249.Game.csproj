@@ -8,6 +8,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\BattleForce2249.Abstractions\BattleForce2249.Abstractions.csproj" />
+      <ProjectReference Include="..\Pilgrimage\Pilgrimage.csproj" />
     </ItemGroup>
 
 </Project>
