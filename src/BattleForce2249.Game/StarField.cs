@@ -153,11 +153,23 @@ public sealed class StarField(ICamera camera) : IRenderable
     /// the viewport spans more tiles than <see cref="MaxTilesPerAxis"/> allows. That is a mistake
     /// in the layer rather than in the zoom, so it belongs where the layer is written.
     /// </para>
+    /// <para>
+    /// <b>Finiteness is checked before any of the bounds, and separately from them.</b> Every
+    /// bound below is an ordered comparison, and an ordered comparison against <c>NaN</c> is false
+    /// whichever way round it is written — so <c>NaN</c> would satisfy each guard that reads as
+    /// though it excludes it, and the layer would then sow a field at a position of <c>NaN</c>:
+    /// not a blank border but a blank screen, reached through the documented way to re-sow the
+    /// field. Checking each number is finite up front is what makes the bounds mean what they say,
+    /// and it also lets the failure name the field that is actually wrong: an infinite
+    /// <see cref="StarLayer.SizeInPixels"/> makes <see cref="SmallestUsableTileSize"/> infinite
+    /// too, so left to the floor check it would be reported as a tile size to raise.
+    /// </para>
     /// </remarks>
     /// <exception cref="ArgumentException">
-    /// A layer has a parallax outside <c>(0, 1]</c>, a tile size that is not positive or is too
-    /// small to fill the screen within <see cref="MaxTilesPerAxis"/> tiles, fewer than one star
-    /// per tile, or a size that is not positive.
+    /// A layer has a parallax, a tile size or a star size that is not a finite number; a parallax
+    /// outside <c>(0, 1]</c>; a tile size that is not positive or is too small to fill the screen
+    /// within <see cref="MaxTilesPerAxis"/> tiles; fewer than one star per tile; or a size that is
+    /// not positive.
     /// </exception>
     public IReadOnlyList<StarLayer> Layers
     {
@@ -169,6 +181,12 @@ public sealed class StarField(ICamera camera) : IRenderable
 
             foreach (StarLayer layer in value)
             {
+                // First, and on its own: none of the ordered comparisons below excludes NaN, so
+                // every one of them would pass a layer that draws its stars nowhere.
+                ThrowIfNotFinite(layer.Parallax, nameof(StarLayer.Parallax));
+                ThrowIfNotFinite(layer.TileSizeInWorldUnits, nameof(StarLayer.TileSizeInWorldUnits));
+                ThrowIfNotFinite(layer.SizeInPixels, nameof(StarLayer.SizeInPixels));
+
                 if (layer.Parallax is <= 0f or > 1f)
                 {
                     throw new ArgumentException(
@@ -218,6 +236,39 @@ public sealed class StarField(ICamera camera) : IRenderable
         }
     }
 
+    /// <summary>
+    /// Refuses a number a layer cannot be drawn from, naming the field it came from.
+    /// </summary>
+    /// <remarks>
+    /// The field is named rather than left to the value, because "must be a finite number, but was
+    /// NaN" three times over says which rule was broken and not which number to go and change.
+    /// </remarks>
+    /// <param name="value">The number the layer carried.</param>
+    /// <param name="field">The name of the <see cref="StarLayer"/> field it came from.</param>
+    static void ThrowIfNotFinite(float value, string field)
+    {
+        if (!float.IsFinite(value))
+        {
+            throw new ArgumentException(
+                $"A star layer's {field} must be a finite number, but was {value}. Every bound on "
+                + "a layer is an ordered comparison, which this would pass without meaning "
+                + "anything, and the layer would then draw a field that is nowhere on the screen.",
+                "value"); // the init accessor's implicit parameter, which nameof cannot reach here
+        }
+    }
+
+    /// <summary>
+    /// Whether a number describes an extent something can actually be drawn into: positive, and
+    /// finite.
+    /// </summary>
+    /// <remarks>
+    /// Finiteness is asked separately rather than trusted to the comparison, for the same reason
+    /// <see cref="Layers"/> asks it first: <c>NaN &lt;= 0f</c> is false, so a guard written as a
+    /// range check alone lets a zoom or a viewport of <c>NaN</c> through into arithmetic whose
+    /// every result is <c>NaN</c>.
+    /// </remarks>
+    static bool IsDrawableExtent(float value) => float.IsFinite(value) && value > 0f;
+
     /// <inheritdoc />
     public void Render(IRenderer renderer)
     {
@@ -225,7 +276,9 @@ public sealed class StarField(ICamera camera) : IRenderable
 
         // Nothing is on screen at a zoom of nothing or a viewport of nothing, and both would put
         // the tile arithmetic below through a division that means nothing.
-        if (camera.PixelsPerUnit <= 0f || viewport.X <= 0f || viewport.Y <= 0f)
+        if (!IsDrawableExtent(camera.PixelsPerUnit)
+            || !IsDrawableExtent(viewport.X)
+            || !IsDrawableExtent(viewport.Y))
         {
             return;
         }

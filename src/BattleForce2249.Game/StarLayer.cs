@@ -5,9 +5,17 @@ namespace BattleForce2249;
 /// sown, and how big its stars are drawn.
 /// </summary>
 /// <remarks>
+/// <para>
 /// A layer describes a field of unbounded extent, not a list of stars. Where its stars stand is
 /// derived from the layer and the tile they fall in, so the field is the same field however far
 /// the player flies and whichever direction they come back from.
+/// </para>
+/// <para>
+/// Every number here is a finite one, and <see cref="StarField.Layers"/> refuses a layer that
+/// carries anything else. A star's position is derived from these by arithmetic, so a single
+/// <c>NaN</c> or infinity anywhere in a layer spreads to every star it sows and puts the whole
+/// field off the screen.
+/// </para>
 /// </remarks>
 /// <param name="Parallax">
 /// How much of the camera's movement this layer takes, from just above zero to one. One is fixed

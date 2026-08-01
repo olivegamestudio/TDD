@@ -434,6 +434,60 @@ public sealed class StarFieldTests
         });
     }
 
+    [Theory]
+    // NaN is the one that gets through everything: every bound in the validation is an ordered
+    // comparison, and an ordered comparison against NaN is false whichever way round it is
+    // written, so each guard reads as though it covers this and none of them does.
+    [InlineData(float.NaN, 200f, 1, 2f, nameof(StarLayer.Parallax))]
+    [InlineData(0.5f, float.NaN, 1, 2f, nameof(StarLayer.TileSizeInWorldUnits))]
+    [InlineData(0.5f, 200f, 1, float.NaN, nameof(StarLayer.SizeInPixels))]
+    // an infinite tile size clears the floor rather than tripping it, and then sows its stars
+    // where no camera will ever be
+    [InlineData(0.5f, float.PositiveInfinity, 1, 2f, nameof(StarLayer.TileSizeInWorldUnits))]
+    // this one was already refused, but by the floor check, which named the tile size as the
+    // thing to fix when the star's size is what is wrong
+    [InlineData(0.5f, 200f, 1, float.PositiveInfinity, nameof(StarLayer.SizeInPixels))]
+    public void Layers_RefusesALayerWhoseNumbersAreNotFinite(
+        float parallax,
+        float tileSize,
+        int starsPerTile,
+        float sizeInPixels,
+        string offendingField)
+    {
+        // a blank border was worth an issue; each of these draws a blank *field*, through the
+        // documented way to re-sow it
+        ArgumentException error = Assert.Throws<ArgumentException>(() =>
+        {
+            _ = FieldOf(new Camera2D(), new StarLayer(parallax, tileSize, starsPerTile, sizeInPixels));
+        });
+
+        // naming the wrong field is barely better than not naming one
+        Assert.Contains(offendingField, error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Render_DrawsNothing_WhenTheZoomIsNotFinite()
+    {
+        // the same shape as the layer guards: `PixelsPerUnit <= 0f` is an ordered comparison, so
+        // a NaN zoom walks past it into arithmetic that means nothing
+        Camera2D camera = new() { PixelsPerUnit = float.NaN };
+        RecordingRenderer renderer = new();
+
+        new StarField(camera).Render(renderer);
+
+        Assert.Empty(renderer.Drawn);
+    }
+
+    [Fact]
+    public void Render_DrawsNothing_WhenTheViewportIsNotFinite()
+    {
+        RecordingRenderer renderer = new() { ViewportSize = new Vector2(float.NaN, 600f) };
+
+        new StarField(new Camera2D()).Render(renderer);
+
+        Assert.Empty(renderer.Drawn);
+    }
+
     [Fact]
     public void Layers_RefusesATileSizeTooSmallToFillTheScreen()
     {
