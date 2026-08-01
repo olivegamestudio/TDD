@@ -62,18 +62,41 @@ public sealed class DisgracedShipTests
     }
 
     [Fact]
-    public void AtFullSpeed_AFrameStaysWellInsideQuest1sTriggers()
+    public void AtFullSpeed_AFrameLandsInsideQuest1sTriggersRatherThanMerelyCrossingThem()
     {
-        // pillar 1: a trigger a fast ship flies straight through is a bug, not a tuning detail.
-        // The watcher samples the player once a frame, so the ground covered between two frames
-        // has to stay comfortably inside the trigger it is meant to fire.
+        // no longer what stands between the game and pillar 1 — the watcher sweeps the journey now,
+        // so a marker cannot be stepped over whatever the numbers are. Kept because a trigger the
+        // ship lands inside is still better content than one it only ever flies through: a player
+        // who eases off near the marker, or stops on it, should be inside it and not beside it.
         double perFrameAt30Hz = Handling.MaximumSpeed / 30;
 
         Assert.True(
             perFrameAt30Hz < Quest1.Start.Distance,
-            $"{perFrameAt30Hz} units a frame can step over a {Quest1.Start.Distance} unit start trigger");
+            $"{perFrameAt30Hz} units a frame overshoots a {Quest1.Start.Distance} unit start trigger");
         Assert.True(
             perFrameAt30Hz < Quest1.End.Distance,
-            $"{perFrameAt30Hz} units a frame can step over a {Quest1.End.Distance} unit end trigger");
+            $"{perFrameAt30Hz} units a frame overshoots a {Quest1.End.Distance} unit end trigger");
+    }
+
+    [Fact]
+    public void AFrameLongEnoughToCrossTheWholeDebrisField_StillFiresQuest1sTriggers()
+    {
+        // pillar 1 at the shipping numbers: the ship cannot outrun quest 1's markers however badly
+        // a frame stalls. A single frame carrying the player from before the start marker to well
+        // past the exit fires both, where sampling the end point alone fires neither.
+        QuestProximityWatcher watcher = new(new BattleForceWorld());
+        QuestLog quests = new();
+        quests.Register(Quest1);
+
+        Position before = new(0, -500);
+        Position after = new(0, 5000);
+
+        // neither end of the journey is inside either trigger, so nothing here fires by luck
+        Assert.True(before.DistanceTo(Quest1Markers.Start) > Quest1.Start.Distance);
+        Assert.True(after.DistanceTo(Quest1Markers.End) > Quest1.End.Distance);
+
+        watcher.Update(quests, before, after);
+
+        Assert.Equal(QuestState.Completed, quests.Find(BattleForceCampaign.Quest1Id)!.State);
     }
 }

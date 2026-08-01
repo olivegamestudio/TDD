@@ -65,6 +65,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A ship travelling fast enough could fly straight through a quest trigger.**
+  `QuestProximityWatcher` measured the player once a frame, at wherever the frame happened to end,
+  so a trigger fired only when a frame *landed* inside it — a frame carrying the ship from just
+  outside one side of a marker to just outside the other fired nothing. It now measures each marker
+  against the segment the player travelled, through the new `Position.DistanceToSegment`, so a
+  marker cannot be stepped over at any frame length. The segment is a segment and not the line
+  through it, so this does not widen a trigger sideways, and both ends of the journey come from the
+  caller within one frame, so nothing keeps state.
+  ([#8](https://github.com/olivegamestudio/TDD/issues/8))
 - **`LocalSaveProgressService` now really persists**, writing to a file and creating the save
   folder on first write. `HasProgress()` was a hardcoded `return true`, reporting progress it had
   never stored. ([#2](https://github.com/olivegamestudio/TDD/pull/2))

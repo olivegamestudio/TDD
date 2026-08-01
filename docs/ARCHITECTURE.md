@@ -63,7 +63,7 @@ The game side supplies where things actually are:
   Forward travel is along the positive Y axis.
 - `QuestProximityWatcher` — measures the player against the markers each frame and calls the
   quest API when a trigger fires. It keeps no memory of what it has already fired; the quest
-  model absorbs repeat calls.
+  model absorbs repeat calls. It measures the **journey**, not the destination — see below.
 - `GameSession` — the game in progress. Starts or resumes, and saves when a quest starts or
   completes rather than every frame.
 
@@ -101,6 +101,36 @@ produces it, leaving the ship either short of its stated maximum or walled off b
 frame it is reached rather than the frame after — at 200 units a second, a frame late is a marker
 the player has already passed. Entering the screen resets the ship: the save carries where the
 player is, never how fast they were going.
+
+## Quest triggers are swept, not sampled
+
+`QuestProximityWatcher.Update` is given both ends of the frame's travel and measures each marker
+against the **segment** between them, through `Position.DistanceToSegment`.
+
+Sampling the end point alone fires a trigger only when a frame happens to *land* inside it. A frame
+that carried the ship from just outside one side of a marker to just outside the other fired
+nothing, so the ship flew straight through a trigger it passed within metres of — a mysterious
+quest that sometimes did not start. Pillar 1 says a trigger a fast ship flies through is a bug in
+the model, not a tuning detail; before this, the only thing preventing it was how generous the
+authored distances happened to be, which is the content covering for the model.
+
+Two properties hold this in shape:
+
+- **The segment is a segment, not the line through it.** A marker beyond either end is measured to
+  that end, so sweeping never widens a trigger sideways or pulls in somewhere the player was
+  heading for but never reached. `Position.DistanceToSegment` clamps the fraction along to `[0, 1]`,
+  and that clamp is the whole of it.
+- **Nothing remembers anything.** `GameScreen.Update` reads the position before flying the ship and
+  passes both ends within the one frame, so neither the screen nor the watcher keeps state. That
+  also means a player who was *placed* rather than flown — entering the screen, or resuming a save
+  — does not drag a phantom journey behind them from wherever the previous one ended, which is what
+  a remembered previous position would have done.
+
+The single-position `Update` overload remains for a player who did not move; a segment whose ends
+coincide is a point, so it behaves exactly as measuring the point does.
+
+`Pilgrimage` is untouched by any of this. It holds no coordinates and measures no distances — the
+quest model declares the rule and the presentation applies it.
 
 ## Saved progress
 
@@ -147,10 +177,6 @@ the session; its `Update` drives the proximity watcher once the session is ready
 
 - Nothing binds a real input device. The ship flies from `IShipInput`, and the MonoGame host still
   resolves the engine's `NeutralShipInput`, so the shipping game has nobody at the controls.
-- Quest triggers are sampled, not swept. `QuestProximityWatcher` measures the player once a frame,
-  so a frame long enough to carry the ship further than a trigger's distance steps over it. Quest
-  1's markers are sized clear of that at any playable frame rate, but the tolerance is the only
-  thing preventing it.
 - Nothing displays a quest title. There is no HUD or quest log; that is a separate `ENGINE`
   issue.
 - Nothing selects a language. Translations are reachable only through the machine's own culture.
