@@ -52,3 +52,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Text assertions no longer depend on the machine's language.** A screen test compared a quest
   title against an English literal with no culture pinned, failing the whole suite on any machine
   not running in English. ([#2](https://github.com/olivegamestudio/TDD/pull/2))
+- **A press now commits the button it started on.** `UIController.Press` armed the held button by
+  re-reading the focused element *after* running the pressed action, so an action that moved focus
+  handed the press to a different button and `Release` fired that button's action instead. Focus
+  moves on its own as well as deliberately — disabling the focused button re-homes focus — so the
+  common "disable this button as it activates" idiom was enough to trigger it, silently and across
+  screens, because the controller is a singleton whose node list every screen shares. The press is
+  now captured and armed before the action runs, which also means a pressed action that calls
+  `Cancel` is obeyed rather than overwritten. ([#12](https://github.com/olivegamestudio/TDD/issues/12))

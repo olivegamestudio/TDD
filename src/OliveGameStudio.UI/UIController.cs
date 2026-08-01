@@ -88,6 +88,8 @@ public sealed class UIController : IUIController
     /// <remarks>
     /// If a specific button is provided and it is enabled, the focus will move to this button, and its associated action will be processed.
     /// In the absence of a specified button, the currently focused element is pressed, provided it is enabled.
+    /// The press stays with the button it started on for as long as it is held: a pressed action that
+    /// moves focus changes what is focused, not what is being pressed.
     /// </remarks>
     public void Press(Button? button = null)
     {
@@ -104,14 +106,21 @@ public sealed class UIController : IUIController
         
         if (_focusedElement is not null)
         {
-            Node node = Require(_focusedElement);
+            // Captured before the action runs, and armed before it runs too. The action can
+            // move focus out from under the press — deliberately through FocusOn, or as a side
+            // effect of Disable re-homing focus to the first enabled button — so re-reading
+            // _focusedElement afterwards would hand the press to a button the player never
+            // touched. Arming first also means an action that calls Cancel is obeyed rather
+            // than overwritten.
+            Button pressed = _focusedElement;
+            Node node = Require(pressed);
             if (!node.Enabled)
             {
                 return;
             }
-            
+
+            _pressing = pressed;
             node.PressedAction?.Invoke();
-            _pressing = _focusedElement;
         }
     }
 
@@ -119,9 +128,12 @@ public sealed class UIController : IUIController
     /// Releases the currently held button and triggers its associated action if enabled.
     /// </summary>
     /// <remarks>
-    /// If a button is currently being pressed, this method sets it to null, retrieves its associated node,
-    /// and invokes the node's press action if the node is enabled. No action is performed if no button
-    /// is currently pressed.
+    /// Commits the button the press started on — not whatever is focused by the time the player
+    /// lets go — and only if that button is still enabled. Whether a button is enabled is asked
+    /// at the moment of release rather than tracked from the moment it changed, so disabling the
+    /// held button mid-press does not have to reach in and cancel the press, and re-enabling it
+    /// before release restores the commit. One rule, decided in one place. No action is performed
+    /// if no button is being held.
     /// </remarks>
     public void Release()
     {
