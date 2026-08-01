@@ -207,6 +207,18 @@ world, and smaller values lag, which is what reads as depth rather than as a tex
 Stars are sized in pixels rather than world units — a point of light at an unreachable distance
 should not become a disc when the world is zoomed into.
 
+"No seam" holds within a stated bound, and the bound is worth knowing because breaking it looks
+like it worked. `StarField.MaxTilesPerAxis` caps the tiles a frame visits per axis, so that a
+wound-out zoom cannot put the frame into a loop measured in millions; past the cap the field is
+clipped to a band around the camera and leaves a blank border. That is reached whenever the
+viewport spans that many tiles of a layer — a joint condition on the viewport, the zoom **and**
+the layer, not on the zoom alone. `StarField.Layers` refuses the half of it that is a mistake in
+the layer, holding each tile size against `SmallestUsableTileSize`, so a layer too finely sown to
+fill `WidestSupportedViewportInPixels` fails where it is written rather than drawing tens of
+thousands of stars into a band. The other half is a limit on the camera: no bound on tile size can
+stop a low enough `PixelsPerUnit` from spanning the cap. Note that it does *not* stop mattering at
+that zoom — stars are sized in pixels, so they stay fully visible beside the blank border.
+
 `StarField` is registered as itself rather than behind an interface. Nothing outside the drawing
 sets anything on it, so an interface would be a name for the container's benefit and no one else's.
 

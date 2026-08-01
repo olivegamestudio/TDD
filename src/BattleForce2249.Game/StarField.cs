@@ -65,8 +65,17 @@ public sealed class StarField(ICamera camera) : IRenderable
     /// to fill <see cref="WidestSupportedViewportInPixels"/> at one pixel per unit, so the half
     /// that is a mistake in the layer fails where the layer is written. The other half cannot be
     /// prevented by any bound on tile size, because a low enough <see cref="ICamera.PixelsPerUnit"/>
-    /// spans this many tiles whatever their size — at which point a star is a fraction of a pixel
-    /// and the band is the honest thing to draw.
+    /// spans this many tiles whatever their size.
+    /// </para>
+    /// <para>
+    /// <b>And what is left is not free.</b> It would be convenient to say the band is honest at
+    /// that zoom, on the grounds that a star would be a fraction of a pixel by then. It would not
+    /// be: <see cref="StarLayer.SizeInPixels"/> is in pixels precisely so that zoom does not
+    /// resize a star, so the blank border sits beside stars drawn at their full size. What bounds
+    /// this half is the camera rather than the layer — nothing in the game moves
+    /// <see cref="ICamera.PixelsPerUnit"/> off one — so it is a real limit on how far the field can
+    /// be zoomed out, and it is written down as one rather than explained away. Explaining it away
+    /// on exactly this reasoning is what #40 was raised for.
     /// </para>
     /// </remarks>
     public const int MaxTilesPerAxis = 256;
@@ -76,12 +85,24 @@ public sealed class StarField(ICamera camera) : IRenderable
     /// tile size against, in pixels at one pixel per unit.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// A layer knows neither the viewport nor the zoom, so a bound on its tile size can only be
     /// taken against a stated screen. This is the widest the game expects to run on, so the check
     /// rejects a tile size that could never fill a screen rather than one that merely might not
     /// fill some particular screen.
+    /// </para>
+    /// <para>
+    /// <b>Why it is set this high.</b> Nothing in the repository declares a target resolution —
+    /// the viewport is whatever the device reports — so this is a stated assumption rather than a
+    /// measured one, and the safe direction to be wrong in is upwards. It only ever raises the
+    /// floor under a tile size, and the floor it produces is around 30 world units against
+    /// shipping layers of 90, 150 and 230, so being generous here costs the game nothing while
+    /// being stingy would let a layer through that leaves a blank border on a display wider than
+    /// the one assumed. 7680 covers 8K and every ultrawide sold today; a narrower guess would not
+    /// have covered the 5120-pixel ultrawides that already exist.
+    /// </para>
     /// </remarks>
-    public const float WidestSupportedViewportInPixels = 3840f;
+    public const float WidestSupportedViewportInPixels = 7680f;
 
     /// <summary>
     /// The smallest tile size a layer drawing stars <paramref name="sizeInPixels"/> across can be

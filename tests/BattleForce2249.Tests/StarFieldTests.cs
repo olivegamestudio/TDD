@@ -523,6 +523,29 @@ public sealed class StarFieldTests
     }
 
     [Fact]
+    public void Render_StillDrawsStarsAtFullSize_WhenTheZoomOutrunsTheCap()
+    {
+        // The band above was justified by a star being a fraction of a pixel at a zoom that low,
+        // so that clipping the field costs the player nothing they could see. It does not work
+        // out that way: StarLayer.SizeInPixels is in pixels by design — "zooming in on the world
+        // should not make it a disc" — so the scale a star is drawn at does not depend on the
+        // zoom at all. The blank border sits beside stars at their full size, which is the same
+        // "passes and still looks broken" shape #40 was raised for.
+        const float StarSize = 3f;
+        StarLayer layer = new(1f, 100f, 1, StarSize);
+        RecordingRenderer renderer = new();
+
+        Sprite[] atFullZoom = RenderTo(renderer, FieldOf(new Camera2D(), layer));
+        Sprite[] pastTheCap = RenderTo(
+            renderer,
+            FieldOf(new Camera2D { PixelsPerUnit = 0.001f }, layer));
+
+        Assert.NotEmpty(pastTheCap);
+        Assert.Equal(atFullZoom[0].Scale, pastTheCap[0].Scale);
+        Assert.All(pastTheCap, sprite => Assert.Equal(atFullZoom[0].Scale, sprite.Scale));
+    }
+
+    [Fact]
     public void DefaultLayers_CanEachFillTheScreen()
     {
         // the shipping layers are nowhere near the cap, and this is what says so out loud
