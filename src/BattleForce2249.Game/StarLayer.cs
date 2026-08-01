@@ -35,6 +35,13 @@ namespace BattleForce2249;
 /// refuses it rather than sowing a field that cannot cover the screen.
 /// </para>
 /// <para>
+/// <b>The floor moves with the screen the game says it supports</b>, because a tile size can only
+/// be judged against a display — see <see cref="DisplayOptions.WidestSupportedViewportInPixels"/>.
+/// A tile size is not usable or unusable on its own; it is usable up to some width and bands past
+/// it. Declaring a wider screen raises the floor, so a layer written against a narrower one has to
+/// be re-sown rather than silently carried over.
+/// </para>
+/// <para>
 /// There is a ceiling for the opposite reason — see
 /// <see cref="StarField.LargestUsableTileSize"/>. A tile wider than half the screen need not have
 /// a star anywhere the player is looking, so a layer sown that thinly can show an empty sky while

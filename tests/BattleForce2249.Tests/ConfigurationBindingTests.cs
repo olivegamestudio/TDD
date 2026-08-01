@@ -32,11 +32,12 @@ public sealed class ConfigurationBindingTests
 
     static ServiceProvider BuildProvider(
         IConfiguration configuration,
-        Action<CompanyScreenOptions>? configure = null)
+        Action<CompanyScreenOptions>? configure = null,
+        Action<DisplayOptions>? configureDisplay = null)
     {
         ServiceCollection services = new();
         services.AddLogging();
-        services.AddBattleForce(configuration, configure);
+        services.AddBattleForce(configuration, configure, configureDisplay);
 
         return services.BuildServiceProvider(new ServiceProviderOptions
         {
@@ -101,6 +102,74 @@ public sealed class ConfigurationBindingTests
             configuration.GetSection(CompanyScreenOptions.SectionName).Exists(),
             $"appsettings.json is missing the '{CompanyScreenOptions.SectionName}' section");
         Assert.NotNull(configuration[$"{CompanyScreenOptions.SectionName}:Duration"]);
+
+        Assert.True(
+            configuration.GetSection(DisplayOptions.SectionName).Exists(),
+            $"appsettings.json is missing the '{DisplayOptions.SectionName}' section");
+        Assert.NotNull(
+            configuration[
+                $"{DisplayOptions.SectionName}:{nameof(DisplayOptions.WidestSupportedViewportInPixels)}"]);
+    }
+
+    [Fact]
+    public void BindsTheDisplaySection()
+    {
+        using ServiceProvider provider = BuildProvider(InMemory(
+            ($"{DisplayOptions.SectionName}:{nameof(DisplayOptions.WidestSupportedViewportInPixels)}", "5120")));
+
+        Assert.Equal(
+            5120f,
+            provider.GetRequiredService<IOptions<DisplayOptions>>().Value.WidestSupportedViewportInPixels);
+    }
+
+    [Fact]
+    public void KeepsTheDeclaredDisplay_WhenTheConfigurationIsEmpty()
+    {
+        // the game states a supported screen whether or not anyone configures one — that is the
+        // point of stating it, and #50 is what the absence of the statement cost
+        using ServiceProvider provider = BuildProvider(InMemory());
+
+        Assert.Equal(
+            7680f,
+            provider.GetRequiredService<IOptions<DisplayOptions>>().Value.WidestSupportedViewportInPixels);
+    }
+
+    [Fact]
+    public void CodeConfiguration_OverridesTheDeclaredDisplay()
+    {
+        using ServiceProvider provider = BuildProvider(
+            InMemory(($"{DisplayOptions.SectionName}:{nameof(DisplayOptions.WidestSupportedViewportInPixels)}", "5120")),
+            configureDisplay: options => options.WidestSupportedViewportInPixels = 3840f);
+
+        Assert.Equal(
+            3840f,
+            provider.GetRequiredService<IOptions<DisplayOptions>>().Value.WidestSupportedViewportInPixels);
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-1920")]
+    [InlineData("NaN")]
+    public void InvalidDisplay_IsRefusedWhereItIsConfigured(string widest)
+    {
+        // not a display anything can be measured against, and a floor derived from it would accept
+        // every layer put to it. Failing at the section that carries it says which line to change.
+        using ServiceProvider provider = BuildProvider(InMemory(
+            ($"{DisplayOptions.SectionName}:{nameof(DisplayOptions.WidestSupportedViewportInPixels)}", widest)));
+
+        Assert.Throws<OptionsValidationException>(
+            () => provider.GetRequiredService<IOptions<DisplayOptions>>().Value);
+    }
+
+    [Fact]
+    public void TheStarFieldIsFlooredAgainstTheConfiguredDisplay()
+    {
+        // the wiring end to end: a build that declares a different screen gets a star field that
+        // holds its layers against that screen, without anything else being told about it
+        using ServiceProvider provider = BuildProvider(InMemory(
+            ($"{DisplayOptions.SectionName}:{nameof(DisplayOptions.WidestSupportedViewportInPixels)}", "5120")));
+
+        Assert.Equal(5120f, provider.GetRequiredService<StarField>().WidestSupportedViewportInPixels);
     }
 
     [Fact]
