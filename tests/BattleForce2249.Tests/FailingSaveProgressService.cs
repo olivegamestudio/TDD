@@ -9,7 +9,15 @@ namespace BattleForce2249.Tests;
 /// </summary>
 /// <param name="loadError">Thrown by <see cref="Load"/>, or <c>null</c> to let reads succeed.</param>
 /// <param name="saveError">Thrown by <see cref="Save"/>, or <c>null</c> to let writes succeed.</param>
-public sealed class FailingSaveProgressService(Exception? loadError = null, Exception? saveError = null)
+/// <param name="setAsideError">
+/// Thrown by <see cref="SetAside"/>, or <c>null</c> to let it succeed. A refused save that cannot
+/// even be moved out of the way is the case where preserving it and replacing it are in direct
+/// conflict, so it needs to be reachable from a test.
+/// </param>
+public sealed class FailingSaveProgressService(
+    Exception? loadError = null,
+    Exception? saveError = null,
+    Exception? setAsideError = null)
     : ISaveProgressService
 {
     /// <summary>
@@ -37,6 +45,17 @@ public sealed class FailingSaveProgressService(Exception? loadError = null, Exce
 
         Content = content;
         SaveCount++;
+        return Task.CompletedTask;
+    }
+
+    public Task SetAside()
+    {
+        if (setAsideError is not null)
+        {
+            throw setAsideError;
+        }
+
+        Content = null;
         return Task.CompletedTask;
     }
 }

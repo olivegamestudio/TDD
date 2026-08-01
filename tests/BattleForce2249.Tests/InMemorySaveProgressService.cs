@@ -12,6 +12,12 @@ public sealed class InMemorySaveProgressService : ISaveProgressService
 
     public int SaveCount { get; private set; }
 
+    /// <summary>
+    /// What was moved out of the way by <see cref="SetAside"/>, or <c>null</c> if nothing was —
+    /// the in-memory stand-in for the file kept beside the save.
+    /// </summary>
+    public string? SetAsideContent { get; private set; }
+
     public Task<bool> HasProgress() => Task.FromResult(Content is not null);
 
     public Task<string?> Load() => Task.FromResult(Content);
@@ -20,6 +26,17 @@ public sealed class InMemorySaveProgressService : ISaveProgressService
     {
         Content = content;
         SaveCount++;
+        return Task.CompletedTask;
+    }
+
+    public Task SetAside()
+    {
+        if (Content is not null)
+        {
+            SetAsideContent = Content;
+            Content = null;
+        }
+
         return Task.CompletedTask;
     }
 

@@ -89,7 +89,7 @@ public sealed class GameSession : IGameSession
         SaveGame? save = SaveGameSerializer.Deserialize(content);
         if (save is null)
         {
-            await StartNewGame();
+            await StartNewGameOver(content);
             return;
         }
 
@@ -99,6 +99,50 @@ public sealed class GameSession : IGameSession
 
         _autoSave = true;
         IsReady = true;
+    }
+
+    /// <summary>
+    /// Starts a new game in place of a save this build refused, keeping the refused content first.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Refusing a save is a judgement, not a measurement. <see cref="SaveGameSerializer"/> decides
+    /// what counts as damaged, and a shape this build will not take may be one a later build reads
+    /// perfectly well — so writing the new game straight over the file made every one of those
+    /// judgements final and irreversible. A player who pressed Continue lost the game they were
+    /// trying to continue.
+    /// </para>
+    /// <para>
+    /// So the file is moved aside first, and only then does the new game save. If it cannot be
+    /// moved, the new game is played with saving held back rather than written over the top: the
+    /// two goals are in direct conflict at that point, and the one that cannot be undone wins.
+    /// That is the same answer a save that could not be *read* already gets, for the same reason.
+    /// </para>
+    /// </remarks>
+    /// <param name="content">
+    /// What was read, so that nothing is set aside when there was nothing there. A missing or
+    /// blank file holds nothing a later build could recover, and keeping it would only leave the
+    /// player a file to wonder about.
+    /// </param>
+    async Task StartNewGameOver(string? content)
+    {
+        if (!string.IsNullOrWhiteSpace(content))
+        {
+            try
+            {
+                await _saveProgressService.SetAside();
+            }
+            catch (Exception error) when (IsStorageFailure(error))
+            {
+                SaveError = error;
+
+                Reset();
+                IsReady = true;
+                return;
+            }
+        }
+
+        await StartNewGame();
     }
 
     /// <inheritdoc />

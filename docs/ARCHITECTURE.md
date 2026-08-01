@@ -101,8 +101,30 @@ intact, and starting a new game on top of it is its own kind of data loss — th
 | The save is… | What happens |
 | ------------ | ------------ |
 | absent | a new game, saved normally |
-| **damaged** — unparseable, or a state that is not a state | a new game, saved normally: the content is already gone, so replacing it loses nothing |
+| **damaged** — unparseable, or a state that is not a state | the file is **set aside**, then a new game saved normally |
+| damaged, and it cannot be set aside | a playable game that **does not write over the save** |
 | **unreadable** — locked, or barred by permissions | a playable game that **does not write over the save**, which may be intact |
+
+#### A refused save is set aside, not written over
+
+"Damaged" is a judgement, not a measurement. `SaveGameSerializer` decides what this build will
+take, and a shape it refuses may be one a later build reads perfectly well — so while the new game
+wrote straight over the file, every one of those judgements was final. A player who pressed
+Continue lost the game they were trying to continue, and no later fix could give it back. That is
+also what made each boundary in the serializer so expensive to get wrong.
+
+So `ISaveProgressService.SetAside` moves the refused content out of the way first, and only then
+does the new game save. `LocalSaveProgressService` puts it beside the save with `.corrupt` before
+the extension — `save.json` becomes `save.corrupt.json`, one generation kept — so the player has
+something a later build could read and support has the file that broke. The engine still learns
+nothing about what a save contains: whether the content is worth keeping is the game's call, and
+this only provides somewhere to put it.
+
+If the file cannot be moved, the new game is played with saving held back rather than written over
+the top. At that point preserving the old save and persisting the new one are in direct conflict,
+and the irreversible one wins — the same answer, for the same reason, that a save which could not
+be *read* already gets. Nothing is set aside when there was no save or a blank one, so a
+first-time player is not left a file that looks recoverable and is not.
 
 The session reports which it is rather than leaving it to be guessed at:
 
