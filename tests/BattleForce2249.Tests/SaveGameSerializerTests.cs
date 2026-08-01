@@ -143,6 +143,40 @@ public sealed class SaveGameSerializerTests
         Assert.Null(SaveGameSerializer.Deserialize(justOutside));
     }
 
+    [Fact]
+    public void Deserialize_ReadsASaveOnTheWorldsNegativeEdge_AndRefusesTheOneJustOutside()
+    {
+        // the edge is stated as a distance from the origin, so it has two sides and only one of
+        // them was pinned. A guard written as "greater than -Extent" rather than "at least" would
+        // pass every test above and still refuse a save sitting exactly on the near edge.
+        string onTheEdge = $$"""
+        { "PlayerX": 0, "PlayerY": {{Invariant(-BattleForceWorld.Extent)}}, "Quests": [] }
+        """;
+        string justOutside = $$"""
+        { "PlayerX": 0, "PlayerY": {{Invariant(Math.BitDecrement(-BattleForceWorld.Extent))}}, "Quests": [] }
+        """;
+
+        Assert.NotNull(SaveGameSerializer.Deserialize(onTheEdge));
+        Assert.Null(SaveGameSerializer.Deserialize(justOutside));
+    }
+
+    [Fact]
+    public void Deserialize_RefusesAPositionOutsideTheWorld_OnEitherAxisAndEitherSign()
+    {
+        // the guard is applied per axis, so each of the four ways out of the world is its own path
+        // through it, and a copy-paste that checked X twice would still satisfy the theory above.
+        double outside = Math.BitIncrement(BattleForceWorld.Extent);
+
+        Assert.Null(SaveGameSerializer.Deserialize(
+            $$"""{ "PlayerX": {{Invariant(outside)}}, "PlayerY": 0, "Quests": [] }"""));
+        Assert.Null(SaveGameSerializer.Deserialize(
+            $$"""{ "PlayerX": {{Invariant(-outside)}}, "PlayerY": 0, "Quests": [] }"""));
+        Assert.Null(SaveGameSerializer.Deserialize(
+            $$"""{ "PlayerX": 0, "PlayerY": {{Invariant(outside)}}, "Quests": [] }"""));
+        Assert.Null(SaveGameSerializer.Deserialize(
+            $$"""{ "PlayerX": 0, "PlayerY": {{Invariant(-outside)}}, "Quests": [] }"""));
+    }
+
     static string Invariant(double value) =>
         value.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
 }

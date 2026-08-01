@@ -48,6 +48,41 @@ public sealed class PositionTests
     }
 
     [Fact]
+    public void DistanceTo_Overflows_OnlyWhenTheAnswerItselfWillNotFitInADouble()
+    {
+        // Hypot moved the failure from "the intermediate square overflowed" to "the answer does",
+        // which is as far as a double can be taken. Worth pinning the difference: 1e300 apart is a
+        // number now, and the only gap that still answers Infinity is one no double could hold.
+        // Anything a caller bounds its own coordinates to is comfortably the first case.
+        Assert.True(double.IsFinite(new Position(1e300, 0).DistanceTo(Position.Origin)));
+        Assert.True(double.IsFinite(new Position(1e308, 1e308).DistanceTo(Position.Origin)));
+        Assert.False(double.IsFinite(new Position(-1e308, 0).DistanceTo(new Position(1e308, 0))));
+    }
+
+    [Fact]
+    public void Offset_AtAnAstronomicalPosition_DoesNotMoveAtAll()
+    {
+        // the arithmetic fact every coordinate bound rests on: a double's own steps eventually grow
+        // wider than the move being asked for, and the position swallows it. A ship out here reports
+        // motion every frame and never goes anywhere, which is why callers bound their coordinates
+        // rather than trusting finiteness.
+        // the step has to be on the astronomical axis to be swallowed — a ship out here can still
+        // move on an axis that is near zero, which is exactly why the failure is so quiet
+        Assert.Equal(new Position(1e300, 0), new Position(1e300, 0).Offset(10, 0));
+        Assert.Equal(new Position(0, 1e300), new Position(0, 1e300).Offset(0, 10));
+    }
+
+    [Fact]
+    public void Offset_StillMoves_AtTheScalesAGameCanPlausiblyBound()
+    {
+        // the other side of the same fact, and the one that makes a bound worth choosing carefully:
+        // a ten unit step is exact well past a billion units out, so a bound drawn there costs a
+        // player nothing.
+        Assert.Equal(new Position(0, 1e9 + 10), new Position(0, 1e9).Offset(0, 10));
+        Assert.Equal(new Position(1e9 + 10, 0), new Position(1e9, 0).Offset(10, 0));
+    }
+
+    [Fact]
     public void Offset_MovesByTheGivenAmount()
     {
         Position moved = new Position(10, 20).Offset(-2, 5);

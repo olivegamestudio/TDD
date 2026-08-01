@@ -1,3 +1,4 @@
+using OliveGameStudio;
 using Pilgrimage;
 
 namespace BattleForce2249.Tests;
@@ -66,6 +67,47 @@ public sealed class BattleForceWorldTests
     {
         Assert.True(Math.Abs(_world.PlayerStart.X) <= BattleForceWorld.Extent);
         Assert.True(Math.Abs(_world.PlayerStart.Y) <= BattleForceWorld.Extent);
+    }
+
+    [Fact]
+    public void TheWorldsEdge_IsSomewhereTheShipCanStillMoveFrom()
+    {
+        // this is the whole difference between the edge and the astronomical coordinates it was
+        // drawn to refuse. A save is accepted for being inside the edge, and "accepted" has to mean
+        // the player can fly out of it: at 1e300 a ten unit step returned the position it started
+        // from, so the ship sat still while the engine reported motion. Raising Extent towards the
+        // scale where that begins would pass every other test on this class and fail here.
+        foreach (double edge in new[] { BattleForceWorld.Extent, -BattleForceWorld.Extent })
+        {
+            Position corner = new(edge, edge);
+
+            Assert.NotEqual(corner, corner.Offset(0, 10));
+            Assert.NotEqual(corner, corner.Offset(10, 0));
+        }
+    }
+
+    [Fact]
+    public void FromTheWorldsEdge_FlyingTowardsQuest1_ActuallyClosesTheDistance()
+    {
+        // the symptom defect 6 was reported for was a quest that can never start: every marker an
+        // unreachable distance away, and flying making no difference to it. Measured from the
+        // furthest place a save is still accepted, the distance has to be a number and it has to
+        // come down — otherwise the guard is admitting the same brick it was written to refuse.
+        Position edge = new(BattleForceWorld.Extent, BattleForceWorld.Extent);
+        Position target = Quest1Markers.Start;
+
+        double before = edge.DistanceTo(target);
+        Assert.True(double.IsFinite(before), $"distance from the world's edge was {before}");
+
+        // one frame of ordinary flight, straight at the marker
+        double toward = 10 / before;
+        Position after = edge.Offset(
+            (target.X - edge.X) * toward,
+            (target.Y - edge.Y) * toward);
+
+        Assert.True(
+            after.DistanceTo(target) < before,
+            $"flying from the edge did not close the distance: {before} -> {after.DistanceTo(target)}");
     }
 
     [Fact]
