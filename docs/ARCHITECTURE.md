@@ -73,12 +73,40 @@ The game side supplies where things actually are:
 
 Ids are never translated. A save written in one language has to load in another.
 
+## The ship the player owns
+
+`Ship` in `OliveGameStudio.World` is a hull someone can be flying: an `Id`, an `AssetKey`, and the
+`ShipHandling` it flies on. Data rather than a hierarchy — the engine owns one physics, so a second
+hull is a second set of numbers and not a second type, which is what makes a ship something a save
+game can name and hand back. The engine says what a ship *is* and ships none; which ships exist is
+content, and `IShipYard` is the seam a game supplies them through, the same shape `ICampaign` and
+`IWorld` already use. `BattleForceShipYard` stocks the one hull Battle Force 2249 has.
+
+`Player.Ship` is what the player is flying and `Player.Award` is how they come by it. It is `null`
+until a game starts or resumes, because a player exists before a game does; nothing should be
+flying or drawing a player before `IGameSession.IsReady`, and by then it is set. Awarding is not a
+move, so placing a player and giving them a ship are independent and neither ordering on the resume
+path can teleport them.
+
+Both strings on a ship are **identifiers, never text**. `Id` goes into the save file and `AssetKey`
+names an asset, so translating either would mean a save written in one language could not load in
+another, and a ship that drew in English would draw as nothing in German. A ship's *name*, if the
+player is ever shown one, is a separate translated string and does not live on the model.
+
+The asset key lives on the ship so that whatever draws the player reads it from the ship they were
+awarded rather than hard-coding one graphic at the draw site — the picture then follows the ship the
+day there is a second one.
+
 ## Flying the ship
 
 The engine owns the physics; the game owns the numbers. `ShipHandling` is a game's acceleration,
 drag and turn rate — `BattleForceShip.Handling` supplies the shipping ones — and `ShipMovement`
 is the physics they are flown through. A better ship is another `ShipHandling`, not another
 physics.
+
+The composition root registers the `ShipHandling` the physics flies **from the ship the yard
+awards** (`IShipYard.StartingShip.Handling`) rather than beside it, so the ship the player owns and
+the ship the physics flies cannot be given two different sets of numbers.
 
 - `ShipControls` — a thrust axis and a helm axis, each clamped to `[-1, 1]`. Analogue, because
   that is the shape a stick and a key both fit: a key is a 1, a stick is whatever it is pushed to.
@@ -131,6 +159,24 @@ what older saves can be read back into.
 A save the campaign has drifted from is tolerated in both directions: a quest the save knows but
 this build no longer ships is ignored, and a quest added since the save was written starts from
 the beginning.
+
+**The save names the player's ship, and names it only.** `SaveGame.ShipId` carries the identifier;
+the handling and the asset key stay out of the file. A ship's numbers and its artwork are content a
+later build is free to rebalance or redraw, and writing them into the save would freeze the
+player's ship at whatever it was worth the day they saved — a balance change would then reach new
+games and not existing ones.
+
+Recording it at all is a pillar 4 decision rather than a convenience. Re-deriving the ship on every
+load works while there is one hull and quietly takes a better one back the moment there are two,
+which is exactly the failure the pillar exists to prevent.
+
+The same both-directions tolerance the quest list gets applies: an identifier this build does not
+stock — a save written before ships were recorded, or one naming a hull since dropped — loads
+flying the starting ship. A downgraded player is a better outcome than a grounded one. Matching is
+**ordinal and exact**; a near miss out of a hand-edited save is a miss, because case folding or
+trimming would put a hull in the cockpit that nothing ever awarded. Note that the fallback is not
+preserved: the next save writes the starting hull's identifier over the one it could not resolve,
+so re-adding that hull in a later build would not give it back.
 
 ### A save that cannot be read is not a save that is gone
 
@@ -211,4 +257,10 @@ game that has quietly stopped.
   issue. `IGameSession.SaveError` is unread for the same reason — there is nowhere to say it.
 - Nothing selects a language. Translations are reachable only through the machine's own culture.
 - There is no persistent record (experience, credits, quest history) separate from the saved
-  position. See pillar 4 in `docs/DESIGN.md`.
+  position beyond the ship the player owns. See pillar 4 in `docs/DESIGN.md`.
+- Nothing draws the ship. `Player.Ship.AssetKey` is `ship1` and is waiting for a reader; that is
+  the rendering half of #5 and belongs to #16.
+- `ShipMovement` is tuned once, at composition, from `IShipYard.StartingShip.Handling` — it does
+  not read `Player.Ship.Handling` each frame. With one hull those are the same instance and nothing
+  is wrong today; the second hull is when the physics has to start asking the player what they are
+  flying.

@@ -132,7 +132,8 @@ public sealed class GameScreenTests : HostTestBase
         GameSession session = new(
             new FailingSaveProgressService(loadError: new IOException("The process cannot access the file.")),
             new BattleForceCampaign(),
-            new BattleForceWorld());
+            new BattleForceWorld(),
+            new BattleForceShipYard());
         GameScreen screen = new(
             session,
             new ShipMovement(BattleForceShip.Handling),

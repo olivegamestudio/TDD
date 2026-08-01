@@ -13,6 +13,26 @@ namespace BattleForce2249;
 public static class BattleForceShip
 {
     /// <summary>
+    /// The identifier the ship is saved under.
+    /// </summary>
+    /// <remarks>
+    /// Save games name the ship by this, so it must not change once a build has written it into a
+    /// file — and unlike anything the player reads it is never translated, because a save written
+    /// in one language has to load in another.
+    /// </remarks>
+    public const string Id = "disgraced";
+
+    /// <summary>
+    /// The key of the asset that represents the ship on screen — <c>ship1</c>.
+    /// </summary>
+    /// <remarks>
+    /// An identifier naming an asset, not text, so it is the same in every language. It lives on
+    /// the ship so that whatever draws the player reads it from the ship they were awarded rather
+    /// than hard-coding one graphic at the draw site.
+    /// </remarks>
+    public const string AssetKey = "ship1";
+
+    /// <summary>
     /// Gets how the starting ship handles.
     /// </summary>
     /// <remarks>
@@ -34,4 +54,16 @@ public static class BattleForceShip
         Acceleration: 180,
         Drag: 0.9,
         TurnRate: 4.5);
+
+    /// <summary>
+    /// Gets the ship itself: the thing a new game awards the player, and the thing a save game
+    /// names.
+    /// </summary>
+    /// <remarks>
+    /// Built from <see cref="Handling"/> rather than from a second copy of the numbers, so the
+    /// handling the game registers for the physics and the handling the awarded ship carries cannot
+    /// drift apart into two ships that fly differently. Declared after <see cref="Handling"/>
+    /// because static initialisers run in source order.
+    /// </remarks>
+    public static Ship Ship { get; } = new(Id, AssetKey, Handling);
 }

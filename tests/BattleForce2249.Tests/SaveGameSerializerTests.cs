@@ -63,4 +63,84 @@ public sealed class SaveGameSerializerTests
 
         Assert.Null(SaveGameSerializer.Deserialize(content));
     }
+
+    // ---- the ship the save remembers ----
+
+    [Fact]
+    public void RoundTrips_TheShipThePlayerWasFlying()
+    {
+        SaveGame saved = new() { ShipId = "disgraced" };
+
+        SaveGame? loaded = SaveGameSerializer.Deserialize(SaveGameSerializer.Serialize(saved));
+
+        Assert.Equal("disgraced", loaded!.ShipId);
+    }
+
+    [Fact]
+    public void WritesTheShipsIdentifier_AndNeverItsContent()
+    {
+        // a ship's numbers and its artwork are content a later build is free to rebalance or
+        // redraw. Writing them into the save would freeze the player's ship at whatever it was
+        // worth the day they saved, so a balance change would reach new games and not existing
+        // ones.
+        string json = SaveGameSerializer.Serialize(new SaveGame { ShipId = BattleForceShip.Id });
+
+        Assert.Contains(BattleForceShip.Id, json);
+        Assert.DoesNotContain(BattleForceShip.AssetKey, json);
+        Assert.DoesNotContain("Acceleration", json);
+        Assert.DoesNotContain("TurnRate", json);
+        Assert.DoesNotContain("Handling", json);
+    }
+
+    [Fact]
+    public void Deserialize_ReadsASaveWrittenBeforeShipsWereRecorded()
+    {
+        // the shape the previous build wrote. It is not damaged, it is old, and it has to load.
+        SaveGame? loaded = SaveGameSerializer.Deserialize(
+            """{ "PlayerX": 1, "PlayerY": 2, "Quests": [] }""");
+
+        Assert.NotNull(loaded);
+        Assert.Equal("", loaded.ShipId);
+        Assert.Equal(1, loaded.PlayerX);
+    }
+
+    [Fact]
+    public void Deserialize_ReadsAShipWrittenAsJsonNull()
+    {
+        // a genuinely separate path from the one above: a property initialiser runs when the
+        // property is absent, not when it is present and null
+        SaveGame? loaded = SaveGameSerializer.Deserialize(
+            """{ "PlayerX": 0, "PlayerY": 0, "ShipId": null, "Quests": null }""");
+
+        Assert.NotNull(loaded);
+        Assert.Equal("", loaded.ShipId);
+        Assert.Empty(loaded.Quests);
+    }
+
+    [Fact]
+    public void TwoSavesDifferingOnlyByShip_AreNotEqual()
+    {
+        // without this, every whole-save assertion in the suite would pass against a serialiser
+        // that dropped the ship on the floor
+        SaveGame flying = new() { ShipId = "earned" };
+        SaveGame grounded = new() { ShipId = "disgraced" };
+
+        Assert.NotEqual(flying, grounded);
+        Assert.NotEqual(flying.GetHashCode(), grounded.GetHashCode());
+    }
+
+    [Fact]
+    public void TheShipsIdentifierIsNeverTranslated()
+    {
+        // a save written in one language has to load in another
+        foreach (string culture in new[] { "de", "ja", "tr", "ar" })
+        {
+            using CultureScope _ = new(culture);
+
+            SaveGame? loaded = SaveGameSerializer.Deserialize(
+                SaveGameSerializer.Serialize(new SaveGame { ShipId = BattleForceShip.Id }));
+
+            Assert.Equal(BattleForceShip.Id, loaded!.ShipId);
+        }
+    }
 }

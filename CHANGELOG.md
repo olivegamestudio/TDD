@@ -19,6 +19,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   proximity triggers, sized so a ship travelling at speed still fires them. ([#1](https://github.com/olivegamestudio/TDD/issues/1))
 - **`OliveGameStudio.World`** — `Position` and `Player`, the X/Y spatial model. The player exposes
   `MoveTo`/`MoveBy` only, leaving control input and physics a separate concern that drives it. ([#2](https://github.com/olivegamestudio/TDD/pull/2))
+- **The player is awarded a ship on a new game, and the save remembers which.** `Ship` in
+  `OliveGameStudio.World` is a hull someone owns — an identifier, the key of the asset that
+  represents it, and its `ShipHandling` — and `Player.Ship`/`Player.Award` is what the player is
+  flying. `IShipYard` is the seam a game supplies its hulls through; `BattleForceShipYard` stocks
+  the Disgraced's ship, which carries the `ship1` graphic. `SaveGame.ShipId` records the ship by
+  identifier and never by content, so a later build stays free to rebalance or redraw it, and an
+  identifier this build does not stock loads flying the starting ship rather than refusing to load
+  at all. Nothing draws the ship yet — the model names the asset and the rendering half is
+  [#16](https://github.com/olivegamestudio/TDD/issues/16). ([#5](https://github.com/olivegamestudio/TDD/issues/5))
 - **Ship movement and physics.** `ShipMovement` flies the ship from `ShipControls` — a thrust axis
   and a helm axis — carrying a heading and a velocity, and moving the player by the ground actually
   covered each frame. Thrust is applied along the heading and momentum survives a turn. Drag is

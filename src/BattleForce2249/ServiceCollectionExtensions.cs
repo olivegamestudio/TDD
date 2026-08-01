@@ -53,9 +53,15 @@ public static class BattleForceServiceCollectionExtensions
         services
             .AddOliveGameStudio()
 
+            // the ships the game can award, so a new game hands the player one and a save can name
+            // the one they were flying
+            .AddSingleton<IShipYard, BattleForceShipYard>()
+
             // the ship the game is flown in: the engine owns the physics, the game owns the
-            // numbers that decide how it handles
-            .AddSingleton(BattleForceShip.Handling)
+            // numbers that decide how it handles. Taken from the ship the yard actually awards
+            // rather than registered beside it, so the ship the player owns and the ship the
+            // physics flies cannot be given two different sets of numbers.
+            .AddSingleton(provider => provider.GetRequiredService<IShipYard>().StartingShip.Handling)
             .AddSingleton<ShipMovement>()
 
             // the quest content, the world its markers stand in, and the watcher that measures

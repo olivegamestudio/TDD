@@ -47,8 +47,13 @@ public static class SaveGameSerializer
         {
             SaveGame? save = JsonSerializer.Deserialize<SaveGame>(content, Options);
 
-            // a save written as JSON null, or with a null quest list, is still readable
-            return save is null ? null : save with { Quests = save.Quests ?? [] };
+            // a save written as JSON null is no save; one with a null quest list or a null ship —
+            // hand edited, or written by a build that did not record ships — is still readable.
+            // The property initialisers do not cover this: they run when a property is absent, not
+            // when it is present and null.
+            return save is null
+                ? null
+                : save with { ShipId = save.ShipId ?? "", Quests = save.Quests ?? [] };
         }
         catch (JsonException)
         {

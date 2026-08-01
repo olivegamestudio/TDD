@@ -38,7 +38,8 @@ public sealed class GameSessionTests
         return new GameSession(
             saves,
             new TestCampaign([.. ids.Select(id => Quest(id))]),
-            new TestWorld([.. ids.Select(id => new QuestMarkers(id, Start, End))]));
+            new TestWorld([.. ids.Select(id => new QuestMarkers(id, Start, End))]),
+            new TestShipYard());
     }
 
     // ---- starting a new game ----
@@ -383,5 +384,128 @@ public sealed class GameSessionTests
         GameSession session = CreateSession(saves);
 
         await Assert.ThrowsAsync<InvalidOperationException>(session.StartNewGame);
+    }
+
+    // ---- the ship the player is flying ----
+
+    [Fact]
+    public async Task StartNewGame_AwardsThePlayerTheStartingShip()
+    {
+        // #5: entering the game screen on a new game leaves the player in a ship
+        GameSession session = CreateSession();
+
+        await session.StartNewGame();
+
+        Assert.Same(TestShipYard.Starter, session.Player.Ship);
+    }
+
+    [Fact]
+    public async Task ThePlayerIsNeverReadyWithoutAShip()
+    {
+        // the contract whatever draws the ship leans on: nothing drives the session until it is
+        // ready, and by then there is something to draw
+        GameSession session = CreateSession();
+
+        Assert.Null(session.Player.Ship);
+        Assert.False(session.IsReady);
+
+        await session.StartNewGame();
+
+        Assert.True(session.IsReady);
+        Assert.NotNull(session.Player.Ship);
+    }
+
+    [Fact]
+    public async Task StartNewGame_RecordsTheAwardedShipInTheSave()
+    {
+        GameSession session = CreateSession();
+
+        await session.StartNewGame();
+
+        Assert.Equal("starter", _saves.Saved!.ShipId);
+    }
+
+    [Fact]
+    public async Task Continue_RestoresTheShipTheSaveNamed_RatherThanReAwardingTheStarter()
+    {
+        // the whole reason the identifier is in the save. Re-deriving it works while there is one
+        // ship and quietly takes a better one back the moment there are two — pillar 4 says the
+        // record survives.
+        _saves.Content = SaveGameSerializer.Serialize(new SaveGame { ShipId = "earned" });
+
+        GameSession session = CreateSession();
+        await session.Continue();
+
+        Assert.Same(TestShipYard.Earned, session.Player.Ship);
+    }
+
+    [Fact]
+    public async Task AnEarnedShip_SurvivesASaveAndReload()
+    {
+        // pillar 4 end to end, through the session rather than through the serialiser alone
+        _saves.Content = SaveGameSerializer.Serialize(new SaveGame { ShipId = "earned" });
+
+        GameSession first = CreateSession();
+        await first.Continue();
+        await first.Save();
+
+        GameSession second = CreateSession();
+        await second.Continue();
+
+        Assert.Same(TestShipYard.Earned, second.Player.Ship);
+    }
+
+    [Fact]
+    public async Task Continue_OverASaveNamingAShipThisBuildDoesNotHave_LeavesThePlayerDowngraded()
+    {
+        // a build that dropped a hull, or a hand edit. A downgraded player is a better outcome
+        // than a grounded one, and the position in the save is still honoured.
+        _saves.Content = """{ "PlayerX": 5, "PlayerY": 7, "ShipId": "no-such-ship", "Quests": [] }""";
+
+        GameSession session = CreateSession();
+        await session.Continue();
+
+        Assert.True(session.IsReady);
+        Assert.Same(TestShipYard.Starter, session.Player.Ship);
+        Assert.Equal(new Position(5, 7), session.Player.Position);
+    }
+
+    [Fact]
+    public async Task Continue_OverASaveWrittenBeforeShipsWereRecorded_AwardsTheStartingShip()
+    {
+        // the exact shape the build before this one wrote: no ShipId at all
+        _saves.Content = """{ "PlayerX": 1, "PlayerY": 2, "Quests": [] }""";
+
+        GameSession session = CreateSession();
+        await session.Continue();
+
+        Assert.Same(TestShipYard.Starter, session.Player.Ship);
+        Assert.Equal(new Position(1, 2), session.Player.Position);
+    }
+
+    [Fact]
+    public async Task Continue_OverASaveThatCannotBeRead_StillAwardsAShip()
+    {
+        // the session plays on without saving, so it still needs something to fly
+        FailingSaveProgressService saves = new(loadError: new IOException("locked"));
+        GameSession session = CreateSession(saves);
+
+        await session.Continue();
+
+        Assert.True(session.IsReady);
+        Assert.Same(TestShipYard.Starter, session.Player.Ship);
+    }
+
+    [Fact]
+    public async Task StartingANewGameOverAResumedOne_TakesTheEarnedShipBack()
+    {
+        // starting over means starting over; the earned ship must not leak across
+        _saves.Content = SaveGameSerializer.Serialize(new SaveGame { ShipId = "earned" });
+
+        GameSession session = CreateSession();
+        await session.Continue();
+        await session.StartNewGame();
+
+        Assert.Same(TestShipYard.Starter, session.Player.Ship);
     }
 }

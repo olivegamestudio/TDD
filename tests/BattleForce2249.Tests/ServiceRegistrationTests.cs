@@ -74,6 +74,28 @@ public sealed class ServiceRegistrationTests
     }
 
     [Fact]
+    public void ResolvesTheShipYard()
+    {
+        using ServiceProvider provider = BuildProvider();
+
+        Assert.IsType<BattleForceShipYard>(provider.GetRequiredService<IShipYard>());
+    }
+
+    [Fact]
+    public void FliesTheHandlingOfTheShipItAwards()
+    {
+        // the physics is tuned once, at composition, from the ship the yard actually hands out —
+        // so the ship the player owns and the ship the physics flies cannot be given two different
+        // sets of numbers. Registering the handling beside the yard rather than from it is how
+        // that drift starts.
+        using ServiceProvider provider = BuildProvider();
+
+        Assert.Same(
+            provider.GetRequiredService<IShipYard>().StartingShip.Handling,
+            provider.GetRequiredService<ShipHandling>());
+    }
+
+    [Fact]
     public void SharesOneShip_BetweenTheGameScreenAndAnythingElseThatNeedsIt()
     {
         // two ships would each fly their own copy of the player around

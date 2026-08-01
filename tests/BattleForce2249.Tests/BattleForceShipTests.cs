@@ -19,6 +19,32 @@ public sealed class BattleForceShipTests
         new BattleForceWorld().QuestMarkers.Single(marker => marker.QuestId == BattleForceCampaign.Quest1Id);
 
     [Fact]
+    public void IsSavedUnderAnIdentifier_NotUnderSomethingThePlayerReads()
+    {
+        // a save written in one language has to load in another, so the identifier is never
+        // translated and never changes once a build has written it into a file
+        Assert.Equal("disgraced", BattleForceShip.Id);
+        Assert.Equal(BattleForceShip.Id, BattleForceShip.Ship.Id);
+    }
+
+    [Fact]
+    public void KnowsTheGraphicThatStandsForIt()
+    {
+        // #5: ship1.png. The asset key is an identifier naming a file, not text, so it is the same
+        // in every language — and it lives on the ship so nothing downstream has to hard-code it.
+        Assert.Equal("ship1", BattleForceShip.AssetKey);
+        Assert.Equal(BattleForceShip.AssetKey, BattleForceShip.Ship.AssetKey);
+    }
+
+    [Fact]
+    public void TheShipCarriesTheHandlingTheGameIsTunedFor()
+    {
+        // built from Handling rather than from a second copy of the numbers, so the ship the
+        // player owns and the ship the physics flies cannot become two ships that fly differently
+        Assert.Same(Handling, BattleForceShip.Ship.Handling);
+    }
+
+    [Fact]
     public void CanBeFlown()
     {
         // the same rules ShipMovement enforces, checked against the shipping numbers so a bad

@@ -32,7 +32,7 @@ public class SaveRecoveryAdversarialTests
     }
 
     static GameSession CreateSession(ISaveProgressService saves) =>
-        new(saves, new Campaign(), new World());
+        new(saves, new Campaign(), new World(), new TestShipYard());
 
     /// <summary>
     /// A save service whose read can be locked and unlocked while the game is running, which is
