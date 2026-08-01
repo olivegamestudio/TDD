@@ -9,6 +9,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`DisplayOptions` — the game now states the display it supports.** One place in the repository
+  says how wide a screen the game is built to fill:
+  `DisplayOptions.WidestSupportedViewportInPixels`, bound from the `Display` section of
+  `appsettings.json` and defaulting to 7680 pixels. It resizes nothing — the window is still
+  whatever the platform gives — it is the screen validation is taken against. Rejected at
+  registration if it is not a real positive width, because every floor derived from a display of
+  nothing collapses to zero and stops rejecting anything. ([#50](https://github.com/olivegamestudio/TDD/issues/50))
+
 - **The `Pilgrimage` quest system.** A standalone quest library with no project references:
   `QuestDefinition` and `QuestTrigger` for authored content, `Quest` for the
   `NotStarted → Active → Completed` lifecycle, `QuestLog` for the player's quests and their
@@ -110,6 +118,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   what reaching it costs — because no bound on tile size can prevent a low enough
   `PixelsPerUnit` from spanning the cap for tiles of any size. The shipping layers are unaffected.
   ([#40](https://github.com/olivegamestudio/TDD/issues/40))
+
+- **The star field's screen is the one the game declares, not one it guessed at.**
+  `WidestSupportedViewportInPixels` was a constant on `StarField` — a product decision about which
+  displays the game supports, stated inside a rendering class, agreeing with nothing else because
+  nothing else stated it. It is now read from `DisplayOptions`, and
+  `SmallestUsableTileSize` derives the floor under a tile size from it rather than from a number
+  of its own. That matters because the two could drift: a layer sown at the floor for a
+  3840-pixel declaration leaves exactly the blank border #40 was raised for on a 7680-pixel
+  display, which is now pinned as a test. Coverage at the declared size is checked on a 16×16 grid
+  rather than 4×4 — the clipped band still reaches into the outer cells of a coarse grid, so 4×4
+  passed while the field was visibly banding. The shipping layers clear the floor at every
+  declared width tested, and what the player gets is unchanged.
+  ([#50](https://github.com/olivegamestudio/TDD/issues/50))
 
 - **Quest proximity triggers are swept across the frame, not sampled at the end of it.**
   `QuestProximityWatcher` measured the player once per frame, at whatever position the frame

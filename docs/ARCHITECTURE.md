@@ -222,6 +222,30 @@ that zoom — stars are sized in pixels, so they stay fully visible beside the b
 `StarField` is registered as itself rather than behind an interface. Nothing outside the drawing
 sets anything on it, so an interface would be a name for the container's benefit and no one else's.
 
+## The display the game supports
+
+`DisplayOptions.WidestSupportedViewportInPixels` is the one place in the repository that says how
+wide a screen the game is built to fill. It binds from the `Display` section of `appsettings.json`
+and defaults to 7680 pixels, which covers 8K and every ultrawide sold today.
+
+It resizes nothing. The window is still whatever the platform gives — the game never sets a size,
+and `Camera2D.PixelsPerUnit` is left at one — so this is not a resolution the game runs at. It is
+the screen that validation is *taken against*: the bar a piece of content has to clear before it
+can claim to fill the screen. `StarField.SmallestUsableTileSize` is the only thing that reads it
+today, and it derives its floor from it rather than restating a number of its own. Anything else
+that needs to hold content against a screen should do the same.
+
+That derivation is load-bearing rather than tidiness. A star layer sown at the floor for one
+declared display leaves a blank border on a display twice as wide — the failure `MaxTilesPerAxis`
+causes, arriving through content that passed validation — so two statements of the supported width
+drifting apart is a defect the player sees. There is one statement, so they cannot. Declaring a
+wider display raises the floor under every tile size, which is the safe direction: overstating it
+only makes the checks stricter, and the shipping layers of 90, 150 and 230 world units clear a
+floor of about 30.
+
+Options are validated at registration, so a display of zero or a negative width fails when the
+container is built rather than collapsing every floor derived from it to nothing.
+
 ## Screen flow
 
 `BattleForceHost` wires company screen → menu screen → game screen. `IFrameTimeController`

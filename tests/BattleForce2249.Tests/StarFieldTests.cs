@@ -454,32 +454,117 @@ public sealed class StarFieldTests
     public void Layers_AcceptsTheSmallestTileSizeThatCanFillTheScreen()
     {
         // the bound has to be reachable, or it is a ban on small tiles rather than a bound
-        float smallest = StarField.SmallestUsableTileSize(3f);
+        StarField field = new(new Camera2D());
+        float smallest = field.SmallestUsableTileSize(3f);
 
-        StarField field = FieldOf(new Camera2D(), new StarLayer(1f, smallest, 1, 3f));
+        field = FieldOf(new Camera2D(), new StarLayer(1f, smallest, 1, 3f));
 
         Assert.Equal(smallest, Assert.Single(field.Layers).TileSizeInWorldUnits);
     }
 
-    [Fact]
-    public void Render_CoversTheWidestSupportedViewport_AtTheSmallestUsableTileSize()
+    [Theory]
+    // the display the game declares today...
+    [InlineData(DisplayOptions.DefaultWidestSupportedViewportInPixels)]
+    // ...and the ones a build could declare instead, narrower and wider, because the floor is
+    // derived from the declaration rather than fixed against one screen
+    [InlineData(3_840f)]
+    [InlineData(5_120f)]
+    [InlineData(15_360f)]
+    public void Render_CoversTheDeclaredDisplay_AtTheSmallestUsableTileSize(float declared)
     {
-        // and what makes the bound honest rather than a number: a layer sown right at it still
-        // fills the widest screen the game claims to support, with the cap in force
+        // What makes the bound honest rather than a number: a layer sown right at the floor still
+        // fills the screen the game says it supports, with the cap in force.
+        //
+        // Sixteen cells to an axis rather than four, because four is not fine enough to catch the
+        // failure. Past the cap the field is clipped to a band about the middle, and that band
+        // still reaches into the outer cells of a coarse grid — a 4x4 grid passed at 7680 against
+        // a floor derived from 3840, which is exactly the case #50 was raised over.
         const float StarSize = 3f;
-        const int Cells = 4;
+        const int Cells = 16;
 
-        StarField field = FieldOf(
-            new Camera2D(),
-            new StarLayer(1f, StarField.SmallestUsableTileSize(StarSize), 1, StarSize));
+        DisplayOptions display = new() { WidestSupportedViewportInPixels = declared };
+        StarField field = new(new Camera2D(), display)
+        {
+            Layers = [new StarLayer(1f, StarField.SmallestUsableTileSize(StarSize, declared), 1, StarSize)],
+        };
 
-        RecordingRenderer renderer = new(
-            StarField.WidestSupportedViewportInPixels,
-            StarField.WidestSupportedViewportInPixels);
+        RecordingRenderer renderer = new(declared, declared);
 
         field.Render(renderer);
 
-        AssertNoEmptyCell(renderer, Cells, Cells, "at the smallest usable tile size");
+        AssertNoEmptyCell(renderer, Cells, Cells, $"at the smallest usable tile size for {declared} pixels");
+    }
+
+    [Fact]
+    public void Render_LeavesABlankBorder_WhenTheDisplayIsWiderThanTheOneDeclared()
+    {
+        // The other half of the same claim, and the reason the floor cannot just be a constant:
+        // a layer sown at the floor for one screen does *not* cover a wider one. This is the
+        // defect #50 documented — with the floor derived from 3840, a 7680-pixel display bands —
+        // pinned as behaviour so that "declare the display, derive the floor" is load-bearing
+        // rather than tidiness.
+        const float StarSize = 3f;
+        const float Declared = 3_840f;
+        const int Cells = 16;
+
+        StarField field = new(
+            new Camera2D(),
+            new DisplayOptions { WidestSupportedViewportInPixels = Declared })
+        {
+            Layers = [new StarLayer(1f, StarField.SmallestUsableTileSize(StarSize, Declared), 1, StarSize)],
+        };
+
+        RecordingRenderer renderer = new(2f * Declared, 2f * Declared);
+
+        field.Render(renderer);
+
+        Assert.Throws<Xunit.Sdk.TrueException>(
+            () => AssertNoEmptyCell(renderer, Cells, Cells, "on a display twice the declared width"));
+    }
+
+    [Fact]
+    public void WidestSupportedViewport_IsTheOneTheGameDeclares()
+    {
+        // the field states no screen of its own: #50's first criterion, said as a test
+        DisplayOptions display = new() { WidestSupportedViewportInPixels = 5_120f };
+
+        Assert.Equal(5_120f, new StarField(new Camera2D(), display).WidestSupportedViewportInPixels);
+        Assert.Equal(
+            DisplayOptions.DefaultWidestSupportedViewportInPixels,
+            new StarField(new Camera2D()).WidestSupportedViewportInPixels);
+    }
+
+    [Fact]
+    public void Layers_RaisesTheFloor_WhenAWiderDisplayIsDeclared()
+    {
+        // the floor moves with the declaration, so a layer written against a narrower screen is
+        // refused rather than quietly leaving a band on the wider one
+        const float StarSize = 3f;
+        const float Narrow = 3_840f;
+
+        float floorForNarrow = StarField.SmallestUsableTileSize(StarSize, Narrow);
+        StarLayer layer = new(1f, floorForNarrow, 1, StarSize);
+
+        // fine against the screen it was written for...
+        StarField narrow = new(
+            new Camera2D(),
+            new DisplayOptions { WidestSupportedViewportInPixels = Narrow })
+        {
+            Layers = [layer],
+        };
+
+        Assert.Equal(floorForNarrow, Assert.Single(narrow.Layers).TileSizeInWorldUnits);
+
+        // ...and refused against a wider one, by the same validation
+        Assert.Throws<ArgumentException>(() =>
+        {
+            _ = new StarField(
+                new Camera2D(),
+                new DisplayOptions { WidestSupportedViewportInPixels = 2f * Narrow })
+            {
+                Layers = [layer],
+            };
+        });
     }
 
     [Theory]
@@ -548,12 +633,31 @@ public sealed class StarFieldTests
     [Fact]
     public void DefaultLayers_CanEachFillTheScreen()
     {
-        // the shipping layers are nowhere near the cap, and this is what says so out loud
+        // #50's third criterion: the shipping layers are re-checked against the floor the declared
+        // display implies, and they are nowhere near it
         StarField field = new(new Camera2D());
 
         Assert.All(field.Layers, layer => Assert.True(
-            layer.TileSizeInWorldUnits >= StarField.SmallestUsableTileSize(layer.SizeInPixels),
-            $"A tile size of {layer.TileSizeInWorldUnits} cannot fill the screen."));
+            layer.TileSizeInWorldUnits >= field.SmallestUsableTileSize(layer.SizeInPixels),
+            $"A tile size of {layer.TileSizeInWorldUnits} cannot fill "
+            + $"{field.WidestSupportedViewportInPixels} pixels."));
+    }
+
+    [Fact]
+    public void Render_CoversTheDeclaredDisplay_WithTheLayersTheGameShips()
+    {
+        // and the same criterion said as a picture rather than as arithmetic: what the player
+        // actually gets fills the widest screen the game claims, not only an 800x600 one
+        const int Cells = 16;
+
+        StarField field = new(new Camera2D());
+        RecordingRenderer renderer = new(
+            field.WidestSupportedViewportInPixels,
+            field.WidestSupportedViewportInPixels);
+
+        field.Render(renderer);
+
+        AssertNoEmptyCell(renderer, Cells, Cells, "shipping layers on the declared display");
     }
 
     [Fact]

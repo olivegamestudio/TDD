@@ -27,7 +27,13 @@ namespace BattleForce2249;
 /// </para>
 /// </remarks>
 /// <param name="camera">The camera the world is drawn through — the same one the ship uses.</param>
-public sealed class StarField(ICamera camera) : IRenderable
+/// <param name="display">
+/// The display the game states it supports, which is what a layer's tile size is held against.
+/// Left null, the declared default applies — the field is not the place a supported display gets
+/// decided, so it reads <see cref="DisplayOptions"/> either way rather than keeping a number of
+/// its own.
+/// </param>
+public sealed class StarField(ICamera camera, DisplayOptions? display = null) : IRenderable
 {
     /// <summary>
     /// The asset key the stars are drawn from. An identifier, not text: it is never translated.
@@ -62,10 +68,11 @@ public sealed class StarField(ICamera camera) : IRenderable
     /// </para>
     /// <para>
     /// <b>Only half of that is prevented.</b> <see cref="Layers"/> refuses a tile size too small
-    /// to fill <see cref="WidestSupportedViewportInPixels"/> at one pixel per unit, so the half
-    /// that is a mistake in the layer fails where the layer is written. The other half cannot be
-    /// prevented by any bound on tile size, because a low enough <see cref="ICamera.PixelsPerUnit"/>
-    /// spans this many tiles whatever their size.
+    /// to fill <see cref="WidestSupportedViewportInPixels"/> — the display
+    /// <see cref="DisplayOptions"/> declares — at one pixel per unit, so the half that is a
+    /// mistake in the layer fails where the layer is written. The other half cannot be prevented
+    /// by any bound on tile size, because a low enough <see cref="ICamera.PixelsPerUnit"/> spans
+    /// this many tiles whatever their size.
     /// </para>
     /// <para>
     /// <b>And what is left is not free.</b> It would be convenient to say the band is honest at
@@ -87,40 +94,62 @@ public sealed class StarField(ICamera camera) : IRenderable
     /// <remarks>
     /// <para>
     /// A layer knows neither the viewport nor the zoom, so a bound on its tile size can only be
-    /// taken against a stated screen. This is the widest the game expects to run on, so the check
-    /// rejects a tile size that could never fill a screen rather than one that merely might not
-    /// fill some particular screen.
+    /// taken against a stated screen. This is that screen, and it is
+    /// <see cref="DisplayOptions.WidestSupportedViewportInPixels"/> — read, not restated. Which
+    /// displays the game supports is a decision about the game rather than about stars, so it is
+    /// made where the game states its other facts and the field derives its floor from it. The
+    /// check therefore rejects a tile size that could never fill a supported screen rather than
+    /// one that merely might not fill some particular screen.
     /// </para>
     /// <para>
-    /// <b>Why it is set this high.</b> Nothing in the repository declares a target resolution —
-    /// the viewport is whatever the device reports — so this is a stated assumption rather than a
-    /// measured one, and the safe direction to be wrong in is upwards. It only ever raises the
-    /// floor under a tile size, and the floor it produces is around 30 world units against
-    /// shipping layers of 90, 150 and 230, so being generous here costs the game nothing while
-    /// being stingy would let a layer through that leaves a blank border on a display wider than
-    /// the one assumed. 7680 covers 8K and every ultrawide sold today; a narrower guess would not
-    /// have covered the 5120-pixel ultrawides that already exist.
+    /// <b>It moves when the declaration moves.</b> Configure a wider display and the floor under
+    /// every tile size rises with it, so a layer that was fine against a narrower declaration is
+    /// refused rather than quietly leaving a band. That is the point of deriving it: the two
+    /// numbers cannot drift apart, because there is only one of them. Raising it is safe for the
+    /// shipping layers — see <see cref="DisplayOptions.DefaultWidestSupportedViewportInPixels"/>
+    /// for how much headroom they have.
     /// </para>
     /// </remarks>
-    public const float WidestSupportedViewportInPixels = 7680f;
+    public float WidestSupportedViewportInPixels => _display.WidestSupportedViewportInPixels;
 
     /// <summary>
     /// The smallest tile size a layer drawing stars <paramref name="sizeInPixels"/> across can be
-    /// sown at and still cover <see cref="WidestSupportedViewportInPixels"/> within
+    /// sown at and still cover <paramref name="widestSupportedViewportInPixels"/> within
     /// <see cref="MaxTilesPerAxis"/> tiles.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// The star's size comes into it because the tile range is widened by a star's width either
     /// side, so that one just off the edge is still drawn while part of it would show.
     /// <c>MaxTilesPerAxis - 4</c> rather than <c>- 1</c> leaves the slack the arithmetic needs: a
     /// tile at each end may be half-covered and counted anyway, and the clamp is a tile wider
     /// below the camera than above it, so a range that only just fits could still lose an edge
     /// depending on where between two tiles the camera happens to stand.
+    /// </para>
+    /// <para>
+    /// Takes the screen as an argument rather than reading the declared one, so the relationship
+    /// between a display and the floor it implies can be stated — and tested — without a field to
+    /// hang it on. <see cref="SmallestUsableTileSize(float)"/> is the same sum against the display
+    /// this field was built for, and is what <see cref="Layers"/> validates against.
+    /// </para>
     /// </remarks>
     /// <param name="sizeInPixels">How big the layer draws each star, in pixels.</param>
-    /// <returns>The smallest tile size, in world units, that fills the screen.</returns>
-    public static float SmallestUsableTileSize(float sizeInPixels) =>
-        (WidestSupportedViewportInPixels + (2f * sizeInPixels)) / (MaxTilesPerAxis - 4f);
+    /// <param name="widestSupportedViewportInPixels">
+    /// The widest screen the layer has to fill, in pixels at one pixel per unit.
+    /// </param>
+    /// <returns>The smallest tile size, in world units, that fills that screen.</returns>
+    public static float SmallestUsableTileSize(float sizeInPixels, float widestSupportedViewportInPixels) =>
+        (widestSupportedViewportInPixels + (2f * sizeInPixels)) / (MaxTilesPerAxis - 4f);
+
+    /// <summary>
+    /// The smallest tile size a layer drawing stars <paramref name="sizeInPixels"/> across can be
+    /// sown at and still cover <see cref="WidestSupportedViewportInPixels"/> — the display this
+    /// field was built for — within <see cref="MaxTilesPerAxis"/> tiles.
+    /// </summary>
+    /// <param name="sizeInPixels">How big the layer draws each star, in pixels.</param>
+    /// <returns>The smallest tile size, in world units, that fills the supported screen.</returns>
+    public float SmallestUsableTileSize(float sizeInPixels) =>
+        SmallestUsableTileSize(sizeInPixels, WidestSupportedViewportInPixels);
 
     static readonly StarLayer[] _defaultLayers =
     [
@@ -131,6 +160,10 @@ public sealed class StarField(ICamera camera) : IRenderable
         new StarLayer(Parallax: 0.60f, TileSizeInWorldUnits: 150f, StarsPerTile: 2, SizeInPixels: 3.5f),
         new StarLayer(Parallax: 1.00f, TileSizeInWorldUnits: 230f, StarsPerTile: 2, SizeInPixels: 5f),
     ];
+
+    // Held rather than read through the parameter each time, so the field answers with the same
+    // display for its whole life even though the options object it came from is shared.
+    readonly DisplayOptions _display = display ?? new DisplayOptions();
 
     readonly IReadOnlyList<StarLayer> _layers = _defaultLayers;
 
@@ -199,7 +232,7 @@ public sealed class StarField(ICamera camera) : IRenderable
 
                 // Last, because the smallest usable tile size is a function of the star's size,
                 // and there is no point deriving it from a size that has just been refused.
-                float smallest = SmallestUsableTileSize(layer.SizeInPixels);
+                float smallest = SmallestUsableTileSize(layer.SizeInPixels, WidestSupportedViewportInPixels);
 
                 if (layer.TileSizeInWorldUnits < smallest)
                 {

@@ -101,6 +101,59 @@ public sealed class ConfigurationBindingTests
             configuration.GetSection(CompanyScreenOptions.SectionName).Exists(),
             $"appsettings.json is missing the '{CompanyScreenOptions.SectionName}' section");
         Assert.NotNull(configuration[$"{CompanyScreenOptions.SectionName}:Duration"]);
+
+        Assert.True(
+            configuration.GetSection(DisplayOptions.SectionName).Exists(),
+            $"appsettings.json is missing the '{DisplayOptions.SectionName}' section");
+        Assert.NotNull(
+            configuration[$"{DisplayOptions.SectionName}:{nameof(DisplayOptions.WidestSupportedViewportInPixels)}"]);
+    }
+
+    [Fact]
+    public void BindsTheDisplaySection()
+    {
+        using ServiceProvider provider = BuildProvider(InMemory(
+            ($"Display:{nameof(DisplayOptions.WidestSupportedViewportInPixels)}", "5120")));
+
+        Assert.Equal(
+            5_120f,
+            provider.GetRequiredService<IOptions<DisplayOptions>>().Value.WidestSupportedViewportInPixels);
+    }
+
+    [Fact]
+    public void ConfiguredDisplay_ReachesTheStarField()
+    {
+        // the value has to arrive where the floor is derived, not merely bind: the whole point of
+        // #50 is that one declaration decides what content is held against
+        using ServiceProvider provider = BuildProvider(InMemory(
+            ($"Display:{nameof(DisplayOptions.WidestSupportedViewportInPixels)}", "5120")));
+
+        Assert.Equal(5_120f, provider.GetRequiredService<StarField>().WidestSupportedViewportInPixels);
+    }
+
+    [Fact]
+    public void ShippedAppSettings_DeclaresTheDisplayTheCodeDefaultsTo()
+    {
+        // the file and the code default say the same thing; a build that wants a different screen
+        // changes the file, and nothing in the game restates the number
+        using ServiceProvider provider = BuildProvider(ShippedConfiguration("appsettings.json"));
+
+        Assert.Equal(
+            DisplayOptions.DefaultWidestSupportedViewportInPixels,
+            provider.GetRequiredService<IOptions<DisplayOptions>>().Value.WidestSupportedViewportInPixels);
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-1920")]
+    public void InvalidConfiguredDisplay_IsRefused(string width)
+    {
+        // a display of nothing is not a narrower screen, it is one no content can be held against
+        using ServiceProvider provider = BuildProvider(InMemory(
+            ($"Display:{nameof(DisplayOptions.WidestSupportedViewportInPixels)}", width)));
+
+        Assert.Throws<OptionsValidationException>(
+            () => provider.GetRequiredService<IOptions<DisplayOptions>>().Value);
     }
 
     [Fact]

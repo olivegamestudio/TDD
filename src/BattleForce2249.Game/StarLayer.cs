@@ -21,10 +21,17 @@ namespace BattleForce2249;
 /// ever drawn, so flying further costs nothing.
 /// <para>
 /// There is a floor on how small it can usefully be — see
-/// <see cref="StarField.SmallestUsableTileSize"/> — because a frame visits at most
+/// <see cref="StarField.SmallestUsableTileSize(float)"/> — because a frame visits at most
 /// <see cref="StarField.MaxTilesPerAxis"/> tiles per axis. Below that the field is clipped to a
 /// band around the camera and leaves a blank border, which is why <see cref="StarField.Layers"/>
 /// refuses it rather than sowing a field that cannot cover the screen.
+/// </para>
+/// <para>
+/// The floor is not a fixed number: it is derived from
+/// <see cref="DisplayOptions.WidestSupportedViewportInPixels"/>, the one place the game says how
+/// wide a screen it supports. A tile size that clears the floor for the display the game declares
+/// today will not clear it for a wider one, so a layer is written against a stated screen rather
+/// than against a constant that happens to be in the file.
 /// </para>
 /// </param>
 /// <param name="StarsPerTile">How many stars stand in each tile.</param>
