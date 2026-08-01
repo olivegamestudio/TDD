@@ -55,11 +55,23 @@ decision will need to know.
 The repository is test-driven. Tests are xUnit, under `tests/<project>.Tests`, targeting
 `net10.0`.
 
-**Agent containers have no .NET SDK, and the network policy blocks downloading one**
-(`builds.dotnet.microsoft.com`, `dotnetcli.azureedge.net` and `aka.ms` return 403 through the
-proxy; NuGet itself is reachable). Work is therefore reviewed by hand and unverified locally — a
-green CI run is the first real confirmation that anything compiles. Say so explicitly at handoff
-rather than implying a build passed.
+**Agent containers can build and run the tests.** This section used to say they could not, on the
+strength of the .NET installer hosts (`builds.dotnet.microsoft.com`, `dotnetcli.azureedge.net`,
+`aka.ms`) returning 403 through the proxy. They still do — but the distribution's own package
+works, provided the index is refreshed first:
+
+```bash
+apt-get update && apt-get install -y dotnet-sdk-10.0   # 10.0.110; without the update, 404
+dotnet build OliveGameStudio.slnx
+dotnet test OliveGameStudio.slnx
+```
+
+NuGet is reachable, so restore succeeds, and MonoGame's `mgcb` tooling restores from
+`BattleForce2249.MonoGame/.config` — the host builds, not just the libraries.
+
+So verify before handing off, and report what you actually ran. If a build genuinely fails, say
+what failed; "no SDK" is no longer a reason. There is still **no CI** (#34), so beyond an agent's
+own run a human running `dotnet test` is the only confirmation.
 
 Tests that assert on user-facing text must pin the culture. A test comparing against an English
 literal with no culture pinned fails on any machine not running in English; this has already

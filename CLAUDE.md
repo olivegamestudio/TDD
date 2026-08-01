@@ -28,9 +28,20 @@ off between agents.
 
 ## Before you claim it works
 
-There is no .NET SDK in agent containers and the network policy blocks downloading one, so you
-almost certainly cannot build or run the tests. Say that plainly at handoff rather than implying a
-green build. CI is the first real confirmation.
+**The SDK is installable in agent containers**, so build and run the tests before you hand off.
+This file used to say the opposite; the missing step is `apt-get update` first, without which the
+`dotnet10` package URLs 404:
+
+```bash
+apt-get update && apt-get install -y dotnet-sdk-10.0
+dotnet build OliveGameStudio.slnx
+dotnet test OliveGameStudio.slnx
+```
+
+That restores MonoGame's `mgcb` tooling and builds the host as well as the libraries. If it does
+fail for you, say so plainly at handoff rather than implying a green build — but say what failed,
+because "no SDK" is no longer a reason. There is still no CI (#34), so until that lands a human
+running `dotnet test` is the only confirmation beyond your own.
 
 ## Keeping the record straight
 
