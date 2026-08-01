@@ -79,9 +79,22 @@ reported as "no save", so a corrupt file yields a new game rather than a crash. 
 written by name, so reordering `QuestState` cannot silently change a save. `SaveGame`'s shape is
 the compatibility boundary — changing it changes what older saves can be read back into.
 
+`SaveGameSerializer` is the only place that decides whether a save can be read, and "can be read"
+means more than "parsed". Content that is well-formed JSON but not a game is refused there too: a
+quest state outside `QuestState`, a quest entry that is absent or names no quest, or a coordinate
+that is not a finite number. All of these used to be handed on as valid and then throw or brick
+further in, where the player's only symptom was a game that had quietly stopped. Deciding once, at
+the edge, is what lets everything downstream be written against a save that makes sense.
+
 A save the campaign has drifted from is tolerated in both directions: a quest the save knows but
 this build no longer ships is ignored, and a quest added since the save was written starts from
 the beginning.
+
+`GameSession.Continue` recovers from storage getting in the way — a file locked, missing or barred
+— and nothing wider, because catching wider would bury real defects behind "could not save". That
+narrowness is only safe because the serializer refuses a save the rest of the load could choke on.
+`GameScreen` logs anything that still escapes, so a game that fails to start is heard rather than
+merely stopped.
 
 ## Localised text
 

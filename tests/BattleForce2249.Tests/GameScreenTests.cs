@@ -139,6 +139,28 @@ public sealed class GameScreenTests : HostTestBase
     }
 
     [Fact]
+    public async Task ADamagedSave_DoesNotSilentlyFreezeTheGameScreen()
+    {
+        // The same freeze as above, reached through a damaged file rather than a locked one: a null
+        // entry in the quest array threw out of Continue, so the session never became ready and the
+        // logged error was the only sign anything had happened.
+        GameSession session = new(
+            new InMemorySaveProgressService { Content = """{ "PlayerX": 0, "PlayerY": 0, "Quests": [ null ] }""" },
+            new BattleForceCampaign(),
+            new BattleForceWorld());
+        GameScreen screen = new(session, new QuestProximityWatcher(new BattleForceWorld()), NullLogger<GameScreen>.Instance);
+
+        screen.Enter();
+        await screen.Started;
+        screen.Update(TimeSpan.FromMilliseconds(16));
+        screen.Update(TimeSpan.FromMilliseconds(16));
+
+        Assert.True(session.IsReady, "the game screen never became ready, so no frame will ever do anything");
+        Quest quest = Assert.Single(session.Quests.Active);
+        Assert.Equal(BattleForceCampaign.Quest1Id, quest.Id);
+    }
+
+    [Fact]
     public async Task AGameThatFailsToStart_IsLoggedRatherThanLostSilently()
     {
         // the session recovers from a save it cannot read, so anything left is a defect — and a

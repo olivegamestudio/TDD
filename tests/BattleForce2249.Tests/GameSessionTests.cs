@@ -277,6 +277,59 @@ public sealed class GameSessionTests
         Assert.True(quest.IsCompleted);
     }
 
+    [Fact]
+    public async Task Continue_StartsANewGame_WhenTheSaveHoldsANullQuestEntry()
+    {
+        // "Quests": null was already handled; a null *element* was not, and reached QuestLog.Restore
+        // as a NullReferenceException that escaped Continue and left the game frozen
+        _saves.Content = """{ "PlayerX": 0, "PlayerY": 0, "Quests": [ null ] }""";
+        GameSession session = CreateSession();
+
+        await session.Continue();
+
+        Assert.True(session.IsReady);
+        Assert.NotNull(session.Quests.Find("quest-1"));
+    }
+
+    [Fact]
+    public async Task Continue_StartsANewGame_WhenTheSaveHoldsAQuestEntryWithNoId()
+    {
+        // a quest entry naming no quest is not something this build ever wrote
+        _saves.Content = """{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "State": "Active" } ] }""";
+        GameSession session = CreateSession();
+
+        await session.Continue();
+
+        Assert.True(session.IsReady);
+        Assert.NotNull(session.Quests.Find("quest-1"));
+    }
+
+    [Fact]
+    public async Task Continue_LeavesAQuestThatCanStart_WhenTheSaveHoldsAnUnreachablePosition()
+    {
+        // 1e400 does not throw; it overflows to Infinity and the save reads as valid. Every distance
+        // from there is Infinity, so no proximity trigger can ever fire and no amount of flying
+        // changes that — the same brick as a quest state outside the enum, through the position.
+        _saves.Content = """
+        { "PlayerX": 1e400, "PlayerY": 0, "Quests": [ { "QuestId": "quest-1", "State": "NotStarted" } ] }
+        """;
+        GameSession session = CreateSession();
+        QuestProximityWatcher watcher = new(new TestWorld(new QuestMarkers("quest-1", Start, End)));
+
+        await session.Continue();
+
+        for (int frame = 0; frame < 500; frame++)
+        {
+            watcher.Update(session.Quests, session.Player.Position);
+            session.Player.MoveBy(0, 10);
+        }
+
+        Quest quest = session.Quests.Find("quest-1")!;
+        Assert.True(
+            quest.IsActive || quest.IsCompleted,
+            $"the quest never started: the player is at {session.Player.Position.X},{session.Player.Position.Y} and can never reach a marker");
+    }
+
     // ---- a save that cannot be read ----
 
     static FailingSaveProgressService LockedSave() =>

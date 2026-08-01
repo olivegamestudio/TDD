@@ -67,7 +67,17 @@ public sealed class QuestLog
     /// </summary>
     /// <param name="id">The identifier to look for.</param>
     /// <returns>The quest, or <c>null</c> when no quest is registered under that identifier.</returns>
-    public Quest? Find(string id) => _quests.GetValueOrDefault(id);
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="id"/> is <c>null</c>. "No quest is registered under no identifier" would be
+    /// a plausible answer and a wrong one: nothing in a game asks for a quest it cannot name, so a
+    /// null here is a defect upstream and quietly returning <c>null</c> would hide it.
+    /// </exception>
+    public Quest? Find(string id)
+    {
+        ArgumentNullException.ThrowIfNull(id);
+
+        return _quests.GetValueOrDefault(id);
+    }
 
     /// <summary>
     /// Empties the log, detaching from the quests it held so a discarded quest can no longer
@@ -95,14 +105,58 @@ public sealed class QuestLog
     /// Puts the registered quests back into their saved states, raising no events.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Saves and campaigns drift apart over a game's life, and both directions are tolerated: a
     /// quest the save knows about but this build no longer ships is ignored, and a quest added
-    /// since the save was written simply starts from the beginning.
+    /// since the save was written simply starts from the beginning. An entry naming no registered
+    /// quest — including one whose identifier is blank — is drift of the same kind and is skipped.
+    /// </para>
+    /// <para>
+    /// Progress that cannot be read at all is a different matter and is refused, because a log left
+    /// holding a state that does not exist is a quest nothing can ever start or finish. The refusal
+    /// is all-or-nothing: the whole batch is checked before any of it is applied, so a game that
+    /// catches one of these still has the log it started with rather than half a save.
+    /// </para>
     /// </remarks>
     /// <param name="progress">The saved quest states.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="progress"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="progress"/> holds an entry that is <c>null</c>, or one whose
+    /// <see cref="QuestProgress.QuestId"/> is <c>null</c>.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="progress"/> holds a state that is not one of the states a quest has.
+    /// </exception>
     public void Restore(IEnumerable<QuestProgress> progress)
     {
-        foreach (QuestProgress saved in progress)
+        ArgumentNullException.ThrowIfNull(progress);
+
+        // Taken once: the caller may hand over a lazy sequence, and reading it twice could yield
+        // something different the second time — checking one batch and applying another.
+        QuestProgress[] entries = [.. progress];
+
+        foreach (QuestProgress saved in entries)
+        {
+            if (saved is null)
+            {
+                throw new ArgumentException(
+                    "The saved progress holds an entry that is not there.", nameof(progress));
+            }
+
+            if (saved.QuestId is null)
+            {
+                throw new ArgumentException(
+                    "The saved progress holds an entry that names no quest.", nameof(progress));
+            }
+
+            if (!Enum.IsDefined(saved.State))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(progress), saved.State, $"'{(int)saved.State}' is not a quest state.");
+            }
+        }
+
+        foreach (QuestProgress saved in entries)
         {
             Find(saved.QuestId)?.Restore(saved.State);
         }

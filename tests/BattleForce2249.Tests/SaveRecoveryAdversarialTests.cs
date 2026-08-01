@@ -259,4 +259,71 @@ public class SaveRecoveryAdversarialTests
         Assert.True(session.Quests.Find("quest-1")!.IsCompleted);
         Assert.Equal(saveOnDisk, saves.Content);
     }
+
+    // ---- the invariant the freezes kept coming back through ----
+
+    public static TheoryData<string> DamagedSaves() =>
+    [
+        "not json at all",
+        "{ \"PlayerX\": ",
+        "null",
+        "[]",
+        "{}",
+        """{ "Quests": null }""",
+        """{ "Quests": [ null ] }""",
+        """{ "Quests": [ null, { "QuestId": "quest-1", "State": "Active" } ] }""",
+        """{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "State": "Active" } ] }""",
+        """{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "QuestId": null, "State": "Active" } ] }""",
+        """{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "QuestId": "", "State": "Active" } ] }""",
+        """{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "QuestId": "quest-1", "State": 99 } ] }""",
+        """{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "QuestId": "quest-1", "State": null } ] }""",
+        """{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "QuestId": "quest-1", "State": "Nonsense" } ] }""",
+        """{ "PlayerX": 1e400, "PlayerY": 0, "Quests": [] }""",
+        """{ "PlayerX": 0, "PlayerY": -1e400, "Quests": [] }""",
+        """{ "PlayerX": 1e400, "PlayerY": 1e400, "Quests": [ null ] }""",
+        """{ "PlayerX": "over there", "PlayerY": 0, "Quests": [] }""",
+        """{ "PlayerX": 0, "PlayerY": 0, "Quests": {} }""",
+        """{ "PlayerX": 0, "PlayerY": 0, "Quests": [ [] ] }""",
+    ];
+
+    [Theory]
+    [MemberData(nameof(DamagedSaves))]
+    public async Task ADamagedSave_AlwaysLeavesAPlayableGame(string content)
+    {
+        // Every freeze reported against this issue has been the same shape: a save the serializer
+        // accepted, something further in throwing, and the exception escaping Continue because it
+        // was not a storage failure. Rather than patch the inputs one at a time, this pins the rule
+        // — whatever the file says, the player gets a game they can play.
+        GameSession session = CreateSession(new FailingSaveProgressService { Content = content });
+
+        await session.Continue();
+
+        Assert.True(session.IsReady, $"the session never became ready for: {content}");
+        Quest quest = session.Quests.Find("quest-1")!;
+        Assert.NotNull(quest);
+        Assert.True(double.IsFinite(session.Player.Position.X) && double.IsFinite(session.Player.Position.Y));
+    }
+
+    [Theory]
+    [MemberData(nameof(DamagedSaves))]
+    public async Task ADamagedSave_AlwaysLeavesQuest1Completable(string content)
+    {
+        // Ready is not the same as playable: an accepted position out at Infinity leaves a session
+        // that is ready and a quest that can never fire. Fly it, and prove the game is really there.
+        GameSession session = CreateSession(new FailingSaveProgressService { Content = content });
+        QuestProximityWatcher watcher = new(new World());
+
+        await session.Continue();
+
+        for (int frame = 0; frame < 500 && !session.Quests.Find("quest-1")!.IsCompleted; frame++)
+        {
+            watcher.Update(session.Quests, session.Player.Position);
+            session.Player.MoveBy(0, 10);
+        }
+
+        Quest quest = session.Quests.Find("quest-1")!;
+        Assert.True(
+            quest.IsCompleted,
+            $"the quest could not be played from {session.Player.Position.X},{session.Player.Position.Y} for: {content}");
+    }
 }

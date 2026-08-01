@@ -63,4 +63,48 @@ public sealed class SaveGameSerializerTests
 
         Assert.Null(SaveGameSerializer.Deserialize(content));
     }
+
+    [Theory]
+    // a null element, rather than a null list — the list was guarded, the elements were not
+    [InlineData("""{ "PlayerX": 0, "PlayerY": 0, "Quests": [ null ] }""")]
+    // an entry that names no quest: absent, null, blank
+    [InlineData("""{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "State": "Active" } ] }""")]
+    [InlineData("""{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "QuestId": null, "State": "Active" } ] }""")]
+    [InlineData("""{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "QuestId": "", "State": "Active" } ] }""")]
+    [InlineData("""{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "QuestId": "   ", "State": "Active" } ] }""")]
+    public void Deserialize_ReturnsNull_ForAQuestEntryThisBuildDidNotWrite(string content)
+    {
+        // these reached QuestLog.Restore as a NullReferenceException and an ArgumentNullException,
+        // neither of which is a storage failure — so they escaped the session and froze the game
+        Assert.Null(SaveGameSerializer.Deserialize(content));
+    }
+
+    [Theory]
+    // 1e400 is well-formed JSON that overflows to Infinity rather than failing to parse
+    [InlineData("1e400")]
+    [InlineData("-1e400")]
+    public void Deserialize_ReturnsNull_ForAPositionNoPlayerCanBeAt(string coordinate)
+    {
+        // a non-finite position is not a crash, it is worse: every distance from it is Infinity, so
+        // no proximity trigger can ever fire and the quest can never be started or completed
+        string x = $$"""{ "PlayerX": {{coordinate}}, "PlayerY": 0, "Quests": [] }""";
+        string y = $$"""{ "PlayerX": 0, "PlayerY": {{coordinate}}, "Quests": [] }""";
+
+        Assert.Null(SaveGameSerializer.Deserialize(x));
+        Assert.Null(SaveGameSerializer.Deserialize(y));
+    }
+
+    [Fact]
+    public void Deserialize_StillReadsASaveAtTheFarEdgeOfTheWorld()
+    {
+        // the guard is on values that are not positions at all, not on distant ones
+        string content = $$"""
+        { "PlayerX": {{double.MaxValue.ToString("R", System.Globalization.CultureInfo.InvariantCulture)}}, "PlayerY": 0, "Quests": [] }
+        """;
+
+        SaveGame? loaded = SaveGameSerializer.Deserialize(content);
+
+        Assert.NotNull(loaded);
+        Assert.Equal(double.MaxValue, loaded.PlayerX);
+    }
 }

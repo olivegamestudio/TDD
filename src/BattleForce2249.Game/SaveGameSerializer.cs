@@ -46,13 +46,41 @@ public static class SaveGameSerializer
         try
         {
             SaveGame? save = JsonSerializer.Deserialize<SaveGame>(content, Options);
+            if (save is null)
+            {
+                return null;
+            }
 
             // a save written as JSON null, or with a null quest list, is still readable
-            return save is null ? null : save with { Quests = save.Quests ?? [] };
+            save = save with { Quests = save.Quests ?? [] };
+
+            return IsPlayable(save) ? save : null;
         }
         catch (JsonException)
         {
             return null;
         }
     }
+
+    /// <summary>
+    /// Whether a save that parsed is one the game can actually be resumed from.
+    /// </summary>
+    /// <remarks>
+    /// Parsing is not the whole of "a save this build can read". Content that is well-formed JSON
+    /// but not a game — a quest entry that is not there, one naming no quest, a coordinate that is
+    /// not a place — used to be handed on as valid and then throw or brick further in, where the
+    /// player's only symptom was a game that quietly stopped. This is the one point that decides,
+    /// so everything downstream can be written against a save that makes sense, and the answer for
+    /// anything that does not is the one the class already promises: no save, so a new game.
+    /// </remarks>
+    /// <param name="save">The parsed save.</param>
+    /// <returns><c>true</c> when the save can be resumed from.</returns>
+    static bool IsPlayable(SaveGame save) =>
+        // Infinity is the dangerous one, and it does not come from a broken file: 1e400 is valid
+        // JSON that overflows on the way in. Every distance measured from there is Infinity, so no
+        // proximity trigger can ever fire again — a quest that can never start and never complete.
+        double.IsFinite(save.PlayerX)
+        && double.IsFinite(save.PlayerY)
+        // A quest entry with no id is not this build's writing, and it is what QuestLog refuses.
+        && save.Quests.All(quest => quest is not null && !string.IsNullOrWhiteSpace(quest.QuestId));
 }
