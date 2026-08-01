@@ -66,6 +66,19 @@ public sealed class GameScreenTests : HostTestBase
     }
 
     [Fact]
+    public void ANewGame_PutsThePlayerInTheDisgracedsShip()
+    {
+        // through the shipping composition, not a hand built session: a player who launches the
+        // game and starts is flying a ship, and it is the one with a graphic to draw
+        StartTheGame();
+
+        ShipModel? ship = Session.Player.Ship;
+        Assert.NotNull(ship);
+        Assert.Same(DisgracedShip.Model, ship);
+        Assert.Equal("ship1", ship.AssetKey);
+    }
+
+    [Fact]
     public void Quest1_IsActive_AfterTheFirstFrameOfANewGame()
     {
         // the screen, not the quest model, notices the player is on the start marker

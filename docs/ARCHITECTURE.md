@@ -27,7 +27,7 @@ to know about ships, quests or credits is on the wrong side of this line.
 | `OliveGameStudio.UI`, `.UI.Abstractions` | Menu and button navigation. Not ship control. |
 | `OliveGameStudio.FrameRate` | Frame time filtering, so a paused or slowed game holds still while frames keep arriving. |
 | `OliveGameStudio.Progress` | `LocalSaveProgressService`, persisting save text to a file. |
-| `OliveGameStudio.World` | `Position`, `Player`, `Velocity`. The spatial model, and the ship physics that moves through it: `ShipMovement`, `ShipHandling`, `ShipControls`, `IShipInput`. |
+| `OliveGameStudio.World` | `Position`, `Player`, `Velocity`. The spatial model, the ship the player owns (`ShipModel`), and the ship physics that moves through it: `ShipMovement`, `ShipHandling`, `ShipControls`, `IShipInput`. |
 | `OliveGameStudio.Localisation` | `ITextProvider`, `JsonTextProvider`, `MissingTextException`. |
 | `Pilgrimage` | The quest system. No project references at all, by design. |
 | `BattleForce2249` | Game host and DI registration. |
@@ -97,6 +97,31 @@ pillar 1, not a tuning detail.
 the speed the two settle at. A separate top speed could be set to disagree with the physics that
 produces it, leaving the ship either short of its stated maximum or walled off below it.
 
+## The ship the player owns
+
+Flying a ship and owning one are two different facts about it, and they are held apart.
+
+- `ShipHandling` is what the physics needs: acceleration, drag, turn rate. Nothing else.
+- `ShipModel` is the ship as a possession — a stable `Id`, the `AssetKey` its graphic is loaded
+  under, and the `ShipHandling` it flies on. Both strings are identifiers and are never
+  translated; the id goes into the save, so it has to outlive a rename of the type or of the ship
+  in the fiction.
+- `Player.Ship` is which ship the player is in, awarded through `GiveShip`. It is `null` until a
+  game has started or resumed, because the engine ships no ships and only the game knows which one
+  a new game hands over.
+
+Game side, `IShipyard` / `BattleForceShipyard` is the seam the ships arrive through, the same way
+`ICampaign` supplies quests and `IWorld` supplies markers. It answers two questions: which ship a
+new game awards, and which ship an id from a save resolves to. `DisgracedShip.Model` is the only
+stock so far, and it carries `DisgracedShip.Handling` itself rather than a second copy of the
+numbers — the ship the player owns and the ship the physics flies cannot drift apart.
+
+**The awarded ship is saved, not re-derived.** `SaveGame.ShipId` records it, and a resumed game
+puts the player back in the ship the save names. Pillar 4 is why: the persistent record survives,
+and a player who has earned a second ship must not be quietly demoted by a reload. A save with no
+ship id, or one naming a ship this build no longer stocks, falls back to the starting ship — the
+same tolerance the quest list already gets in both directions.
+
 `GameScreen.Update` flies the ship **before** it measures the quests, so a trigger fires on the
 frame it is reached rather than the frame after — at 200 units a second, a frame late is a marker
 the player has already passed. Entering the screen resets the ship: the save carries where the
@@ -105,7 +130,8 @@ player is, never how fast they were going.
 ## Saved progress
 
 The engine's `ISaveProgressService` exposes `HasProgress`, `Load` and `Save`, all in terms of
-text. `SaveGame` and `SaveGameSerializer` in `BattleForce2249.Game` decide what that text is.
+text. `SaveGame` and `SaveGameSerializer` in `BattleForce2249.Game` decide what that text is: the
+player's position, the id of the ship they are flying, and every registered quest's state.
 
 Reading is deliberately forgiving: a missing, blank or damaged save deserialises to `null` and is
 reported as "no save", so a corrupt file yields a new game rather than a crash. Quest states are
@@ -114,7 +140,8 @@ the compatibility boundary — changing it changes what older saves can be read 
 
 A save the campaign has drifted from is tolerated in both directions: a quest the save knows but
 this build no longer ships is ignored, and a quest added since the save was written starts from
-the beginning.
+the beginning. The ship id is treated the same way — a save written before ships were recorded,
+or one naming a ship this build no longer stocks, loads into the starting ship.
 
 ## Localised text
 
@@ -151,8 +178,15 @@ the session; its `Update` drives the proximity watcher once the session is ready
   so a frame long enough to carry the ship further than a trigger's distance steps over it. Quest
   1's markers are sized clear of that at any playable frame rate, but the tolerance is the only
   thing preventing it.
+- Nothing draws the ship. The player is awarded one and the save carries which, but nothing reads
+  `Player.Ship.AssetKey` and puts a texture on screen; that is a separate `ENGINE` issue.
+- `ShipMovement` is constructed from the registered `ShipHandling` rather than from the ship the
+  player is actually in. With one ship in the shipyard the two are the same object, so nothing is
+  wrong today, but the second ship is the point at which the physics has to start asking
+  `Player.Ship` how it handles.
 - Nothing displays a quest title. There is no HUD or quest log; that is a separate `ENGINE`
   issue.
 - Nothing selects a language. Translations are reachable only through the machine's own culture.
-- There is no persistent record (experience, credits, quest history) separate from the saved
-  position. See pillar 4 in `docs/DESIGN.md`.
+- The persistent record is still thin. The save carries position, ship and quest state; there is
+  no experience, credits or quest history, and nothing yet distinguishes the record that survives
+  death from the position that does not. See pillar 4 in `docs/DESIGN.md`.

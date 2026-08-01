@@ -20,6 +20,23 @@ public sealed class GameSessionTests
         public IReadOnlyList<QuestMarkers> QuestMarkers { get; } = markers;
     }
 
+    static readonly ShipModel Starter = new("starter", "ship1", new ShipHandling(180, 0.9, 2.5));
+
+    static readonly ShipModel Earned = new("earned", "ship2", new ShipHandling(240, 0.8, 2.2));
+
+    /// <summary>
+    /// A shipyard stocking exactly what a test wants. The first ship is the one a new game awards.
+    /// </summary>
+    sealed class TestShipyard(params ShipModel[] ships) : IShipyard
+    {
+        public ShipModel StartingShip => Ships[0];
+
+        public IReadOnlyList<ShipModel> Ships { get; } = ships;
+
+        public ShipModel? Find(string? id) =>
+            id is null ? null : Ships.FirstOrDefault(ship => ship.Id == id);
+    }
+
     static QuestDefinition Quest(string id, bool autoStarts = true) =>
         new(id,
             $"Title of {id}",
@@ -29,14 +46,18 @@ public sealed class GameSessionTests
 
     readonly InMemorySaveProgressService _saves = new();
 
-    GameSession CreateSession(params string[] questIds)
+    GameSession CreateSession(params string[] questIds) =>
+        CreateSession(new TestShipyard(Starter), questIds);
+
+    GameSession CreateSession(IShipyard shipyard, params string[] questIds)
     {
         string[] ids = questIds.Length == 0 ? ["quest-1"] : questIds;
 
         return new GameSession(
             _saves,
             new TestCampaign([.. ids.Select(id => Quest(id))]),
-            new TestWorld([.. ids.Select(id => new QuestMarkers(id, Start, End))]));
+            new TestWorld([.. ids.Select(id => new QuestMarkers(id, Start, End))]),
+            shipyard);
     }
 
     // ---- starting a new game ----
@@ -49,6 +70,31 @@ public sealed class GameSessionTests
         await session.StartNewGame();
 
         Assert.Equal(Start, session.Player.Position);
+    }
+
+    [Fact]
+    public async Task StartNewGame_AwardsThePlayerTheStartingShip()
+    {
+        GameSession session = CreateSession();
+        Assert.Null(session.Player.Ship);
+
+        await session.StartNewGame();
+
+        Assert.Same(Starter, session.Player.Ship);
+    }
+
+    [Fact]
+    public async Task StartNewGame_TakesBackAShipEarnedInAPreviousGame()
+    {
+        // a new game is a new game: starting one over the top of a finished one must not leave
+        // the player flying whatever the last run ended in
+        GameSession session = CreateSession(new TestShipyard(Starter, Earned));
+        await session.StartNewGame();
+        session.Player.GiveShip(Earned);
+
+        await session.StartNewGame();
+
+        Assert.Same(Starter, session.Player.Ship);
     }
 
     [Fact]
@@ -110,6 +156,20 @@ public sealed class GameSessionTests
         Assert.NotNull(saved);
         Assert.Equal(3, saved.PlayerX);
         Assert.Equal(400, saved.PlayerY);
+    }
+
+    [Fact]
+    public async Task SavesTheShipThePlayerIsFlying()
+    {
+        // pillar 4: the persistent record survives. A ship the player has earned is part of that
+        // record, not something re-derived from the campaign every time the game loads.
+        GameSession session = CreateSession(new TestShipyard(Starter, Earned));
+        await session.StartNewGame();
+
+        session.Player.GiveShip(Earned);
+        await session.Save();
+
+        Assert.Equal(Earned.Id, _saves.Saved!.ShipId);
     }
 
     [Fact]
@@ -199,6 +259,64 @@ public sealed class GameSessionTests
 
         Assert.Equal(new Position(0, 700), resumed.Player.Position);
         Assert.Single(resumed.Quests.Active);
+    }
+
+    [Fact]
+    public async Task Continue_PutsThePlayerBackInTheShipTheySaved()
+    {
+        GameSession first = CreateSession(new TestShipyard(Starter, Earned));
+        await first.StartNewGame();
+        first.Player.GiveShip(Earned);
+        await first.Save();
+
+        GameSession resumed = CreateSession(new TestShipyard(Starter, Earned));
+        await resumed.Continue();
+
+        Assert.Same(Earned, resumed.Player.Ship);
+    }
+
+    [Fact]
+    public async Task Continue_AwardsTheStartingShip_WhenTheSavePreDatesShipsBeingRecorded()
+    {
+        // an older save has no ship id at all, and must still load
+        _saves.Content = SaveGameSerializer.Serialize(new SaveGame
+        {
+            PlayerY = 500,
+            Quests = [new QuestProgress("quest-1", QuestState.Active)],
+        });
+        GameSession session = CreateSession();
+
+        await session.Continue();
+
+        Assert.Same(Starter, session.Player.Ship);
+    }
+
+    [Fact]
+    public async Task Continue_AwardsTheStartingShip_WhenTheSaveNamesAShipThisBuildNoLongerHas()
+    {
+        // drift is tolerated in both directions, the same as the quest list: being demoted a hull
+        // is a better outcome than a save that will not load
+        _saves.Content = SaveGameSerializer.Serialize(new SaveGame
+        {
+            ShipId = "a-ship-from-a-later-build",
+            Quests = [new QuestProgress("quest-1", QuestState.NotStarted)],
+        });
+        GameSession session = CreateSession();
+
+        await session.Continue();
+
+        Assert.Same(Starter, session.Player.Ship);
+        Assert.True(session.IsReady);
+    }
+
+    [Fact]
+    public async Task Continue_AwardsTheStartingShip_WhenThereIsNoSave()
+    {
+        GameSession session = CreateSession();
+
+        await session.Continue();
+
+        Assert.Same(Starter, session.Player.Ship);
     }
 
     [Fact]

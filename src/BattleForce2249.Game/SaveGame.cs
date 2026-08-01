@@ -20,6 +20,17 @@ public sealed record SaveGame
     public double PlayerY { get; init; }
 
     /// <summary>
+    /// Gets the id of the ship the player was flying.
+    /// </summary>
+    /// <remarks>
+    /// The awarded ship is part of the persistent record rather than re-derived on load: pillar 4
+    /// says the record survives, and a player who has earned a second ship must not be quietly put
+    /// back in the first one by a reload. Blank means a save written before ships were recorded,
+    /// or one naming a ship this build no longer has; either way the player gets the starting ship.
+    /// </remarks>
+    public string ShipId { get; init; } = string.Empty;
+
+    /// <summary>
     /// Gets the state of every quest that was registered when the game was saved.
     /// </summary>
     public IReadOnlyList<QuestProgress> Quests { get; init; } = [];
@@ -34,8 +45,9 @@ public sealed record SaveGame
         other is not null
         && PlayerX.Equals(other.PlayerX)
         && PlayerY.Equals(other.PlayerY)
+        && string.Equals(ShipId, other.ShipId, StringComparison.Ordinal)
         && Quests.SequenceEqual(other.Quests);
 
     /// <inheritdoc />
-    public override int GetHashCode() => HashCode.Combine(PlayerX, PlayerY, Quests.Count);
+    public override int GetHashCode() => HashCode.Combine(PlayerX, PlayerY, ShipId, Quests.Count);
 }

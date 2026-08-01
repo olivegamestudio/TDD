@@ -19,6 +19,29 @@ public sealed class DisgracedShipTests
         new BattleForceWorld().QuestMarkers.Single(marker => marker.QuestId == BattleForceCampaign.Quest1Id);
 
     [Fact]
+    public void FliesOnTheHandlingItIsRegisteredWith()
+    {
+        // one set of numbers, not two: the ship the player owns and the ship the physics flies
+        // must not be able to drift apart
+        Assert.Same(Handling, DisgracedShip.Model.Handling);
+    }
+
+    [Fact]
+    public void IsDrawnWithTheShip1Graphic()
+    {
+        // ship1.png in the MonoGame content build; the pipeline drops the extension
+        Assert.Equal("ship1", DisgracedShip.Model.AssetKey);
+    }
+
+    [Fact]
+    public void KeepsAnIdThatSavesAlreadyName()
+    {
+        // pinned deliberately: this string is written into every save this build produces, so
+        // changing it silently puts existing players back in a ship the save no longer names
+        Assert.Equal("disgraced", DisgracedShip.Model.Id);
+    }
+
+    [Fact]
     public void CanBeFlown()
     {
         // the same rules ShipMovement enforces, checked against the shipping numbers so a bad

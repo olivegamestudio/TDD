@@ -74,6 +74,17 @@ public sealed class ServiceRegistrationTests
     }
 
     [Fact]
+    public void ResolvesTheShipyard()
+    {
+        using ServiceProvider provider = BuildProvider();
+
+        IShipyard shipyard = provider.GetRequiredService<IShipyard>();
+
+        Assert.IsType<BattleForceShipyard>(shipyard);
+        Assert.Same(DisgracedShip.Model, shipyard.StartingShip);
+    }
+
+    [Fact]
     public void SharesOneShip_BetweenTheGameScreenAndAnythingElseThatNeedsIt()
     {
         // two ships would each fly their own copy of the player around

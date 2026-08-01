@@ -12,6 +12,7 @@ public sealed class GameSession : IGameSession
     readonly ISaveProgressService _saveProgressService;
     readonly ICampaign _campaign;
     readonly IWorld _world;
+    readonly IShipyard _shipyard;
 
     /// <summary>
     /// Whether a quest changing state should write a save. It is turned off while a game is being
@@ -20,16 +21,22 @@ public sealed class GameSession : IGameSession
     bool _autoSave;
 
     /// <summary>
-    /// Creates a session for the given campaign and world.
+    /// Creates a session for the given campaign, world and ships.
     /// </summary>
     /// <param name="saveProgressService">The service the save game is written to and read from.</param>
     /// <param name="campaign">The quests the session plays.</param>
     /// <param name="world">The world it plays them in.</param>
-    public GameSession(ISaveProgressService saveProgressService, ICampaign campaign, IWorld world)
+    /// <param name="shipyard">The ships it can put the player in.</param>
+    public GameSession(
+        ISaveProgressService saveProgressService,
+        ICampaign campaign,
+        IWorld world,
+        IShipyard shipyard)
     {
         _saveProgressService = saveProgressService;
         _campaign = campaign;
         _world = world;
+        _shipyard = shipyard;
 
         Quests.QuestStarted += OnQuestChanged;
         Quests.QuestCompleted += OnQuestChanged;
@@ -70,6 +77,12 @@ public sealed class GameSession : IGameSession
 
         Reset();
         Player.MoveTo(new Position(save.PlayerX, save.PlayerY));
+
+        // a save naming a ship this build no longer has puts the player back in the starting one
+        // rather than failing to load: the same tolerance the save's quest list already gets, and
+        // being left shipless is a worse outcome than being demoted a hull
+        Player.GiveShip(_shipyard.Find(save.ShipId) ?? _shipyard.StartingShip);
+
         Quests.Restore(save.Quests);
 
         _autoSave = true;
@@ -80,7 +93,8 @@ public sealed class GameSession : IGameSession
     public Task Save() => _saveProgressService.Save(SaveGameSerializer.Serialize(Capture()));
 
     /// <summary>
-    /// Returns the session to a freshly registered campaign with the player at the world's start.
+    /// Returns the session to a freshly registered campaign, with the player at the world's start
+    /// in the ship a new game awards.
     /// </summary>
     void Reset()
     {
@@ -94,6 +108,7 @@ public sealed class GameSession : IGameSession
         }
 
         Player.MoveTo(_world.PlayerStart);
+        Player.GiveShip(_shipyard.StartingShip);
     }
 
     /// <summary>
@@ -103,6 +118,10 @@ public sealed class GameSession : IGameSession
     {
         PlayerX = Player.Position.X,
         PlayerY = Player.Position.Y,
+
+        // blank only if something saved before a game was started or resumed, which reads back as
+        // "no ship recorded" and awards the starting one — the same as an older save
+        ShipId = Player.Ship?.Id ?? string.Empty,
         Quests = Quests.Capture(),
     };
 

@@ -58,6 +58,10 @@ public static class BattleForceServiceCollectionExtensions
             .AddSingleton(DisgracedShip.Handling)
             .AddSingleton<ShipMovement>()
 
+            // the ships the game can put the player in, and so which one a new game awards and
+            // which one a save's ship id resolves to
+            .AddSingleton<IShipyard, BattleForceShipyard>()
+
             // the quest content, the world its markers stand in, and the watcher that measures
             // the player against them
             .AddSingleton<ICampaign, BattleForceCampaign>()

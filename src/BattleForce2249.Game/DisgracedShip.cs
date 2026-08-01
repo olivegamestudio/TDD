@@ -43,4 +43,19 @@ public static class DisgracedShip
         Acceleration: 180,
         Drag: 0.9,
         TurnRate: 2.5);
+
+    /// <summary>
+    /// Gets the ship itself: the one a new game awards, and the one every save so far names.
+    /// </summary>
+    /// <remarks>
+    /// It carries <see cref="Handling"/> rather than a second copy of the numbers, so the ship the
+    /// player owns and the ship the physics flies cannot drift apart.
+    /// </remarks>
+    public static ShipModel Model { get; } = new(
+        // an identifier, never translated. It goes into the save, so it outlives any rename of
+        // the type or of the ship's name in the fiction.
+        Id: "disgraced",
+        // ship1.png in the content build; the content pipeline drops the extension
+        AssetKey: "ship1",
+        Handling: Handling);
 }
