@@ -109,6 +109,9 @@ public sealed class ConfigurationBindingTests
         Assert.NotNull(
             configuration[
                 $"{DisplayOptions.SectionName}:{nameof(DisplayOptions.WidestSupportedViewportInPixels)}"]);
+        Assert.NotNull(
+            configuration[
+                $"{DisplayOptions.SectionName}:{nameof(DisplayOptions.NarrowestSupportedViewportInPixels)}"]);
     }
 
     [Fact]
@@ -161,15 +164,50 @@ public sealed class ConfigurationBindingTests
             () => provider.GetRequiredService<IOptions<DisplayOptions>>().Value);
     }
 
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-720")]
+    [InlineData("NaN")]
+    public void InvalidNarrowestDisplay_IsRefusedWhereItIsConfigured(string narrowest)
+    {
+        // the same argument at the far end: the ceiling on a tile size is half of this, so a
+        // declaration nothing can be halved gives a ceiling that admits every layer put to it
+        using ServiceProvider provider = BuildProvider(InMemory(
+            ($"{DisplayOptions.SectionName}:{nameof(DisplayOptions.NarrowestSupportedViewportInPixels)}",
+                narrowest)));
+
+        Assert.Throws<OptionsValidationException>(
+            () => provider.GetRequiredService<IOptions<DisplayOptions>>().Value);
+    }
+
     [Fact]
-    public void TheStarFieldIsFlooredAgainstTheConfiguredDisplay()
+    public void ADisplayDeclaredNarrowerAtTheWideEnd_IsRefusedAtBinding()
+    {
+        // a contradiction rather than a tight bound — the two screens are what a star layer is held
+        // between, so this way round leaves no tile size that clears both. Caught in the section
+        // that carries it, rather than discovered later as a field that refuses all its content.
+        using ServiceProvider provider = BuildProvider(InMemory(
+            ($"{DisplayOptions.SectionName}:{nameof(DisplayOptions.WidestSupportedViewportInPixels)}", "1920"),
+            ($"{DisplayOptions.SectionName}:{nameof(DisplayOptions.NarrowestSupportedViewportInPixels)}", "3840")));
+
+        Assert.Throws<OptionsValidationException>(
+            () => provider.GetRequiredService<IOptions<DisplayOptions>>().Value);
+    }
+
+    [Fact]
+    public void TheStarFieldIsBoundedAgainstTheConfiguredDisplay()
     {
         // the wiring end to end: a build that declares a different screen gets a star field that
-        // holds its layers against that screen, without anything else being told about it
+        // holds its layers against that screen at both ends, without anything else being told
         using ServiceProvider provider = BuildProvider(InMemory(
-            ($"{DisplayOptions.SectionName}:{nameof(DisplayOptions.WidestSupportedViewportInPixels)}", "5120")));
+            ($"{DisplayOptions.SectionName}:{nameof(DisplayOptions.WidestSupportedViewportInPixels)}", "5120"),
+            ($"{DisplayOptions.SectionName}:{nameof(DisplayOptions.NarrowestSupportedViewportInPixels)}", "1080")));
 
-        Assert.Equal(5120f, provider.GetRequiredService<StarField>().WidestSupportedViewportInPixels);
+        StarField field = provider.GetRequiredService<StarField>();
+
+        Assert.Equal(5120f, field.WidestSupportedViewportInPixels);
+        Assert.Equal(1080f, field.NarrowestSupportedViewportInPixels);
+        Assert.Equal(540f, field.LargestUsableTileSize);
     }
 
     [Fact]

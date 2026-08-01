@@ -82,14 +82,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- **The game states the widest screen it supports, in one place.** `DisplayOptions` binds from a
-  `Display` section of configuration and carries `WidestSupportedViewportInPixels`, defaulting to
-  7680 — 8K, and wider than any ultrawide sold today. It is a statement about the screen the game
-  promises to look right on, not a window size: the game still draws to whatever viewport the
-  device reports. `StarField` reads its floor from it rather than holding a constant of its own,
-  so `SmallestUsableTileSize` and `WidestSupportedViewportInPixels` are now instance members and
-  `StarField` takes an `IOptions<DisplayOptions>`. A build that declares a different screen gets a
-  star field floored against that screen.
+- **The game states the screens it supports, in one place and at both ends.** `DisplayOptions`
+  binds from a `Display` section of configuration and carries `WidestSupportedViewportInPixels`
+  (7680 — 8K, and wider than any ultrawide sold today) and `NarrowestSupportedViewportInPixels`
+  (720, the short side of a 720p display). They are statements about the screens the game promises
+  to look right on, not window sizes: the game still draws to whatever viewport the device reports.
+  `StarField` reads both bounds from them rather than holding constants of its own, so
+  `SmallestUsableTileSize`, `WidestSupportedViewportInPixels`, `NarrowestSupportedViewportInPixels`
+  and `LargestUsableTileSize` are now instance members and `StarField` takes an
+  `IOptions<DisplayOptions>`. A build that declares different screens gets a star field bounded
+  against them: a wider one raises the floor, a narrower one lowers the ceiling. A declared screen
+  that is not a finite positive number of pixels, or a narrowest wider than the widest, is refused
+  at binding and at construction — the second is a contradiction rather than a tight bound, and
+  would leave the two bounds crossed and every layer refused.
   ([#50](https://github.com/olivegamestudio/TDD/issues/50))
 
 - **The game window clears to black rather than cornflower blue.** It is space, and it is now a
@@ -129,7 +134,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   coverage test grids the viewport 16 cells across rather than 4 — a grid whose cells are wider
   than the border being looked for cannot see the border, which is why the coarse grid passed at
   7680 while the fine one failed. The shipping layers reach a little over 22,000 pixels, which is
-  what bounds how much wider a build can honestly declare.
+  what bounds how much wider a build can honestly declare. `NarrowestSupportedViewportInPixels`
+  was the same defect at the far end — a constant of 720 inside `StarField`, deriving the ceiling
+  the game validates its content against — and moved with it, so the game no longer declares one of
+  the two screens it supports and guesses the other.
   ([#50](https://github.com/olivegamestudio/TDD/issues/50))
 
 - **Quest proximity triggers are swept across the frame, not sampled at the end of it.**

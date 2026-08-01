@@ -43,9 +43,12 @@ namespace BattleForce2249;
 /// </para>
 /// <para>
 /// There is a ceiling for the opposite reason — see
-/// <see cref="StarField.LargestUsableTileSize"/>. A tile wider than half the screen need not have
-/// a star anywhere the player is looking, so a layer sown that thinly can show an empty sky while
-/// passing every other check. <see cref="StarField.Layers"/> refuses that end too.
+/// <see cref="StarField.LargestUsableTileSize"/>, which is half
+/// <see cref="DisplayOptions.NarrowestSupportedViewportInPixels"/>. A tile wider than half the
+/// screen need not have a star anywhere the player is looking, so a layer sown that thinly can
+/// show an empty sky while passing every other check. <see cref="StarField.Layers"/> refuses that
+/// end too. This end moves with the declared screen as well, in the other direction: declaring a
+/// <em>narrower</em> screen lowers the ceiling.
 /// </para>
 /// </param>
 /// <param name="StarsPerTile">How many stars stand in each tile.</param>

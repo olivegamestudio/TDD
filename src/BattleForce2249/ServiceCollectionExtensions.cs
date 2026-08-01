@@ -63,7 +63,24 @@ public static class BattleForceServiceCollectionExtensions
                     && options.WidestSupportedViewportInPixels > 0f,
                 $"{DisplayOptions.SectionName}:"
                 + $"{nameof(DisplayOptions.WidestSupportedViewportInPixels)} must be a finite "
-                + "positive number of pixels.");
+                + "positive number of pixels.")
+            .Validate(
+                options => float.IsFinite(options.NarrowestSupportedViewportInPixels)
+                    && options.NarrowestSupportedViewportInPixels > 0f,
+                $"{DisplayOptions.SectionName}:"
+                + $"{nameof(DisplayOptions.NarrowestSupportedViewportInPixels)} must be a finite "
+                + "positive number of pixels.")
+
+            // A contradiction rather than a tight bound: the two screens are what a star layer is
+            // held between, so declaring them the wrong way round leaves no tile size that clears
+            // both. Caught in the declaration rather than discovered as a bound that accepts
+            // nothing.
+            .Validate(
+                options => !(options.NarrowestSupportedViewportInPixels
+                    > options.WidestSupportedViewportInPixels),
+                $"{DisplayOptions.SectionName}:"
+                + $"{nameof(DisplayOptions.NarrowestSupportedViewportInPixels)} cannot be wider "
+                + $"than {nameof(DisplayOptions.WidestSupportedViewportInPixels)}.");
 
         if (configure is not null)
         {

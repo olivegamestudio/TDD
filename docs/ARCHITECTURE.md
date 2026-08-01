@@ -238,10 +238,19 @@ declaration is their reach, a little over 22,000 pixels, which a test pins so ra
 is a decision rather than a silent band.
 
 A tile size is bounded at the far end too, against `LargestUsableTileSize` — half
-`NarrowestSupportedViewportInPixels`, since a screen two tiles across always spans a whole tile and
-so is certain to be shown that tile's stars. A layer sown more thinly than that draws a handful of
-stars and can put none of them on screen: the same "passed validation and shows the player nothing"
-failure as the blank border, reached from the opposite direction.
+`DisplayOptions.NarrowestSupportedViewportInPixels`, since a screen two tiles across always spans a
+whole tile and so is certain to be shown that tile's stars. A layer sown more thinly than that
+draws a handful of stars and can put none of them on screen: the same "passed validation and shows
+the player nothing" failure as the blank border, reached from the opposite direction.
+
+**Both ends are declared, and for the same reason.** The narrowest screen was a constant inside
+`StarField` until #50, which left the game stating one of the two screens it supports and guessing
+the other — the same defect the issue was raised for, at the other end of the same pair. Both now
+bind from the `Display` section, and the two move the bounds in opposite directions: declaring a
+wider screen raises the floor, declaring a narrower one lowers the ceiling, and both shrink the
+range of tile sizes a layer may be sown at. Declaring a narrowest screen wider than the widest is
+refused at binding and at construction — it is not a tight bound but a contradiction, and the two
+bounds would cross and refuse everything with advice pointing in both directions at once.
 
 Layer validation checks that each number **is a number** before it checks any range, and `Render`
 asks the same of the zoom and the viewport. Every range check is an ordered comparison and an

@@ -130,14 +130,24 @@ public sealed class StarField : IRenderable
     /// at one pixel per unit.
     /// </summary>
     /// <remarks>
-    /// The companion to <see cref="WidestSupportedViewportInPixels"/> and the same kind of stated
-    /// assumption: nothing in the repository declares a display size, so a bound on a tile size can
-    /// only be taken against a screen someone names. It is the narrowest <em>side</em> rather than
-    /// a width because a tile is square and has to fit the shorter axis. The safe direction to be
-    /// wrong in is the opposite one here — too small a guess only tightens the ceiling, while too
-    /// large a one would admit a layer that shows the player an empty sky on a smaller display.
+    /// <para>
+    /// The companion to <see cref="WidestSupportedViewportInPixels"/>, and read the same way: from
+    /// <see cref="DisplayOptions.NarrowestSupportedViewportInPixels"/> rather than decided here. A
+    /// bound on a tile size can only be taken against a screen someone names, and naming it is the
+    /// game's job rather than the star field's — which is the whole of #50, and applies at this end
+    /// exactly as it does at the other.
+    /// </para>
+    /// <para>
+    /// It is the narrowest <em>side</em> rather than a width because a tile is square and has to
+    /// fit the shorter axis.
+    /// </para>
+    /// <para>
+    /// Held as its own value rather than read from the options each time, for the same reason as
+    /// <see cref="WidestSupportedViewportInPixels"/>: a ceiling that moved after a field was sown
+    /// would leave layers in place that no longer clear it.
+    /// </para>
     /// </remarks>
-    public const float NarrowestSupportedViewportInPixels = 720f;
+    public float NarrowestSupportedViewportInPixels { get; }
 
     /// <summary>
     /// The largest tile size a layer can be sown at and still be certain to put a star on screen.
@@ -164,8 +174,13 @@ public sealed class StarField : IRenderable
     /// leave the sky empty. Both are a layer accepted while being described as safe, which is what
     /// #40 was raised about, so both ends are closed rather than only the one noticed first.
     /// </para>
+    /// <para>
+    /// An instance member rather than a static one, because the screen it is halved from is
+    /// configured rather than compiled in. A tile size is not too large on its own — it is too
+    /// large for some declared display, and declaring a narrower one lowers this.
+    /// </para>
     /// </remarks>
-    public const float LargestUsableTileSize = NarrowestSupportedViewportInPixels / 2f;
+    public float LargestUsableTileSize => NarrowestSupportedViewportInPixels / 2f;
 
     static readonly StarLayer[] _defaultLayers =
     [
@@ -194,9 +209,10 @@ public sealed class StarField : IRenderable
     /// <param name="camera">The camera the world is drawn through — the same one the ship uses.</param>
     /// <param name="display">What the game says about the screen it is drawn on.</param>
     /// <exception cref="ArgumentException">
-    /// The declared widest viewport is not a finite positive number of pixels. Guarded here as
-    /// well as where the options are bound, because a field can be built without going through
-    /// the container, and every bound below divides by this.
+    /// A declared viewport is not a finite positive number of pixels, or the declared narrowest
+    /// screen is wider than the declared widest. Guarded here as well as where the options are
+    /// bound, because a field can be built without going through the container, and every bound
+    /// below is measured against these.
     /// </exception>
     public StarField(ICamera camera, IOptions<DisplayOptions> display)
     {
@@ -204,6 +220,7 @@ public sealed class StarField : IRenderable
         ArgumentNullException.ThrowIfNull(display);
 
         float widest = display.Value.WidestSupportedViewportInPixels;
+        float narrowest = display.Value.NarrowestSupportedViewportInPixels;
 
         if (!IsDrawableExtent(widest))
         {
@@ -216,8 +233,35 @@ public sealed class StarField : IRenderable
                 nameof(display));
         }
 
+        if (!IsDrawableExtent(narrowest))
+        {
+            throw new ArgumentException(
+                $"{DisplayOptions.SectionName}:"
+                + $"{nameof(DisplayOptions.NarrowestSupportedViewportInPixels)} must be a finite "
+                + $"positive number of pixels, but was {narrowest}. The ceiling on a tile size is "
+                + "half of it, so a field built on this one would accept a layer sown so coarsely "
+                + "that the screen falls between its stars.",
+                nameof(display));
+        }
+
+        // Refused rather than left to bite as a pair of bounds that cross: a narrowest screen wider
+        // than the widest one raises the floor above the ceiling, so every layer is refused and the
+        // advice points both ways at once. The contradiction is in the declaration, so it is named
+        // there rather than reported as a fault in the first layer that meets it.
+        if (narrowest > widest)
+        {
+            throw new ArgumentException(
+                $"{DisplayOptions.SectionName}:"
+                + $"{nameof(DisplayOptions.NarrowestSupportedViewportInPixels)} ({narrowest}) "
+                + $"cannot be wider than "
+                + $"{nameof(DisplayOptions.WidestSupportedViewportInPixels)} ({widest}). A screen "
+                + "cannot be both, and the two bounds a star layer is held between would cross.",
+                nameof(display));
+        }
+
         _camera = camera;
         WidestSupportedViewportInPixels = widest;
+        NarrowestSupportedViewportInPixels = narrowest;
     }
 
     /// <summary>
