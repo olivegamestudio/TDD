@@ -53,6 +53,11 @@ public static class BattleForceServiceCollectionExtensions
         services
             .AddOliveGameStudio()
 
+            // the ship the game is flown in: the engine owns the physics, the game owns the
+            // numbers that decide how it handles
+            .AddSingleton(BattleForceShip.Handling)
+            .AddSingleton<ShipMovement>()
+
             // the quest content, the world its markers stand in, and the watcher that measures
             // the player against them
             .AddSingleton<ICampaign, BattleForceCampaign>()

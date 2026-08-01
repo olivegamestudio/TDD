@@ -27,7 +27,7 @@ to know about ships, quests or credits is on the wrong side of this line.
 | `OliveGameStudio.UI`, `.UI.Abstractions` | Menu and button navigation. Not ship control. |
 | `OliveGameStudio.FrameRate` | Frame time filtering, so a paused or slowed game holds still while frames keep arriving. |
 | `OliveGameStudio.Progress` | `LocalSaveProgressService`, persisting save text to a file. |
-| `OliveGameStudio.World` | `Position`, `Player`. The spatial model. |
+| `OliveGameStudio.World` | `Position`, `Player`, `Velocity`. The spatial model, and the ship physics that moves through it: `ShipMovement`, `ShipHandling`, `ShipControls`, `IShipInput`. |
 | `OliveGameStudio.Localisation` | `ITextProvider`, `JsonTextProvider`, `MissingTextException`. |
 | `Pilgrimage` | The quest system. No project references at all, by design. |
 | `BattleForce2249` | Game host and DI registration. |
@@ -72,6 +72,39 @@ The game side supplies where things actually are:
   completes rather than every frame.
 
 Ids are never translated. A save written in one language has to load in another.
+
+## Flying the ship
+
+The engine owns the physics; the game owns the numbers. `ShipHandling` is a game's acceleration,
+drag and turn rate — `BattleForceShip.Handling` supplies the shipping ones — and `ShipMovement`
+is the physics they are flown through. A better ship is another `ShipHandling`, not another
+physics.
+
+- `ShipControls` — a thrust axis and a helm axis, each clamped to `[-1, 1]`. Analogue, because
+  that is the shape a stick and a key both fit: a key is a 1, a stick is whatever it is pushed to.
+- `IShipInput` — where the pilot's intent comes from. The platform host owns the real device, so
+  the engine ships the seam and `NeutralShipInput`, which asks for nothing. A host registers a
+  keyboard or gamepad after `AddOliveGameStudio` and wins under the engine's `AddSingleton`.
+- `ShipMovement` — carries a `Heading` and a `Velocity`, applies thrust along the heading, and
+  moves the `Player` by the ground covered. Momentum survives a turn; a turn points the ship
+  somewhere new rather than teleporting the velocity there.
+
+Two decisions worth knowing before changing this:
+
+**Drag is integrated, not stepped.** Velocity follows `v(t) = terminal + (v₀ - terminal)·e^(-drag·t)`,
+the exact answer for a constant thrust against linear drag, and the position moves by that
+velocity's integral over the frame. `e^(-k·a)·e^(-k·b)` is `e^(-k·(a+b))`, so two half frames land
+exactly where one whole frame does. A ship whose reach depends on the frame rate is a bug against
+pillar 1, not a tuning detail.
+
+**Top speed is derived, not configured.** `ShipHandling.MaximumSpeed` is `Acceleration / Drag`,
+the speed the two settle at. A separate top speed could be set to disagree with the physics that
+produces it, leaving the ship either short of its stated maximum or walled off below it.
+
+`GameScreen.Update` flies the ship **before** it measures the quests, so a trigger fires on the
+frame it is reached rather than the frame after — at 200 units a second, a frame late is a marker
+the player has already passed. Entering the screen resets the ship: the save carries where the
+player is, never how fast they were going.
 
 ## Saved progress
 
@@ -160,8 +193,12 @@ game that has quietly stopped.
 
 ## Known gaps
 
-- Nothing moves the ship. Quest 1 is completable by test, not by playing — movement and physics
-  are issue #3.
+- Nothing binds a real input device. The ship flies from `IShipInput`, and the MonoGame host still
+  resolves the engine's `NeutralShipInput`, so the shipping game has nobody at the controls.
+- Quest triggers are sampled, not swept. `QuestProximityWatcher` measures the player once a frame,
+  so a frame long enough to carry the ship further than a trigger's distance steps over it. Quest
+  1's markers are sized clear of that at any playable frame rate, but the tolerance is the only
+  thing preventing it.
 - Nothing displays a quest title. There is no HUD or quest log; that is a separate `ENGINE`
   issue. `IGameSession.SaveError` is unread for the same reason — there is nowhere to say it.
 - Nothing selects a language. Translations are reachable only through the machine's own culture.
