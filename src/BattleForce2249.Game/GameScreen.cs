@@ -109,7 +109,12 @@ public sealed class GameScreen(
     ///
     /// The narrowing to <see cref="float"/> is the world model keeping its precision while the
     /// drawing side takes what a graphics device can use. At the sizes a viewport spans, the
-    /// difference is far below a pixel.
+    /// difference is far below a pixel — but only while the position is inside the
+    /// <see cref="float"/> range at all. Beyond it the narrowing does not lose precision, it
+    /// produces infinity, and the camera refuses a target that is not finite. The world is
+    /// unbounded and the physics cannot fly that far, so the only way in is a save file carrying
+    /// the number, and <see cref="SaveGameSerializer"/> refuses one that does. This is where the
+    /// two ranges meet, so it is written down here as well as there.
     /// </remarks>
     static ShipPose PoseOf(Position position, double heading) =>
         new(new Vector2((float)position.X, (float)position.Y), (float)heading);

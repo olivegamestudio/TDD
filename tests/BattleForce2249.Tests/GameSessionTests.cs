@@ -186,6 +186,28 @@ public sealed class GameSessionTests
     }
 
     [Fact]
+    public async Task Continue_StartsANewGame_WhenTheSaveHoldsAPositionTheGameCannotResumeAt()
+    {
+        // 1e300 is a finite double and valid JSON, so it reads back as a save — but it is beyond
+        // what a float can hold, and the position reaches the camera as one. A save the game
+        // cannot be resumed at is a damaged save, and a damaged save is a new game rather than a
+        // crash on the first frame drawn.
+        _saves.Content = SaveGameSerializer.Serialize(new SaveGame
+        {
+            PlayerX = 1e300,
+            PlayerY = 0,
+            Quests = [new QuestProgress("quest-1", QuestState.Completed)],
+        });
+        GameSession session = CreateSession();
+
+        await session.Continue();
+
+        Assert.Equal(Start, session.Player.Position);
+        Assert.Equal(QuestState.NotStarted, session.Quests.Find("quest-1")!.State);
+        Assert.True(session.IsReady);
+    }
+
+    [Fact]
     public async Task Continue_RestoresThePlayerPositionAndQuestProgress()
     {
         GameSession first = CreateSession();

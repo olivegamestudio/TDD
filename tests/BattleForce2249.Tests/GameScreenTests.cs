@@ -104,6 +104,32 @@ public sealed class GameScreenTests : HostTestBase
     }
 
     [Fact]
+    public async Task Render_SurvivesASaveWhosePositionIsBeyondWhatTheCameraCanBeAimedAt()
+    {
+        // The end of the path the camera's guard closed, from the only direction it is reachable
+        // from. A save carries the position as a double and the drawing side takes it as a float,
+        // so 1e300 — finite, and valid JSON — arrives at the camera as infinity. Refusing it at
+        // the camera turned a blank screen into an exception thrown once a frame, for a player
+        // whose save file went bad; the save is refused instead, and the game plays.
+        InMemorySaveProgressService saves = new()
+        {
+            Content = SaveGameSerializer.Serialize(new SaveGame { PlayerX = 1e300, PlayerY = 1e300 }),
+        };
+        GameSession session = new(saves, new BattleForceCampaign(), new BattleForceWorld());
+        await session.Continue();
+
+        Camera2D camera = new();
+        ShipView ship = new(camera);
+        GameScreen screen = ScreenFor(camera, ship, session);
+
+        screen.Update(TimeSpan.FromSeconds(1.0 / 60));
+        screen.Render(new RecordingRenderer());
+
+        Assert.True(float.IsFinite(camera.Target.X) && float.IsFinite(camera.Target.Y));
+        Assert.Equal(new BattleForceWorld().PlayerStart, session.Player.Position);
+    }
+
+    [Fact]
     public void Render_LeavesTheShipInTheMiddleOfTheViewport()
     {
         // the whole point of the camera following: wherever the ship has flown to, it is on
