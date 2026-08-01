@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OliveGameStudio;
+using Pilgrimage;
 
 namespace BattleForce2249;
 
@@ -51,6 +52,14 @@ public static class BattleForceServiceCollectionExtensions
 
         services
             .AddOliveGameStudio()
+
+            // the quest content, the world its markers stand in, and the watcher that measures
+            // the player against them
+            .AddSingleton<ICampaign, BattleForceCampaign>()
+            .AddSingleton<IWorld, BattleForceWorld>()
+            .AddSingleton<QuestProximityWatcher>()
+            .AddSingleton<IGameSession, GameSession>()
+
             .AddSingleton<ICompanyScreen, CompanyScreen>()
             .AddSingleton<IMenuScreen, MenuScreen>()
             .AddSingleton<IGameScreen, GameScreen>()
