@@ -57,3 +57,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   moved focus, including the codebase's own idiom of disabling a button as it activates, handed the
   press to an unrelated button whose released action then fired on release. The same ordering meant
   a pressed action could not `Cancel()` the press it started. ([#12](https://github.com/olivegamestudio/TDD/issues/12))
+- **A redirect cycle now fails loudly instead of freezing the game.**
+  `LifecycleScreenDirector.NavigateTo` followed an `EnterResult.Redirect` chain with no bound, so
+  two screens redirecting at each other — or one redirecting to itself — spun inside the call
+  forever and the update loop never ticked again. It now throws `InvalidOperationException` naming
+  the path the moment a screen would be entered twice in one navigation, exits the live screen and
+  leaves nothing current. ([#14](https://github.com/olivegamestudio/TDD/issues/14))
