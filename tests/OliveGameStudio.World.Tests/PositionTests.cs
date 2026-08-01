@@ -29,6 +29,25 @@ public sealed class PositionTests
     }
 
     [Fact]
+    public void DistanceTo_FromAnAstronomicalPosition_IsStillANumber()
+    {
+        // squaring the gap before taking the root overflows at anything wider than the root of
+        // double.MaxValue — 1.34e154 — so two perfectly real points answered Infinity. A caller
+        // measuring proximity gets no error out of that, just a comparison that is never true.
+        Position far = new(1e300, 0);
+
+        Assert.Equal(1e300, far.DistanceTo(Position.Origin));
+    }
+
+    [Fact]
+    public void DistanceTo_IsFinite_WhenBothAxesAreAstronomical()
+    {
+        Position far = new(1e300, 1e300);
+
+        Assert.True(double.IsFinite(far.DistanceTo(Position.Origin)));
+    }
+
+    [Fact]
     public void Offset_MovesByTheGivenAmount()
     {
         Position moved = new Position(10, 20).Offset(-2, 5);

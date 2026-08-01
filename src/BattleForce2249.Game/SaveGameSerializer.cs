@@ -76,11 +76,22 @@ public static class SaveGameSerializer
     /// <param name="save">The parsed save.</param>
     /// <returns><c>true</c> when the save can be resumed from.</returns>
     static bool IsPlayable(SaveGame save) =>
-        // Infinity is the dangerous one, and it does not come from a broken file: 1e400 is valid
-        // JSON that overflows on the way in. Every distance measured from there is Infinity, so no
-        // proximity trigger can ever fire again — a quest that can never start and never complete.
-        double.IsFinite(save.PlayerX)
-        && double.IsFinite(save.PlayerY)
+        // Infinity is the obvious one, and it does not come from a broken file: 1e400 is valid JSON
+        // that overflows on the way in. But finiteness was never the condition — 1e300 is finite,
+        // one character away in the file, and lands the player somewhere no flight can carry them
+        // back from, which is the same quest that can never start and never complete. The world
+        // states how far it goes; a save outside it did not come from playing this game.
+        IsInTheWorld(save.PlayerX)
+        && IsInTheWorld(save.PlayerY)
         // A quest entry with no id is not this build's writing, and it is what QuestLog refuses.
         && save.Quests.All(quest => quest is not null && !string.IsNullOrWhiteSpace(quest.QuestId));
+
+    /// <summary>
+    /// Whether a saved coordinate names a place inside the world. NaN answers <c>false</c> from
+    /// both comparisons, so it is refused without being named separately.
+    /// </summary>
+    /// <param name="coordinate">The coordinate read from the save.</param>
+    /// <returns><c>true</c> when the coordinate is somewhere the game could have put the player.</returns>
+    static bool IsInTheWorld(double coordinate) =>
+        coordinate >= -BattleForceWorld.Extent && coordinate <= BattleForceWorld.Extent;
 }

@@ -94,17 +94,55 @@ public sealed class SaveGameSerializerTests
         Assert.Null(SaveGameSerializer.Deserialize(y));
     }
 
-    [Fact]
-    public void Deserialize_StillReadsASaveAtTheFarEdgeOfTheWorld()
+    [Theory]
+    // finite, so IsFinite admits them, and one character away in the file from the 1e400 above
+    [InlineData("1e300")]
+    [InlineData("1.7976931348623157e308")]
+    [InlineData("-1e300")]
+    public void Deserialize_ReturnsNull_ForAPositionBeyondTheEdgeOfTheWorld(string coordinate)
     {
-        // the guard is on values that are not positions at all, not on distant ones
-        string content = $$"""
-        { "PlayerX": {{double.MaxValue.ToString("R", System.Globalization.CultureInfo.InvariantCulture)}}, "PlayerY": 0, "Quests": [] }
+        // finiteness was never the condition the guard wanted. A coordinate this far out is not
+        // somewhere play can have put the player, and it is somewhere play cannot get them back
+        // from — the same brick as an infinite one, reached by a value the finite check accepts.
+        string x = $$"""{ "PlayerX": {{coordinate}}, "PlayerY": 0, "Quests": [] }""";
+        string y = $$"""{ "PlayerX": 0, "PlayerY": {{coordinate}}, "Quests": [] }""";
+
+        Assert.Null(SaveGameSerializer.Deserialize(x));
+        Assert.Null(SaveGameSerializer.Deserialize(y));
+    }
+
+    [Fact]
+    public void Deserialize_StillReadsASaveFarFromTheCampaign()
+    {
+        // the guard is on positions outside the world, not on distant ones — a save a thousand
+        // marker-lengths out is a long flight home, but it is a game, and refusing it would throw
+        // the player's progress away
+        string content = """
+        { "PlayerX": -123456.75, "PlayerY": 987654.5, "Quests": [] }
         """;
 
         SaveGame? loaded = SaveGameSerializer.Deserialize(content);
 
         Assert.NotNull(loaded);
-        Assert.Equal(double.MaxValue, loaded.PlayerX);
+        Assert.Equal(-123456.75, loaded.PlayerX);
+        Assert.Equal(987654.5, loaded.PlayerY);
     }
+
+    [Fact]
+    public void Deserialize_ReadsASaveOnTheWorldsEdge_AndRefusesTheOneJustOutside()
+    {
+        // the boundary is stated, so it is worth pinning which side of it each answer falls on
+        string onTheEdge = $$"""
+        { "PlayerX": {{Invariant(BattleForceWorld.Extent)}}, "PlayerY": 0, "Quests": [] }
+        """;
+        string justOutside = $$"""
+        { "PlayerX": {{Invariant(Math.BitIncrement(BattleForceWorld.Extent))}}, "PlayerY": 0, "Quests": [] }
+        """;
+
+        Assert.NotNull(SaveGameSerializer.Deserialize(onTheEdge));
+        Assert.Null(SaveGameSerializer.Deserialize(justOutside));
+    }
+
+    static string Invariant(double value) =>
+        value.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
 }

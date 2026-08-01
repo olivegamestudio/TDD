@@ -46,6 +46,29 @@ public sealed class BattleForceWorldTests
     }
 
     [Fact]
+    public void EveryMarkerStandsWellInsideTheWorldsEdge()
+    {
+        // the edge is what a save is refused for being outside, so a marker anywhere near it would
+        // mean the campaign itself was authored somewhere the game will not load a save from
+        Assert.All(
+            _world.QuestMarkers,
+            markers => Assert.All(
+                new[] { markers.Start, markers.End },
+                marker =>
+                {
+                    Assert.True(Math.Abs(marker.X) < BattleForceWorld.Extent / 1000);
+                    Assert.True(Math.Abs(marker.Y) < BattleForceWorld.Extent / 1000);
+                }));
+    }
+
+    [Fact]
+    public void ANewGameStartsInsideTheWorld()
+    {
+        Assert.True(Math.Abs(_world.PlayerStart.X) <= BattleForceWorld.Extent);
+        Assert.True(Math.Abs(_world.PlayerStart.Y) <= BattleForceWorld.Extent);
+    }
+
+    [Fact]
     public void EveryQuestInTheCampaignHasMarkers()
     {
         Assert.All(

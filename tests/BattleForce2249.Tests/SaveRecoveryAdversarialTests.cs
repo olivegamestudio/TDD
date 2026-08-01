@@ -281,6 +281,10 @@ public class SaveRecoveryAdversarialTests
         """{ "PlayerX": 1e400, "PlayerY": 0, "Quests": [] }""",
         """{ "PlayerX": 0, "PlayerY": -1e400, "Quests": [] }""",
         """{ "PlayerX": 1e400, "PlayerY": 1e400, "Quests": [ null ] }""",
+        // finite, and just as unplayable: every marker is a distance no flight can close, and one
+        // of them used to be Infinity away because the measurement itself overflowed
+        """{ "PlayerX": 1e300, "PlayerY": 0, "Quests": [] }""",
+        """{ "PlayerX": 0, "PlayerY": 1.7976931348623157e308, "Quests": [] }""",
         """{ "PlayerX": "over there", "PlayerY": 0, "Quests": [] }""",
         """{ "PlayerX": 0, "PlayerY": 0, "Quests": {} }""",
         """{ "PlayerX": 0, "PlayerY": 0, "Quests": [ [] ] }""",
