@@ -9,6 +9,8 @@ public sealed class GameScreenTests
     {
         public int Rendered { get; private set; }
 
+        public string AssetKey { get; set; } = ShipView.DefaultAssetKey;
+
         public ShipPose Pose { get; set; }
 
         public void Render(IRenderer renderer) => Rendered++;

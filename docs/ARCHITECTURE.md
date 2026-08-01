@@ -140,9 +140,15 @@ the screen is indistinguishable from one that was never drawn.
 `IShipView` is the seam between the logic and engine stages for the ship: the logic sets a
 `ShipPose` — a position and a heading — and the view draws whatever it last said. A heading of
 zero is straight forward, up the screen, and the angle increases to starboard, which matches the
-artwork's own orientation and lets the heading pass through to the sprite untouched. The sense of
-that angle is a convention rather than something the type can enforce; a model that measures its
-heading the other way round negates it on the way in.
+artwork's own orientation and lets the heading pass through to the sprite untouched. `ShipMovement`
+measures its heading the same way, so nothing corrects it on the way in. The sense of that angle
+is still a convention rather than something the type can enforce, and a model that measured it
+the other way round would negate it at the point it hands the pose over — not by redefining
+`ShipPose`, because the quest markers are laid out along the same forward axis.
+
+Which sprite is drawn is `IShipView.AssetKey`, set by whatever owns the player's ship from that
+ship's own asset key rather than named at the draw site, so the picture follows the ship the
+player was awarded. Changing it takes effect on the next draw.
 
 ## Screen flow
 

@@ -76,7 +76,7 @@ public sealed class BattleForceHostTests : HostTestBase
         ScreenDirector.NavigateTo(Resolve<IGameScreen>());
         game.Draw(renderer);
 
-        Assert.Equal([ShipView.TextureKey], renderer.Textures.Requested);
+        Assert.Equal([ShipView.DefaultAssetKey], renderer.Textures.Requested);
     }
 
     [Fact]

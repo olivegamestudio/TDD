@@ -10,10 +10,10 @@ namespace BattleForce2249;
 public sealed class ShipView(ICamera camera) : IShipView
 {
     /// <summary>
-    /// The asset key of the ship's sprite, as the content build names it. An identifier, not
-    /// text: it is never translated.
+    /// The asset key drawn until something says otherwise — the ship the player starts with.
+    /// An identifier, not text: it is never translated.
     /// </summary>
-    public const string TextureKey = "ship1";
+    public const string DefaultAssetKey = "ship1";
 
     /// <summary>
     /// How long the ship is, nose to engines, in world units.
@@ -26,7 +26,31 @@ public sealed class ShipView(ICamera camera) : IShipView
     /// </remarks>
     public const float LengthInWorldUnits = 96f;
 
+    string _assetKey = DefaultAssetKey;
+
     ITexture? _texture;
+
+    /// <inheritdoc />
+    public string AssetKey
+    {
+        get => _assetKey;
+
+        set
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(value);
+
+            if (string.Equals(_assetKey, value, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _assetKey = value;
+
+            // Dropped rather than reloaded here: loading belongs to the draw, which is the only
+            // place a graphics device is known to exist.
+            _texture = null;
+        }
+    }
 
     /// <inheritdoc />
     public ShipPose Pose { get; set; }
@@ -36,7 +60,7 @@ public sealed class ShipView(ICamera camera) : IShipView
     {
         // Loaded on first draw rather than up front: the graphics device the texture belongs to
         // does not exist until the platform host has a window, which is after this is built.
-        _texture ??= renderer.Textures.Load(TextureKey);
+        _texture ??= renderer.Textures.Load(_assetKey);
 
         // The origin is the middle of the sprite, so the ship turns about itself rather than
         // swinging around its top left corner.

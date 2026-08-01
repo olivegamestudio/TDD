@@ -45,9 +45,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **`OliveGameStudio.MonoGame`** — the platform adapter: `MonoGameRenderer` over a sprite batch,
   `MonoGameTextureLoader` over the content pipeline, and `MonoGameTexture` behind `ITexture`. The
   only engine project that names a MonoGame type. ([#16](https://github.com/olivegamestudio/TDD/issues/16))
-- **The ship is drawn.** `ShipView` puts `ship1` on screen at the pose the logic side sets
+- **The ship is drawn.** `ShipView` puts the ship on screen at the pose the logic side sets
   through `IShipView`, sized in world units and turned to its heading, with the camera following
-  it so it holds the middle of the viewport however far it flies. ([#16](https://github.com/olivegamestudio/TDD/issues/16))
+  it so it holds the middle of the viewport however far it flies. Which sprite it draws is
+  `IShipView.AssetKey` — set from the awarded ship's own asset key rather than named at the draw
+  site — defaulting to `ship1`. ([#16](https://github.com/olivegamestudio/TDD/issues/16))
 
 ### Changed
 

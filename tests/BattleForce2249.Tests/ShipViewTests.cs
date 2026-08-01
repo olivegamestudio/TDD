@@ -35,7 +35,7 @@ public sealed class ShipViewTests
 
         view.Render(renderer);
 
-        Assert.Equal([ShipView.TextureKey], renderer.Textures.Requested);
+        Assert.Equal([ShipView.DefaultAssetKey], renderer.Textures.Requested);
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public sealed class ShipViewTests
         // the outside of the screen instead of turning it on the spot.
         ShipView view = CreateView(out _);
         RecordingRenderer renderer = new();
-        renderer.Textures.SetSize(ShipView.TextureKey, 1024, 512);
+        renderer.Textures.SetSize(ShipView.DefaultAssetKey, 1024, 512);
 
         view.Render(renderer);
 
@@ -118,7 +118,7 @@ public sealed class ShipViewTests
         // its own size would fill the window with one ship
         ShipView view = CreateView(out _);
         RecordingRenderer renderer = new();
-        renderer.Textures.SetSize(ShipView.TextureKey, 1024, 1024);
+        renderer.Textures.SetSize(ShipView.DefaultAssetKey, 1024, 1024);
 
         view.Render(renderer);
 
@@ -131,7 +131,7 @@ public sealed class ShipViewTests
     {
         ShipView view = CreateView(out _);
         RecordingRenderer renderer = new();
-        renderer.Textures.SetSize(ShipView.TextureKey, 256, 256);
+        renderer.Textures.SetSize(ShipView.DefaultAssetKey, 256, 256);
 
         view.Render(renderer);
 
@@ -145,7 +145,7 @@ public sealed class ShipViewTests
         // the ship is a fixed size in the world, so zooming in makes it bigger on screen
         ShipView view = CreateView(out Camera2D camera);
         RecordingRenderer renderer = new();
-        renderer.Textures.SetSize(ShipView.TextureKey, 1024, 1024);
+        renderer.Textures.SetSize(ShipView.DefaultAssetKey, 1024, 1024);
         camera.PixelsPerUnit = 3f;
 
         view.Render(renderer);
@@ -173,5 +173,84 @@ public sealed class ShipViewTests
 
         Assert.Equal(Vector2.Zero, view.Pose.Position);
         Assert.Equal(0f, view.Pose.Heading);
+    }
+
+    [Fact]
+    public void AssetKey_DefaultsToTheShipThePlayerStartsWith()
+    {
+        ShipView view = CreateView(out _);
+
+        Assert.Equal(ShipView.DefaultAssetKey, view.AssetKey);
+    }
+
+    [Fact]
+    public void Render_DrawsWhateverTheAssetKeyNames()
+    {
+        // the picture follows the ship the player was awarded, rather than the draw site
+        // naming one asset and every new ship needing a change here
+        ShipView view = CreateView(out _);
+        RecordingRenderer renderer = new();
+        view.AssetKey = "ship2";
+
+        view.Render(renderer);
+
+        Assert.Equal(["ship2"], renderer.Textures.Requested);
+    }
+
+    [Fact]
+    public void ChangingTheAssetKey_DrawsTheNewShip_OnTheNextFrame()
+    {
+        ShipView view = CreateView(out _);
+        RecordingRenderer renderer = new();
+
+        view.Render(renderer);
+        view.AssetKey = "ship2";
+        view.Render(renderer);
+
+        Assert.Equal([ShipView.DefaultAssetKey, "ship2"], renderer.Textures.Requested);
+    }
+
+    [Fact]
+    public void ChangingTheAssetKey_ResizesTheShip_FromTheNewTexture()
+    {
+        // the scale is derived from whatever texture was loaded, so a differently sized sprite
+        // must not carry the old ship's scale over with it
+        ShipView view = CreateView(out _);
+        RecordingRenderer renderer = new();
+        renderer.Textures.SetSize(ShipView.DefaultAssetKey, 1024, 1024);
+        renderer.Textures.SetSize("ship2", 256, 256);
+
+        view.Render(renderer);
+        view.AssetKey = "ship2";
+        renderer.Clear();
+        view.Render(renderer);
+
+        Sprite sprite = renderer.Single();
+        Assert.Equal(ShipView.LengthInWorldUnits, sprite.Scale * sprite.Texture.Height, 4);
+    }
+
+    [Fact]
+    public void SettingTheSameAssetKey_DoesNotReload()
+    {
+        // whatever owns the ship may set this every frame; that must not be a load every frame
+        ShipView view = CreateView(out _);
+        RecordingRenderer renderer = new();
+
+        view.Render(renderer);
+        view.AssetKey = ShipView.DefaultAssetKey;
+        view.Render(renderer);
+
+        Assert.Single(renderer.Textures.Requested);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void AssetKey_RefusesToBeBlank(string key)
+    {
+        // fails where the mistake was made, rather than deep inside the content pipeline
+        ShipView view = CreateView(out _);
+
+        Assert.Throws<ArgumentException>(() => view.AssetKey = key);
     }
 }
