@@ -99,6 +99,19 @@ A save the campaign has drifted from is tolerated in both directions: a quest th
 this build no longer ships is ignored, and a quest added since the save was written starts from
 the beginning.
 
+**A position is only progress beside the quest progress it was taken with.** Tolerating drift means
+a readable save can restore no progress at all — every entry naming a quest the campaign dropped,
+or naming no quest and dropped as drift, or no entries. Its coordinates then place a player inside
+a campaign nobody has begun, and quest 1's start trigger is 25 units wide around the marker a new
+game spawns on: a player set down a thousand units out has nothing active, nothing to fly towards,
+and gets further from the only trigger that could help with every frame of flying forward. So
+`GameSession.Continue` uses the saved position only when at least one registered quest came back
+started or completed; otherwise the player begins where a new game begins. The file itself is still
+accepted, and deliberately — declining the position leaves it on disk, where refusing it would have
+it overwritten by the game replacing it. The line costs a save taken after the player has travelled
+but before any quest has begun; no such save can be written while the first quest starts where the
+player spawns, and a campaign that changes that has to revisit this.
+
 `GameSession.Continue` recovers from storage getting in the way — a file locked, missing or barred
 — and nothing wider, because catching wider would bury real defects behind "could not save". That
 narrowness is only safe because the serializer refuses a save the rest of the load could choke on.

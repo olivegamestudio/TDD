@@ -53,6 +53,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   is now dropped and the rest of the file read, which is the answer `QuestLog.Restore` already gave
   for the same input; `Restore` skips a `null` id on the same grounds it already skipped a blank
   one. An entry that is `null` is not drift and is still refused whole. ([#44](https://github.com/olivegamestudio/TDD/issues/44))
+- **A save that restores no quest progress no longer strands the player where its coordinates
+  say.** Tolerating drift made such files readable, and reading one handed the player its position
+  as well as its empty progress — a thousand units past a start trigger 25 units wide, with no
+  quest active and the direction the campaign teaches leading further away every frame.
+  `GameSession.Continue` now uses the saved position only when at least one registered quest came
+  back started or completed, and otherwise begins the player where a new game begins. The file is
+  still accepted rather than refused, so it is left on disk instead of being overwritten. ([#44](https://github.com/olivegamestudio/TDD/issues/44))
 - **`LocalSaveProgressService` now really persists**, writing to a file and creating the save
   folder on first write. `HasProgress()` was a hardcoded `return true`, reporting progress it had
   never stored. ([#2](https://github.com/olivegamestudio/TDD/pull/2))

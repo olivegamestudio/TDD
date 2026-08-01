@@ -287,6 +287,37 @@ public class SaveRecoveryAdversarialTests
     }
 
     [Fact]
+    public async Task ASaveAcceptedWithNoWordAboutQuest1_StillLeavesItCompletable()
+    {
+        // QA's finding on #44, kept under the name it was reported with. Narrowing what gets
+        // refused made this file readable, and reading it handed the player its position as well
+        // as its (empty) progress: 700 units past a start trigger 25 units wide, no quest active,
+        // and the direction the campaign teaches taking them further away every frame. Recoverable
+        // only by flying backwards into the debris field the quest is about getting out of.
+        LockableSaveProgressService saves = new()
+        {
+            Content = """
+            { "PlayerX": 0, "PlayerY": 700, "Quests": [ { "QuestId": "  ", "State": "Active" } ] }
+            """,
+        };
+        GameSession session = CreateSession(saves);
+        QuestProximityWatcher watcher = new(new World());
+
+        await session.Continue();
+
+        // the file is declined, not refused: nothing has been written over it yet
+        Assert.Equal(0, saves.SaveCount);
+
+        for (int frame = 0; frame < 500 && !session.Quests.Find("quest-1")!.IsCompleted; frame++)
+        {
+            watcher.Update(session.Quests, session.Player.Position);
+            session.Player.MoveBy(0, 10);
+        }
+
+        Assert.True(session.Quests.Find("quest-1")!.IsCompleted);
+    }
+
+    [Fact]
     public async Task ThatSaveWithANullEntryInsteadOfABlankId_IsStillRefused()
     {
         // The other half of the same decision. A blank id is a name that names nothing; a null entry
