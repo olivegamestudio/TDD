@@ -114,4 +114,127 @@ public sealed class Camera2DTests
         Assert.Equal(new Vector2(400f, 300f), camera.WorldToScreen(Vector2.Zero, Viewport));
         Assert.Equal(new Vector2(640f, 360f), camera.WorldToScreen(Vector2.Zero, new Vector2(1280f, 720f)));
     }
+
+    [Theory]
+    [InlineData(float.NaN, 0f)]
+    [InlineData(float.PositiveInfinity, 0f)]
+    [InlineData(float.NegativeInfinity, 0f)]
+    public void Target_RefusesAnXThatIsNotFinite(float x, float y)
+    {
+        // #57: unchecked, this draws every sprite in the game at a NaN position — a blank screen
+        // rather than an error, which is the hard failure to diagnose
+        Camera2D camera = new();
+
+        ArgumentException error = Assert.Throws<ArgumentException>(
+            () => camera.Target = new Vector2(x, y));
+
+        Assert.Contains("Target", error.Message, StringComparison.Ordinal);
+        Assert.Contains("X", error.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(0f, float.NaN)]
+    [InlineData(0f, float.PositiveInfinity)]
+    [InlineData(0f, float.NegativeInfinity)]
+    public void Target_RefusesAYThatIsNotFinite(float x, float y)
+    {
+        Camera2D camera = new();
+
+        ArgumentException error = Assert.Throws<ArgumentException>(
+            () => camera.Target = new Vector2(x, y));
+
+        Assert.Contains("Target", error.Message, StringComparison.Ordinal);
+        Assert.Contains("Y", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Target_RefusedInAnObjectInitialiserToo()
+    {
+        // the initialiser goes through the same setter; a camera cannot be born non-finite either
+        Assert.Throws<ArgumentException>(
+            () => _ = new Camera2D { Target = new Vector2(float.NaN, float.NaN) });
+    }
+
+    [Fact]
+    public void Target_KeepsTheLastGoodPosition_WhenARefusedOneIsAssigned()
+    {
+        // the refusal names the frame that produced the bad number and leaves the camera usable,
+        // rather than half-assigning a position nothing can be drawn from
+        Camera2D camera = new() { Target = new Vector2(120f, -45f) };
+
+        Assert.Throws<ArgumentException>(() => camera.Target = new Vector2(0f, float.NaN));
+
+        Assert.Equal(new Vector2(120f, -45f), camera.Target);
+        Assert.Equal(Centre, camera.WorldToScreen(camera.Target, Viewport));
+    }
+
+    [Fact]
+    public void Target_AcceptsAPositionAsFarOutAsTheWorldGoes()
+    {
+        // the rule is finiteness, not a bound: the world is unbounded and the player flies on
+        Camera2D camera = new() { Target = new Vector2(-96_000f, 250_000f) };
+
+        Assert.Equal(new Vector2(-96_000f, 250_000f), camera.Target);
+    }
+
+    [Theory]
+    [InlineData(float.NaN)]
+    [InlineData(float.PositiveInfinity)]
+    [InlineData(float.NegativeInfinity)]
+    public void PixelsPerUnit_RefusesAZoomThatIsNotFinite(float pixelsPerUnit)
+    {
+        Camera2D camera = new();
+
+        ArgumentException error = Assert.Throws<ArgumentException>(
+            () => camera.PixelsPerUnit = pixelsPerUnit);
+
+        Assert.Contains("PixelsPerUnit", error.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(0f)]
+    [InlineData(-1f)]
+    public void PixelsPerUnit_RefusesAZoomThatIsNotPositive(float pixelsPerUnit)
+    {
+        // a zoom of nothing puts nothing on screen and every tile calculation through a division
+        // by zero; a negative one mirrors the world
+        Camera2D camera = new();
+
+        ArgumentException error = Assert.Throws<ArgumentException>(
+            () => camera.PixelsPerUnit = pixelsPerUnit);
+
+        Assert.Contains("PixelsPerUnit", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PixelsPerUnit_KeepsTheLastGoodZoom_WhenARefusedOneIsAssigned()
+    {
+        Camera2D camera = new() { PixelsPerUnit = 2f };
+
+        Assert.Throws<ArgumentException>(() => camera.PixelsPerUnit = float.NaN);
+
+        Assert.Equal(2f, camera.PixelsPerUnit);
+    }
+
+    [Fact]
+    public void PixelsPerUnit_AcceptsAZoomWoundRightOut()
+    {
+        // small is not the same as invalid: the field is documented as clipping at a low enough
+        // zoom, which is a limit rather than a mistake, so the setter must not refuse it
+        Camera2D camera = new() { PixelsPerUnit = 0.000_01f };
+
+        Assert.Equal(0.000_01f, camera.PixelsPerUnit);
+    }
+
+    [Fact]
+    public void NoFiniteTarget_AndNoFiniteZoom_CanPutASpriteAtANaNPosition()
+    {
+        // what the refusals are for, said as the property they buy: with both members held to
+        // the contract, nothing that reaches WorldToScreen can come back non-finite
+        Camera2D camera = new() { Target = new Vector2(1_000_000f, -1_000_000f), PixelsPerUnit = 0.001f };
+
+        Vector2 screen = camera.WorldToScreen(new Vector2(-500_000f, 750_000f), Viewport);
+
+        Assert.True(float.IsFinite(screen.X) && float.IsFinite(screen.Y), $"drawn at {screen}");
+    }
 }

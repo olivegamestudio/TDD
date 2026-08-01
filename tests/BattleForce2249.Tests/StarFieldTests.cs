@@ -381,8 +381,10 @@ public sealed class StarFieldTests
     public void Render_DrawsNothing_WhenTheZoomIsNotPositive(float pixelsPerUnit)
     {
         // nothing is on screen at a zoom of nothing, and working out which tiles to visit would
-        // be a division that means nothing
-        Camera2D camera = new() { PixelsPerUnit = pixelsPerUnit };
+        // be a division that means nothing. Through an UncheckedCamera because #57 put the same
+        // rule on Camera2D's setter: what is being covered here is the field's own guard against
+        // an ICamera that did not keep the contract, which is still the field's to hold.
+        UncheckedCamera camera = new() { PixelsPerUnit = pixelsPerUnit };
         RecordingRenderer renderer = new();
 
         new StarField(camera).Render(renderer);
@@ -487,8 +489,9 @@ public sealed class StarFieldTests
     public void Render_DrawsNothing_WhenTheZoomIsNotFinite()
     {
         // the same shape as the layer guards: `PixelsPerUnit <= 0f` is an ordered comparison, so
-        // a NaN zoom walks past it into arithmetic that means nothing
-        Camera2D camera = new() { PixelsPerUnit = float.NaN };
+        // a NaN zoom walks past it into arithmetic that means nothing. Camera2D now refuses this
+        // where it is set (#57), so it takes an UncheckedCamera to still get one in here.
+        UncheckedCamera camera = new() { PixelsPerUnit = float.NaN };
         RecordingRenderer renderer = new();
 
         new StarField(camera).Render(renderer);
@@ -504,6 +507,33 @@ public sealed class StarFieldTests
         new StarField(new Camera2D()).Render(renderer);
 
         Assert.Empty(renderer.Drawn);
+    }
+
+    [Theory]
+    [InlineData(float.NaN, float.NaN)]
+    [InlineData(0f, float.NaN)]
+    [InlineData(float.PositiveInfinity, 0f)]
+    public void Render_CannotBeScatteredAtNaN_ByACameraThatFollowedANonFinitePosition(
+        float x,
+        float y)
+    {
+        // #57, end to end: the field's own guard covers the zoom and the viewport but cannot see
+        // the camera's target, and a non-finite one used to draw the whole field at a position
+        // that is nowhere — sixteen sprites, none of them on screen. The camera refuses it now,
+        // so the frame that produced the number fails instead of the picture quietly emptying.
+        Camera2D camera = new() { Target = new Vector2(613f, -227f) };
+        StarField field = new(camera);
+        RecordingRenderer renderer = new();
+
+        Assert.Throws<ArgumentException>(() => camera.Target = new Vector2(x, y));
+
+        field.Render(renderer);
+
+        Assert.NotEmpty(renderer.Drawn);
+        Assert.All(renderer.Drawn, sprite =>
+            Assert.True(
+                float.IsFinite(sprite.Position.X) && float.IsFinite(sprite.Position.Y),
+                $"a star was drawn at {sprite.Position}"));
     }
 
     [Fact]
