@@ -26,11 +26,26 @@ namespace BattleForce2249;
 /// band around the camera and leaves a blank border, which is why <see cref="StarField.Layers"/>
 /// refuses it rather than sowing a field that cannot cover the screen.
 /// </para>
+/// <para>
+/// There is a ceiling too — see <see cref="StarField.LargestUsableTileSize"/> — because tiles
+/// wider than the screen sow their stars further apart than the viewport is wide, so the viewport
+/// can fall between them and the field goes blank for the opposite reason. Both ends are refused
+/// where the layer is written.
+/// </para>
+/// <para>
+/// Must be a finite number. So must <see cref="Parallax"/> and <see cref="SizeInPixels"/>: the
+/// bounds either side of this one are ordered comparisons, and an ordered comparison against
+/// <see cref="float.NaN"/> is false, so a NaN would clear every one of them and then place every
+/// star nowhere.
+/// </para>
 /// </param>
 /// <param name="StarsPerTile">How many stars stand in each tile.</param>
 /// <param name="SizeInPixels">
 /// How big each star is drawn, in pixels rather than world units. A star is a point of light at
-/// an unreachable distance; zooming in on the world should not make it a disc.
+/// an unreachable distance; zooming in on the world should not make it a disc. Bounded above by
+/// <see cref="StarField.WidestSupportedViewportInPixels"/> — a star wider than the screen is not a
+/// point of light, and the tile-size floor is derived from this number, so leaving it unbounded
+/// could raise that floor above the ceiling.
 /// </param>
 public readonly record struct StarLayer(
     float Parallax,

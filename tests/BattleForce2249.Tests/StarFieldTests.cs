@@ -461,6 +461,131 @@ public sealed class StarFieldTests
         Assert.Equal(smallest, Assert.Single(field.Layers).TileSizeInWorldUnits);
     }
 
+    [Theory]
+    [InlineData(float.NaN, 90f, 2, 2.5f, nameof(StarLayer.Parallax))]
+    [InlineData(0.3f, float.NaN, 2, 2.5f, nameof(StarLayer.TileSizeInWorldUnits))]
+    [InlineData(0.3f, 90f, 2, float.NaN, nameof(StarLayer.SizeInPixels))]
+    [InlineData(float.PositiveInfinity, 90f, 2, 2.5f, nameof(StarLayer.Parallax))]
+    [InlineData(float.NegativeInfinity, 90f, 2, 2.5f, nameof(StarLayer.Parallax))]
+    [InlineData(0.3f, float.PositiveInfinity, 2, 2.5f, nameof(StarLayer.TileSizeInWorldUnits))]
+    [InlineData(0.3f, float.NegativeInfinity, 2, 2.5f, nameof(StarLayer.TileSizeInWorldUnits))]
+    [InlineData(0.3f, 90f, 2, float.PositiveInfinity, nameof(StarLayer.SizeInPixels))]
+    public void Layers_RefusesANumberThatIsNotOne_NamingTheFieldToFix(
+        float parallax,
+        float tileSize,
+        int starsPerTile,
+        float sizeInPixels,
+        string field)
+    {
+        // Every other guard in Layers is an ordered comparison, and an ordered comparison against
+        // NaN is false, so a NaN once walked through all of them and sowed a field whose every
+        // star was drawn at a NaN position — a blank screen, reached through the property
+        // documented as the supported way to re-sow the field. Infinity is the same shape: it
+        // clears the range checks and then places every star outside any viewport.
+        ArgumentException error = Assert.Throws<ArgumentException>(() =>
+        {
+            _ = FieldOf(new Camera2D(), new StarLayer(parallax, tileSize, starsPerTile, sizeInPixels));
+        });
+
+        // and it has to name the field that is wrong: an infinite SizeInPixels used to be caught
+        // only in passing, by the tile-size floor derived from it, which sent the author to the
+        // wrong number
+        Assert.Contains(field, error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Layers_RefusesATileSizeTooLargeToPutAStarOnTheScreen()
+    {
+        // The floor closed the small end; this is the large end, which fails the same way round.
+        // A tile wider than the screen may hold no star the screen can see: at 1e30 world units
+        // the field draws eight stars, none of them within a million viewports of the camera, so
+        // the layer is accepted, costs a frame nothing, and shows the player nothing.
+        ArgumentException error = Assert.Throws<ArgumentException>(() =>
+        {
+            _ = FieldOf(new Camera2D(), new StarLayer(1f, 1e30f, 1, 3f));
+        });
+
+        Assert.Contains(nameof(StarLayer.TileSizeInWorldUnits), error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Layers_AcceptsTheLargestTileSizeThatCanStillPutAStarOnTheScreen()
+    {
+        // the ceiling has to be reachable too, for the same reason the floor does
+        StarField field = FieldOf(
+            new Camera2D(),
+            new StarLayer(1f, StarField.LargestUsableTileSize, 1, 3f));
+
+        Assert.Equal(StarField.LargestUsableTileSize, Assert.Single(field.Layers).TileSizeInWorldUnits);
+    }
+
+    [Theory]
+    // Swept across a tile rather than sampled at one place, because "wherever the camera stands"
+    // is the whole claim: the worst case is the camera sitting so a tile boundary falls just
+    // inside each edge of the viewport, and one offset would miss it.
+    [InlineData(0f, 0f)]
+    [InlineData(0.13f, 0.87f)]
+    [InlineData(0.37f, 0.5f)]
+    [InlineData(0.5f, 0.37f)]
+    [InlineData(0.99f, 0.01f)]
+    public void Render_PutsAStarOnTheWidestSupportedViewport_AtTheLargestUsableTileSize(
+        float acrossTheTileX,
+        float acrossTheTileY)
+    {
+        // and what makes the ceiling honest rather than a number: a tile that size is at most half
+        // the screen, so a whole tile falls inside the viewport wherever the camera stands between
+        // two of them, and the stars sown in it are on screen by construction rather than by luck.
+        StarField field = FieldOf(
+            new Camera2D
+            {
+                Target = new Vector2(
+                    StarField.LargestUsableTileSize * acrossTheTileX,
+                    StarField.LargestUsableTileSize * acrossTheTileY),
+            },
+            new StarLayer(1f, StarField.LargestUsableTileSize, 1, 3f));
+
+        RecordingRenderer renderer = new(
+            StarField.WidestSupportedViewportInPixels,
+            StarField.WidestSupportedViewportInPixels);
+
+        field.Render(renderer);
+
+        Assert.Contains(renderer.Drawn, sprite =>
+            sprite.Position.X >= 0f
+            && sprite.Position.X <= renderer.ViewportSize.X
+            && sprite.Position.Y >= 0f
+            && sprite.Position.Y <= renderer.ViewportSize.Y);
+    }
+
+    [Fact]
+    public void Layers_RefusesAStarWiderThanTheScreenItIsDrawnOn()
+    {
+        // A point of light at an unreachable distance that covers the whole viewport is not one.
+        // The operative reason is narrower than the aesthetic one: the tile-size floor is derived
+        // from the star's size, so an unbounded SizeInPixels can push the floor above the ceiling
+        // and leave a layer with no tile size it can be sown at, advised in one message to raise a
+        // number the next message refuses.
+        ArgumentException error = Assert.Throws<ArgumentException>(() =>
+        {
+            _ = FieldOf(
+                new Camera2D(),
+                new StarLayer(1f, 200f, 1, StarField.WidestSupportedViewportInPixels + 1f));
+        });
+
+        Assert.Contains(nameof(StarLayer.SizeInPixels), error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheFloorAndTheCeiling_LeaveEveryPermittedStarSizeATileSizeToBeSownAt()
+    {
+        // the guarantee the star-size cap exists for, said as an assertion rather than as prose:
+        // at the biggest star the field accepts, there is still room between the two bounds
+        Assert.True(
+            StarField.SmallestUsableTileSize(StarField.WidestSupportedViewportInPixels)
+                <= StarField.LargestUsableTileSize,
+            "The smallest usable tile size for the largest permitted star exceeds the largest usable tile size.");
+    }
+
     [Fact]
     public void Render_CoversTheWidestSupportedViewport_AtTheSmallestUsableTileSize()
     {

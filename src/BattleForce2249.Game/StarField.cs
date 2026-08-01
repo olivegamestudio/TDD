@@ -122,6 +122,34 @@ public sealed class StarField(ICamera camera) : IRenderable
     public static float SmallestUsableTileSize(float sizeInPixels) =>
         (WidestSupportedViewportInPixels + (2f * sizeInPixels)) / (MaxTilesPerAxis - 4f);
 
+    /// <summary>
+    /// The largest tile size a layer can be sown at and still be certain of putting a star on a
+    /// <see cref="WidestSupportedViewportInPixels"/> screen at one pixel per unit.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The other end of the same failure. A tile size too small clips the field to a band and
+    /// leaves a blank border; a tile size too large sows the stars so far apart that the viewport
+    /// can fall between them, and the field is blank for the opposite reason. Both pass every
+    /// other check, both draw sprites, and neither puts anything where the player is looking.
+    /// </para>
+    /// <para>
+    /// <b>Why half the screen.</b> A stretch of world can only be guaranteed to contain a whole
+    /// tile if it is at least two tiles long — one tile of slack covers the worst case, where the
+    /// camera stands so that a tile boundary falls just inside each edge. At half the screen or
+    /// below, a complete tile lies within the viewport wherever the camera happens to stand, so
+    /// the stars sown in that tile are on screen by construction.
+    /// </para>
+    /// <para>
+    /// Like the floor, this is held against the widest screen rather than the narrowest, which is
+    /// the conservative direction: it refuses only a tile size that could put a star on no screen
+    /// at all, and leaves the layer's author to judge how thickly to sow within that. It is a
+    /// constant rather than a function of the star's size because a star's size widens the range
+    /// of tiles visited, which can only help at this end.
+    /// </para>
+    /// </remarks>
+    public const float LargestUsableTileSize = WidestSupportedViewportInPixels / 2f;
+
     static readonly StarLayer[] _defaultLayers =
     [
         // Far to near, which is also the order they are drawn in: the near layer stacks over the
@@ -151,13 +179,24 @@ public sealed class StarField(ICamera camera) : IRenderable
     /// <b>A tile size too small is refused too</b>, because it fails in a way that looks like it
     /// worked: the layer draws tens of thousands of stars and still leaves a blank border, since
     /// the viewport spans more tiles than <see cref="MaxTilesPerAxis"/> allows. That is a mistake
-    /// in the layer rather than in the zoom, so it belongs where the layer is written.
+    /// in the layer rather than in the zoom, so it belongs where the layer is written. A tile size
+    /// too large is refused for the mirror of that reason — see <see cref="LargestUsableTileSize"/>.
+    /// </para>
+    /// <para>
+    /// <b>Every float is checked for being a number first</b>, before any of the range checks. An
+    /// ordered comparison against <see cref="float.NaN"/> is false, so a NaN reads as passing each
+    /// guard below in turn and reaches <see cref="Render"/>, where it draws every star at a NaN
+    /// position and leaves the screen blank. Checking finiteness up front is also what lets each
+    /// message name the field that is actually wrong: an infinite size once tripped the tile-size
+    /// floor derived from it, and sent the author to the wrong number.
     /// </para>
     /// </remarks>
     /// <exception cref="ArgumentException">
-    /// A layer has a parallax outside <c>(0, 1]</c>, a tile size that is not positive or is too
-    /// small to fill the screen within <see cref="MaxTilesPerAxis"/> tiles, fewer than one star
-    /// per tile, or a size that is not positive.
+    /// A layer has a parallax, tile size or star size that is not a finite number; a parallax
+    /// outside <c>(0, 1]</c>; a tile size that is not positive, is too small to fill the screen
+    /// within <see cref="MaxTilesPerAxis"/> tiles, or is above
+    /// <see cref="LargestUsableTileSize"/>; fewer than one star per tile; or a star size that is
+    /// not positive or is wider than <see cref="WidestSupportedViewportInPixels"/>.
     /// </exception>
     public IReadOnlyList<StarLayer> Layers
     {
@@ -169,6 +208,13 @@ public sealed class StarField(ICamera camera) : IRenderable
 
             foreach (StarLayer layer in value)
             {
+                // First, and for every float, because everything below is an ordered comparison
+                // and an ordered comparison against NaN is false — each guard would read as
+                // covering the case and none of them would.
+                RequireANumber(layer.Parallax, nameof(StarLayer.Parallax));
+                RequireANumber(layer.TileSizeInWorldUnits, nameof(StarLayer.TileSizeInWorldUnits));
+                RequireANumber(layer.SizeInPixels, nameof(StarLayer.SizeInPixels));
+
                 if (layer.Parallax is <= 0f or > 1f)
                 {
                     throw new ArgumentException(
@@ -197,6 +243,33 @@ public sealed class StarField(ICamera camera) : IRenderable
                         nameof(value));
                 }
 
+                // Bounded above as well, and not only because a point of light wider than the
+                // screen is not one: the tile-size floor below is derived from this number, so an
+                // unbounded star size could push the floor past LargestUsableTileSize and leave
+                // the layer with no tile size at all — refused by one message for being under the
+                // floor and by the next for being over the ceiling.
+                if (layer.SizeInPixels > WidestSupportedViewportInPixels)
+                {
+                    throw new ArgumentException(
+                        $"A star's SizeInPixels must be at most {WidestSupportedViewportInPixels}, "
+                        + $"the width of the widest screen the game supports, but was "
+                        + $"{layer.SizeInPixels}.",
+                        nameof(value));
+                }
+
+                if (layer.TileSizeInWorldUnits > LargestUsableTileSize)
+                {
+                    throw new ArgumentException(
+                        $"A star layer's tile size must be at most {LargestUsableTileSize} so that "
+                        + $"a whole tile falls inside a {WidestSupportedViewportInPixels}-pixel "
+                        + $"screen wherever the camera stands, but was {layer.TileSizeInWorldUnits}. "
+                        + "Lower TileSizeInWorldUnits to at most "
+                        + $"{LargestUsableTileSize}; a larger tile sows its stars further apart "
+                        + "than the screen is wide, so the viewport can fall between them and the "
+                        + "field draws nothing the player can see.",
+                        nameof(value));
+                }
+
                 // Last, because the smallest usable tile size is a function of the star's size,
                 // and there is no point deriving it from a size that has just been refused.
                 float smallest = SmallestUsableTileSize(layer.SizeInPixels);
@@ -215,6 +288,27 @@ public sealed class StarField(ICamera camera) : IRenderable
             }
 
             _layers = [.. value];
+        }
+    }
+
+    /// <summary>
+    /// Refuses a value that is not a finite number, naming the field it came from.
+    /// </summary>
+    /// <remarks>
+    /// Separate from the range checks rather than folded into them as <c>!(x &gt; 0f)</c>: that
+    /// spelling is correct too, but it is correct by way of a <c>!</c> the reader has to notice,
+    /// and it would report a NaN parallax as being outside <c>(0, 1]</c> — true, but not the thing
+    /// to fix.
+    /// </remarks>
+    /// <param name="value">The number as the layer gave it.</param>
+    /// <param name="field">The name of the field on <see cref="StarLayer"/> it came from.</param>
+    static void RequireANumber(float value, string field)
+    {
+        if (!float.IsFinite(value))
+        {
+            throw new ArgumentException(
+                $"A star layer's {field} must be a finite number, but was {value}.",
+                "value");
         }
     }
 

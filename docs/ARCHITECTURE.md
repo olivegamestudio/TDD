@@ -219,6 +219,20 @@ thousands of stars into a band. The other half is a limit on the camera: no boun
 stop a low enough `PixelsPerUnit` from spanning the cap. Note that it does *not* stop mattering at
 that zoom — stars are sized in pixels, so they stay fully visible beside the blank border.
 
+A tile size can also be too *large*, and it goes blank for the opposite reason: tiles wider than
+the screen sow their stars further apart than the viewport, so the viewport can fall between them.
+`LargestUsableTileSize` is half `WidestSupportedViewportInPixels`, which is the point at which a
+whole tile is guaranteed to fall inside the viewport wherever the camera stands. Both bounds are
+held against the *widest* supported screen rather than the narrowest, which is the conservative
+direction at both ends: a layer is refused only when it could work on no screen at all.
+
+Every float on a layer is checked for being a finite number before any of those bounds are
+applied. An ordered comparison against `NaN` is false, so without that check a `NaN` clears every
+range guard in turn — each one reading as though it covered the case — and is then drawn at a
+`NaN` position, which is a blank screen reached through validation that reported the layer as
+sound. Checking it up front is also what lets each message name the field that is wrong rather
+than whichever derived bound happened to trip first.
+
 `StarField` is registered as itself rather than behind an interface. Nothing outside the drawing
 sets anything on it, so an interface would be a name for the container's benefit and no one else's.
 
