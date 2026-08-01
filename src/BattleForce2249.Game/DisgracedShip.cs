@@ -35,12 +35,14 @@ public static class DisgracedShip
     /// than past. Quest 1's exit marker is 1000 units forward, so getting clear is a run of
     /// roughly six seconds at full burn.
     ///
-    /// The turn rate is 2.5 radians a second — a little under a second and a half for a full
+    /// The turn rate is 4.5 radians a second — a little under a second and a half for a full
     /// circle — because the ship keeps its momentum through a turn and a slower helm would make
-    /// every correction feel like an argument with the controls.
+    /// every correction feel like an argument with the controls. It shipped at 2.5, which is two
+    /// and a half seconds to come about and not what this remark or the tests ever asked for; the
+    /// duration is the number that was agreed, so the rate is the one that moved.
     /// </remarks>
     public static ShipHandling Handling { get; } = new(
         Acceleration: 180,
         Drag: 0.9,
-        TurnRate: 2.5);
+        TurnRate: 4.5);
 }

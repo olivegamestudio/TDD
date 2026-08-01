@@ -29,7 +29,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   real device. The engine ships `NeutralShipInput` as the default, so a game composes and runs with
   nobody at the controls; a host registers its keyboard or gamepad after `AddOliveGameStudio`. ([#3](https://github.com/olivegamestudio/TDD/issues/3))
 - **`DisgracedShip`** — the Disgraced's ship: 180 units per second per second against a drag of 0.9,
-  settling at 200 units a second, and 2.5 radians a second at full helm. Quest 1's exit marker is a
+  settling at 200 units a second, and 4.5 radians a second at full helm — a little under a second
+  and a half to come about. Quest 1's exit marker is a
   run of roughly six seconds at full burn. Named for the pilot rather than the game, and left
   without a `Ship` base type until a second ship exists to factor one out of.
   ([#3](https://github.com/olivegamestudio/TDD/issues/3),

@@ -42,6 +42,18 @@ public sealed class DisgracedShipTests
     }
 
     [Fact]
+    public void ComesAbout_InALittleUnderASecondAndAHalf()
+    {
+        // The figure `DisgracedShip.Handling` documents, asserted against the number it ships, so
+        // the two cannot drift apart again. They already had: the remark said a second and a half
+        // while the rate said two and a half seconds, and neither noticed because nothing measured
+        // the duration — only that it was under two. A test on the number alone would have to be
+        // rewritten every time the helm is tuned; this one only fails when the ship stops handling
+        // the way it is described as handling.
+        Assert.InRange(Math.Tau / Handling.TurnRate, 1.3, 1.5);
+    }
+
+    [Fact]
     public void ReachesQuest1sExitMarker_AtFullThrust_InAPlayableTime()
     {
         Player player = new();
