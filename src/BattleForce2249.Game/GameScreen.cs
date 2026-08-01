@@ -110,6 +110,15 @@ public sealed class GameScreen(
     /// The narrowing to <see cref="float"/> is the world model keeping its precision while the
     /// drawing side takes what a graphics device can use. At the sizes a viewport spans, the
     /// difference is far below a pixel.
+    ///
+    /// It costs range as well as precision, and that half is not free. A world coordinate past
+    /// <see cref="float.MaxValue"/> is a perfectly good <see cref="double"/> that narrows to an
+    /// infinity, and an infinite pose is every sprite in the game drawn nowhere — which the camera
+    /// now refuses outright rather than drawing as a blank screen. Nothing is checked here,
+    /// because the one route such a position could arrive by is a save, and
+    /// <see cref="SaveGame.CanBeResumed"/> turns it away before a game is resumed into it. A
+    /// guard here could only throw out of the frame loop, which is too late to be any use to
+    /// anybody.
     /// </remarks>
     static ShipPose PoseOf(Position position, double heading) =>
         new(new Vector2((float)position.X, (float)position.Y), (float)heading);

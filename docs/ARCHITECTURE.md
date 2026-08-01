@@ -119,6 +119,15 @@ reported as "no save", so a corrupt file yields a new game rather than a crash. 
 written by name, so reordering `QuestState` cannot silently change a save. `SaveGame`'s shape is
 the compatibility boundary — changing it changes what older saves can be read back into.
 
+"Damaged" is decided by whether the game can resume, not by whether a parser was happy.
+`SaveGame.CanBeResumed` turns away a snapshot that reads back perfectly and still cannot be
+played, and today that means one thing: a player position past what the drawing side can hold.
+The world is measured in `double` and the screen in `float`, and `GameScreen.PoseOf` narrows once
+between them — so a coordinate past `float.MaxValue` is a good `double` that becomes an infinity
+at that seam, and an infinite pose is the whole world drawn nowhere. The camera refuses such a
+target outright, so the check has to happen before a game is resumed into one rather than in the
+frame loop, where nothing is left that could do anything about it.
+
 A save the campaign has drifted from is tolerated in both directions: a quest the save knows but
 this build no longer ships is ignored, and a quest added since the save was written starts from
 the beginning.

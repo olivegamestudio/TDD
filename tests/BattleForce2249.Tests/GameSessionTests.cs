@@ -186,6 +186,39 @@ public sealed class GameSessionTests
     }
 
     [Fact]
+    public async Task Continue_StartsANewGame_WhenTheSavedPositionCanNeverBeDrawn()
+    {
+        // A position past what the drawing side can hold is not a corrupt file — it parses, it
+        // round trips, and every quest beside it is intact. It is still a game nobody can play:
+        // the first frame hands the camera a position that is nowhere, and the camera refuses it.
+        // Falling back to a new game is what the game already does with a save it cannot read.
+        _saves.Content = SaveGameSerializer.Serialize(new SaveGame { PlayerX = 1e300 });
+        GameSession session = CreateSession();
+
+        await session.Continue();
+
+        Assert.Equal(Start, session.Player.Position);
+        Assert.True(session.IsReady);
+    }
+
+    [Fact]
+    public async Task Continue_ResumesFromTheFurthestPositionThatCanBeDrawn()
+    {
+        // the other side of the same bound: the game resumes from as far out as it can draw, so
+        // the check refuses only what is unplayable rather than trimming the world short of it
+        Position furthest = new(float.MaxValue, -float.MaxValue);
+        GameSession first = CreateSession();
+        await first.StartNewGame();
+        first.Player.MoveTo(furthest);
+        await first.Save();
+
+        GameSession resumed = CreateSession();
+        await resumed.Continue();
+
+        Assert.Equal(furthest, resumed.Player.Position);
+    }
+
+    [Fact]
     public async Task Continue_RestoresThePlayerPositionAndQuestProgress()
     {
         GameSession first = CreateSession();

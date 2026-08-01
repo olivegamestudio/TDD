@@ -477,6 +477,31 @@ public sealed class GameScreenTests : HostTestBase
     }
 
     [Fact]
+    public void ASaveTheGameCouldNeverDrawFrom_DoesNotBringDownTheFrameItIsResumedInto()
+    {
+        // End to end, through the real composition, because this defect only exists at the seam:
+        // the save is intact, the world holds the position happily in double, and it is the
+        // narrowing to the drawing side's float that turns it into a position that is nowhere.
+        // Before the camera refused a non-finite target that showed as a blank screen; now it
+        // throws out of Render, in the frame loop, where nothing can do anything about it.
+        InMemorySaveProgressService saves = new()
+        {
+            Content = SaveGameSerializer.Serialize(new SaveGame { PlayerX = 1e300, PlayerY = 1e300 }),
+        };
+        IHost host = StartTheGame(services => services.AddSingleton<ISaveProgressService>(saves));
+
+        Play(host, frames: 1);
+        ((IRenderable)GameScreen).Render(new RecordingRenderer());
+
+        // the player is put back at the world start rather than left somewhere unplayable
+        Assert.Equal(new BattleForceWorld().PlayerStart, Session.Player.Position);
+
+        ShipPose pose = Resolve<IShipView>().Pose;
+        Assert.True(float.IsFinite(pose.Position.X) && float.IsFinite(pose.Position.Y));
+        Assert.True(float.IsFinite(Resolve<ICamera>().Target.X));
+    }
+
+    [Fact]
     public void EnteringTheScreen_BringsTheShipToRest()
     {
         // the save carries where the player is, never how fast they were going
