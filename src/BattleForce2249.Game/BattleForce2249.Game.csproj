@@ -7,7 +7,19 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <!--
+        The translations ship as files beside the game rather than compiled in, so a language can be
+        corrected, or a new one dropped in, without a rebuild.
+      -->
+      <None Remove="Text\**\*.json" />
+      <Content Include="Text\**\*.json" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+
+    <ItemGroup>
       <ProjectReference Include="..\BattleForce2249.Abstractions\BattleForce2249.Abstractions.csproj" />
+      <ProjectReference Include="..\OliveGameStudio.Localisation\OliveGameStudio.Localisation.csproj" />
+      <ProjectReference Include="..\OliveGameStudio.World\OliveGameStudio.World.csproj" />
+      <ProjectReference Include="..\Pilgrimage\Pilgrimage.csproj" />
     </ItemGroup>
 
 </Project>
