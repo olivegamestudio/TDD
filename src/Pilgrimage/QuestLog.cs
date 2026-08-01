@@ -117,6 +117,13 @@ public sealed class QuestLog
     /// is all-or-nothing: the whole batch is checked before any of it is applied, so a game that
     /// catches one of these still has the log it started with rather than half a save.
     /// </para>
+    /// <para>
+    /// A game that checks its own save before it gets here should draw the line in the same place —
+    /// refuse an entry that is absent or carries no identifier, and treat a blank one as drift. The
+    /// two lines are worth keeping together because they are not equally costly to get wrong: this
+    /// method skips one entry, while a save boundary that refuses is refusing a whole file, and
+    /// every quest the player really did finish goes with it.
+    /// </para>
     /// </remarks>
     /// <param name="progress">The saved quest states.</param>
     /// <exception cref="ArgumentNullException"><paramref name="progress"/> is <c>null</c>.</exception>

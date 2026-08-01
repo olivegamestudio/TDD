@@ -305,6 +305,28 @@ public sealed class GameSessionTests
     }
 
     [Fact]
+    public async Task Continue_KeepsTheProgress_WhenTheSaveAlsoHoldsAQuestEntryWithABlankId()
+    {
+        // The save is real progress with one junk entry beside it. Refusing the whole file for the
+        // junk started a new game over a completed campaign — and because a new game saves at once,
+        // there was no second chance at it. A blank id names no quest this build ships, so there is
+        // nothing to apply it to and nothing lost by skipping it, which is what QuestLog does.
+        _saves.Content = """
+        { "PlayerX": 0, "PlayerY": 700,
+          "Quests": [ { "QuestId": "quest-1", "State": "Completed" },
+                      { "QuestId": "  ",      "State": "Active"    } ] }
+        """;
+        GameSession session = CreateSession();
+
+        await session.Continue();
+
+        Assert.True(session.IsReady);
+        Assert.Equal(700, session.Player.Position.Y);
+        Quest quest = Assert.Single(session.Quests.Quests);
+        Assert.True(quest.IsCompleted);
+    }
+
+    [Fact]
     public async Task Continue_LeavesAQuestThatCanStart_WhenTheSaveHoldsAnUnreachablePosition()
     {
         // 1e400 does not throw; it overflows to Infinity and the save reads as valid. Every distance

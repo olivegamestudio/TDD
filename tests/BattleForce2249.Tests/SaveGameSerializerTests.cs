@@ -67,16 +67,37 @@ public sealed class SaveGameSerializerTests
     [Theory]
     // a null element, rather than a null list — the list was guarded, the elements were not
     [InlineData("""{ "PlayerX": 0, "PlayerY": 0, "Quests": [ null ] }""")]
-    // an entry that names no quest: absent, null, blank
+    // an entry with no identifier at all: absent, or written as null
     [InlineData("""{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "State": "Active" } ] }""")]
     [InlineData("""{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "QuestId": null, "State": "Active" } ] }""")]
-    [InlineData("""{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "QuestId": "", "State": "Active" } ] }""")]
-    [InlineData("""{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "QuestId": "   ", "State": "Active" } ] }""")]
     public void Deserialize_ReturnsNull_ForAQuestEntryThisBuildDidNotWrite(string content)
     {
         // these reached QuestLog.Restore as a NullReferenceException and an ArgumentNullException,
         // neither of which is a storage failure — so they escaped the session and froze the game
         Assert.Null(SaveGameSerializer.Deserialize(content));
+    }
+
+    [Theory]
+    [InlineData("\"\"")]
+    [InlineData("\"   \"")]
+    public void Deserialize_KeepsTheProgressBesideAnEntryNamingNoQuest(string blankId)
+    {
+        // A blank identifier is not an unreadable entry, it is an entry naming a quest this build
+        // does not have — the drift QuestLog.Restore skips. Refusing the whole file for it threw
+        // away the completed campaign saved next to it, and a refused save is then written over.
+        string content = $$"""
+        { "PlayerX": 0, "PlayerY": 700,
+          "Quests": [ { "QuestId": "quest-1", "State": "Completed" },
+                      { "QuestId": {{blankId}},  "State": "Active"    } ] }
+        """;
+
+        SaveGame? loaded = SaveGameSerializer.Deserialize(content);
+
+        Assert.NotNull(loaded);
+        Assert.Equal(700, loaded.PlayerY);
+        Assert.Equal(
+            QuestState.Completed,
+            loaded.Quests.Single(quest => quest.QuestId == "quest-1").State);
     }
 
     [Theory]

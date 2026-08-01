@@ -233,6 +233,33 @@ public class SaveRecoveryAdversarialTests
     }
 
     [Fact]
+    public async Task AJunkQuestEntry_DoesNotCostThePlayerTheProgressSavedBesideIt()
+    {
+        // The refusal that mattered: one entry naming no quest used to condemn the whole file, and
+        // the new game that replaced it wrote over the completed campaign before anyone could look
+        // at it. Asserted on the disk as well as in the session, because that write is what made
+        // the loss permanent.
+        LockableSaveProgressService saves = new()
+        {
+            Content = """
+            { "PlayerX": 0, "PlayerY": 700,
+              "Quests": [ { "QuestId": "quest-1", "State": "Completed" },
+                          { "QuestId": "  ",      "State": "Active"    } ] }
+            """,
+        };
+        string? saveOnDisk = saves.Content;
+        GameSession session = CreateSession(saves);
+
+        await session.Continue();
+
+        Assert.True(session.IsReady);
+        Assert.Equal(700, session.Player.Position.Y);
+        Assert.True(session.Quests.Find("quest-1")!.IsCompleted);
+        Assert.Equal(0, saves.SaveCount);
+        Assert.Equal(saveOnDisk, saves.Content);
+    }
+
+    [Fact]
     public async Task AnUnreadableSave_LeavesQuest1CompletableByPlaying()
     {
         // End to end, through the watcher that drives quests in the real game: the stand-in game is
@@ -274,7 +301,6 @@ public class SaveRecoveryAdversarialTests
         """{ "Quests": [ null, { "QuestId": "quest-1", "State": "Active" } ] }""",
         """{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "State": "Active" } ] }""",
         """{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "QuestId": null, "State": "Active" } ] }""",
-        """{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "QuestId": "", "State": "Active" } ] }""",
         """{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "QuestId": "quest-1", "State": 99 } ] }""",
         """{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "QuestId": "quest-1", "State": null } ] }""",
         """{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "QuestId": "quest-1", "State": "Nonsense" } ] }""",

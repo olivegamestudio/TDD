@@ -66,12 +66,23 @@ public static class SaveGameSerializer
     /// Whether a save that parsed is one the game can actually be resumed from.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Parsing is not the whole of "a save this build can read". Content that is well-formed JSON
-    /// but not a game — a quest entry that is not there, one naming no quest, a coordinate that is
-    /// not a place — used to be handed on as valid and then throw or brick further in, where the
-    /// player's only symptom was a game that quietly stopped. This is the one point that decides,
-    /// so everything downstream can be written against a save that makes sense, and the answer for
-    /// anything that does not is the one the class already promises: no save, so a new game.
+    /// but not a game — a quest entry that is not there, one with no identifier at all, a
+    /// coordinate that is not a place — used to be handed on as valid and then throw or brick
+    /// further in, where the player's only symptom was a game that quietly stopped. This is the one
+    /// point that decides, so everything downstream can be written against a save that makes sense,
+    /// and the answer for anything that does not is the one the class already promises: no save, so
+    /// a new game.
+    /// </para>
+    /// <para>
+    /// "Damaged file, new game" stops at the file. It is deliberately not applied to a single entry
+    /// the rest of the save can be resumed without: an entry whose identifier is blank names no
+    /// quest this build ships, which is the drift <see cref="QuestLog.Restore"/> skips, so the two
+    /// edges answer alike and the completed campaign saved beside it survives. Condemning the whole
+    /// file for it was the more destructive reading of the same evidence, and irreversibly so — a
+    /// refused save is written over by the new game that replaces it.
+    /// </para>
     /// </remarks>
     /// <param name="save">The parsed save.</param>
     /// <returns><c>true</c> when the save can be resumed from.</returns>
@@ -81,6 +92,9 @@ public static class SaveGameSerializer
         // proximity trigger can ever fire again — a quest that can never start and never complete.
         double.IsFinite(save.PlayerX)
         && double.IsFinite(save.PlayerY)
-        // A quest entry with no id is not this build's writing, and it is what QuestLog refuses.
-        && save.Quests.All(quest => quest is not null && !string.IsNullOrWhiteSpace(quest.QuestId));
+        // Exactly what QuestLog.Restore refuses, and no more: an entry that is not there, and one
+        // carrying no identifier to look a quest up by. A blank identifier is a quest that is not
+        // registered, which Restore skips — refusing it here would have thrown the save away over
+        // an entry there was nothing to apply anyway.
+        && save.Quests.All(quest => quest is not null && quest.QuestId is not null);
 }

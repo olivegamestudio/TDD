@@ -247,8 +247,8 @@ public sealed class QuestLogTests
     public void Restore_AcceptsAnEntryWithABlankQuestId_AsAQuestItDoesNotHave()
     {
         // blank is not unreadable — it names no registered quest, which is the drift case Restore
-        // already tolerates. A game that never writes blank ids rejects them at its own save
-        // boundary; the library has no business guessing that for it.
+        // already tolerates. A game's own save boundary is expected to draw the same line: refusing
+        // a blank id there throws away a whole file over an entry there is nothing to apply.
         QuestLog log = new();
         log.Register(Definition("quest-1"));
 

@@ -81,10 +81,17 @@ the compatibility boundary — changing it changes what older saves can be read 
 
 `SaveGameSerializer` is the only place that decides whether a save can be read, and "can be read"
 means more than "parsed". Content that is well-formed JSON but not a game is refused there too: a
-quest state outside `QuestState`, a quest entry that is absent or names no quest, or a coordinate
-that is not a finite number. All of these used to be handed on as valid and then throw or brick
-further in, where the player's only symptom was a game that had quietly stopped. Deciding once, at
-the edge, is what lets everything downstream be written against a save that makes sense.
+quest state outside `QuestState`, a quest entry that is absent or carries no identifier at all, or
+a coordinate that is not a finite number. All of these used to be handed on as valid and then throw
+or brick further in, where the player's only symptom was a game that had quietly stopped. Deciding
+once, at the edge, is what lets everything downstream be written against a save that makes sense.
+
+"Damaged file, new game" stops at the file, and deliberately does not extend to a single entry the
+rest of the save can be resumed without. An entry whose quest identifier is blank names no quest
+this build ships — the same drift `QuestLog.Restore` skips — so it is skipped rather than taken as
+grounds for throwing away the progress saved beside it. The serializer refuses exactly what
+`QuestLog.Restore` refuses and no more; the two edges answering differently about one entry is how
+a completed campaign came to be discarded over the junk next to it.
 
 A save the campaign has drifted from is tolerated in both directions: a quest the save knows but
 this build no longer ships is ignored, and a quest added since the save was written starts from
