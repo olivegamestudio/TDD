@@ -313,4 +313,36 @@ public sealed class ShipMovementTests
         Assert.Throws<ArgumentNullException>(
             () => _ship.Update(null!, ShipControls.Neutral, TimeSpan.FromSeconds(1)));
     }
+
+    // ---- a device that reports nonsense ----
+
+    [Fact]
+    public void ANaNFrame_DoesNotPoisonTheShip()
+    {
+        // NaN propagates through every arithmetic path here, so one bad frame from a device would
+        // otherwise put NaN in the heading, then the velocity, then the position — and nothing
+        // recovers it. The ship is then silently unflyable: no trigger ever fires again, because
+        // every distance measured against a NaN position is NaN, and the save carries it.
+        _ship.Update(_player, new ShipControls(double.NaN, double.NaN), TimeSpan.FromMilliseconds(16));
+
+        _ship.Update(_player, new ShipControls(thrust: 1, turn: 0), TimeSpan.FromMilliseconds(16));
+
+        Assert.False(double.IsNaN(_player.Position.X), "position X is NaN");
+        Assert.False(double.IsNaN(_player.Position.Y), "position Y is NaN");
+        Assert.False(double.IsNaN(_ship.Heading), "heading is NaN");
+        Assert.True(_player.Position.Y > 0, "the good frame after the bad one did not move the ship");
+    }
+
+    [Fact]
+    public void AnInfiniteFrame_FliesAtFullDeflectionRatherThanBreakingTheShip()
+    {
+        _ship.Update(
+            _player,
+            new ShipControls(double.PositiveInfinity, double.NegativeInfinity),
+            TimeSpan.FromSeconds(1));
+
+        Assert.True(double.IsFinite(_player.Position.X));
+        Assert.True(double.IsFinite(_player.Position.Y));
+        Assert.InRange(_ship.Velocity.Speed, 0, Handling.MaximumSpeed);
+    }
 }

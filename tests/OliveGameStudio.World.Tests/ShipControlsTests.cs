@@ -37,4 +37,25 @@ public sealed class ShipControlsTests
     {
         Assert.Equal(new ShipControls(1, -1), new ShipControls(4, -9));
     }
+
+    [Theory]
+    [InlineData(double.PositiveInfinity, 1)]
+    [InlineData(double.NegativeInfinity, -1)]
+    public void AnInfiniteAxis_ReadsAsFullDeflection(double asked, double expected)
+    {
+        Assert.Equal(expected, new ShipControls(thrust: asked, turn: asked).Thrust);
+        Assert.Equal(expected, new ShipControls(thrust: asked, turn: asked).Turn);
+    }
+
+    [Fact]
+    public void ANaNAxis_ReadsAsHandsOff()
+    {
+        // Math.Clamp(NaN, -1, 1) is NaN — the clamp does not hold for it, so a device reporting a
+        // NaN axis would put NaN into the heading and never get it back out again. A pilot who
+        // cannot be read is a pilot asking for nothing.
+        ShipControls controls = new(thrust: double.NaN, turn: double.NaN);
+
+        Assert.Equal(0, controls.Thrust);
+        Assert.Equal(0, controls.Turn);
+    }
 }

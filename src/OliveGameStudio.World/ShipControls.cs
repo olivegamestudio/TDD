@@ -26,9 +26,25 @@ public readonly record struct ShipControls
     /// </remarks>
     public ShipControls(double thrust, double turn)
     {
-        Thrust = Math.Clamp(thrust, -1, 1);
-        Turn = Math.Clamp(turn, -1, 1);
+        Thrust = Axis(thrust);
+        Turn = Axis(turn);
     }
+
+    /// <summary>
+    /// Brings whatever a device reported for an axis into <c>[-1, 1]</c>.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Math.Clamp(double, double, double)"/> does not hold for <c>NaN</c> — it returns
+    /// <c>NaN</c> — and <c>NaN</c> then propagates through every arithmetic path in the physics.
+    /// One unreadable frame would put it in the heading, then the velocity, then the position, and
+    /// nothing after it recovers: the ship stops moving for good, every quest distance measured
+    /// against that position is <c>NaN</c> so no trigger fires again, and the state is saved. So an
+    /// axis that cannot be read is treated as an axis asking for nothing, which is the same thing
+    /// an unbound device reports and the one reading that is always safe to fly on.
+    /// </remarks>
+    /// <param name="value">What the device reported.</param>
+    /// <returns>The axis, clamped, with an unreadable value read as neutral.</returns>
+    static double Axis(double value) => double.IsNaN(value) ? 0 : Math.Clamp(value, -1, 1);
 
     /// <summary>
     /// Hands off the controls. What an unbound input device reports, and what a frame with no

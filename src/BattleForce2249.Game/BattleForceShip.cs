@@ -22,12 +22,16 @@ public static class BattleForceShip
     /// than past. Quest 1's exit marker is 1000 units forward, so getting clear is a run of
     /// roughly six seconds at full burn.
     ///
-    /// The turn rate is 2.5 radians a second — a little under a second and a half for a full
+    /// The turn rate is 4.5 radians a second — a little under a second and a half for a full
     /// circle — because the ship keeps its momentum through a turn and a slower helm would make
-    /// every correction feel like an argument with the controls.
+    /// every correction feel like an argument with the controls. It was 2.5, which is 2.5 seconds
+    /// to come about: slower than this comment said and slower than the test asserting the feel
+    /// would allow. The number was the one of the three that was wrong, because the helm is chosen
+    /// for how fast the ship comes about, and both of the other two asked for a fast one. Ask
+    /// <see cref="ShipHandling.SecondsForAFullCircle"/> rather than reading it off the radians.
     /// </remarks>
     public static ShipHandling Handling { get; } = new(
         Acceleration: 180,
         Drag: 0.9,
-        TurnRate: 2.5);
+        TurnRate: 4.5);
 }

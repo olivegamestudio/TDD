@@ -38,7 +38,17 @@ public sealed class BattleForceShipTests
     public void TurnsRightRoundInUnderTwoSeconds()
     {
         // a ship that takes longer than this to come about makes every correction an argument
-        Assert.True(Math.Tau / Handling.TurnRate < 2, "the ship is too slow to turn");
+        Assert.True(
+            Handling.SecondsForAFullCircle < 2,
+            $"the ship is too slow to turn: {Handling.SecondsForAFullCircle:0.###} seconds to come about");
+    }
+
+    [Fact]
+    public void ComesAbout_InALittleUnderASecondAndAHalf()
+    {
+        // the feel the handling is documented as having, pinned so the number and the prose cannot
+        // drift apart again — they had, along with the ceiling above, into three separate claims
+        Assert.InRange(Handling.SecondsForAFullCircle, 1.25, 1.5);
     }
 
     [Fact]

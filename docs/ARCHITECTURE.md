@@ -82,6 +82,10 @@ physics.
 
 - `ShipControls` — a thrust axis and a helm axis, each clamped to `[-1, 1]`. Analogue, because
   that is the shape a stick and a key both fit: a key is a 1, a stick is whatever it is pushed to.
+  An axis that cannot be read at all — `NaN` — is neutral, not clamped: `Math.Clamp` returns `NaN`
+  unchanged, and one `NaN` frame would otherwise reach the heading, the velocity and the position
+  and never leave, so the ship would stop for good and every quest distance after it would be
+  `NaN`. A pilot who cannot be read is a pilot asking for nothing.
 - `IShipInput` — where the pilot's intent comes from. The platform host owns the real device, so
   the engine ships the seam and `NeutralShipInput`, which asks for nothing. A host registers a
   keyboard or gamepad after `AddOliveGameStudio` and wins under the engine's `AddSingleton`.
@@ -100,6 +104,10 @@ pillar 1, not a tuning detail.
 **Top speed is derived, not configured.** `ShipHandling.MaximumSpeed` is `Acceleration / Drag`,
 the speed the two settle at. A separate top speed could be set to disagree with the physics that
 produces it, leaving the ship either short of its stated maximum or walled off below it.
+`SecondsForAFullCircle` is `τ / TurnRate` for the same reason, and it is not hypothetical: the
+turn rate is stored in radians a second but is chosen for how quickly the ship comes about, and
+the number, a test asserting a time and a comment describing the feel drifted into three different
+claims about the same ship. Ask for the derived figure rather than writing a second one down.
 
 `GameScreen.Update` flies the ship **before** it measures the quests, so a trigger fires on the
 frame it is reached rather than the frame after — at 200 units a second, a frame late is a marker

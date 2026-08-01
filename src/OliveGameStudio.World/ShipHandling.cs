@@ -28,4 +28,17 @@ public sealed record ShipHandling(double Acceleration, double Drag, double TurnR
     /// stated top speed or hit an invisible wall short of the one the physics implies.
     /// </remarks>
     public double MaximumSpeed => Acceleration / Drag;
+
+    /// <summary>
+    /// Gets how long the ship takes to turn all the way round at full helm, in seconds, or
+    /// <see cref="double.PositiveInfinity"/> for a ship with no helm at all.
+    /// </summary>
+    /// <remarks>
+    /// Derived for the same reason as <see cref="MaximumSpeed"/>, and for a reason that has already
+    /// happened once: how quickly a ship comes about is what the number is chosen for, but the
+    /// number itself is radians a second, so a turn rate, a test asserting a time and a comment
+    /// describing the feel drifted into three different claims about the same ship. There is one
+    /// place to say it now, and it is computed rather than written down.
+    /// </remarks>
+    public double SecondsForAFullCircle => Math.Tau / TurnRate;
 }

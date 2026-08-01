@@ -24,13 +24,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   covered each frame. Thrust is applied along the heading and momentum survives a turn. Drag is
   integrated exactly rather than stepped, so a second of flight covers the same distance whether it
   arrived as one frame or a hundred and sixty. `ShipHandling` holds the tuning, and derives the top
-  speed from the acceleration and drag rather than letting a third number disagree with them. ([#3](https://github.com/olivegamestudio/TDD/issues/3))
+  speed from the acceleration and drag rather than letting a third number disagree with them, and
+  how long the ship takes to come about from the turn rate for the same reason. An axis a device
+  cannot report — `NaN` — reads as hands off rather than propagating through the physics and
+  leaving the ship permanently unflyable. ([#3](https://github.com/olivegamestudio/TDD/issues/3))
 - **`IShipInput`** — the seam gameplay input arrives through, because the platform host owns the
   real device. The engine ships `NeutralShipInput` as the default, so a game composes and runs with
   nobody at the controls; a host registers its keyboard or gamepad after `AddOliveGameStudio`. ([#3](https://github.com/olivegamestudio/TDD/issues/3))
 - **`BattleForceShip`** — the game's ship: 180 units per second per second against a drag of 0.9,
-  settling at 200 units a second, and 2.5 radians a second at full helm. Quest 1's exit marker is a
-  run of roughly six seconds at full burn. ([#3](https://github.com/olivegamestudio/TDD/issues/3))
+  settling at 200 units a second, and 4.5 radians a second at full helm — a little under a second
+  and a half to come about. Quest 1's exit marker is a run of roughly six seconds at full
+  burn. ([#3](https://github.com/olivegamestudio/TDD/issues/3))
 - **`IWorld` and `QuestProximityWatcher`** in the game — where each quest's markers stand, and the
   per-frame measurement that drives the quest API from the player's position. ([#2](https://github.com/olivegamestudio/TDD/pull/2))
 - **Saved games.** `SaveGame` and `SaveGameSerializer` persist the player's position and every
