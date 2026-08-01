@@ -104,6 +104,28 @@ Anything that *holds* a translated string, though, has to re-read it: `BattleFor
 builds its list on each read rather than in a field initialiser, because the campaign is a DI
 singleton and a cached list would freeze the player's language at startup.
 
+## UI elements
+
+`Element` and its three kinds — `Button`, `Image`, `Text` — are **identities, not values**. Two
+elements are the same element only when they are the same object; nothing about them is compared.
+That is why the hierarchy is classes rather than records.
+
+It is load bearing rather than stylistic. `IUIController` is registered as a singleton, so every
+screen's buttons live in one node list, and two screens are free to label a button the same
+obvious thing — `BACK`, `CONTINUE`, `START` — without either author knowing the other did. While
+`Button` was a record, `==` compared names, so `UIController` resolved both to the first matching
+node: one screen's `Disable` greyed out another screen's button, and one screen's `OnReleased`
+overwrote the other's handler. Nothing warned, because nothing was wrong at any single call site.
+
+Two rules follow, and both are pinned by tests:
+
+- **Nothing in `UIController` compares names.** Every lookup — `Require`, `Link`, `SetEnabled` —
+  resolves the button itself. A button that merely shares a name with a managed one is a stranger
+  and is reported as one.
+- **`Add` rejects a button it already holds.** A second node for the same button is unreachable by
+  construction, since every lookup finds the first, so the double add throws rather than leaving a
+  button that silently stops responding.
+
 ## Screen flow
 
 `BattleForceHost` wires company screen → menu screen → game screen. `IFrameTimeController`

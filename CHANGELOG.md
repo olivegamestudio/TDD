@@ -46,6 +46,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Two buttons with the same name are two buttons.** `Element` and its kinds are now classes
+  rather than records, so `==` is identity. `Button` was a record, which made `==` value equality
+  on the name, and `UIController` resolves every button through `==` — so with the controller
+  registered as a singleton, two screens each labelling a button `BACK` shared one node. One
+  screen's `Disable` greyed out the other's button and one screen's `OnReleased` overwrote the
+  other's handler, silently. `Add` now also rejects a button it already holds, since the second
+  node it used to create could never be reached.
+  ([#13](https://github.com/olivegamestudio/TDD/issues/13))
 - **`LocalSaveProgressService` now really persists**, writing to a file and creating the save
   folder on first write. `HasProgress()` was a hardcoded `return true`, reporting progress it had
   never stored. ([#2](https://github.com/olivegamestudio/TDD/pull/2))

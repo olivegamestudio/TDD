@@ -3,6 +3,11 @@ namespace OliveGameStudio;
 /// <summary>
 /// Defines the contract for a UI controller that manages and interacts with UI elements, such as buttons.
 /// </summary>
+/// <remarks>
+/// Buttons are resolved by identity, never by name. An implementation is expected to be shared
+/// between screens, so two screens may label a button the same thing and must still be able to
+/// enable, wire and press their own.
+/// </remarks>
 public interface IUIController
 {
     /// <summary>
@@ -60,6 +65,10 @@ public interface IUIController
     /// This allows the element to participate in UI interactions such as receiving focus or being pressed.
     /// </summary>
     /// <param name="element">The UI element to be added to the controller.</param>
+    /// <exception cref="InvalidOperationException">
+    /// The button is already managed by this controller. Adding it twice would leave a second,
+    /// unreachable registration behind, so it fails rather than half working.
+    /// </exception>
     void Add(Element element);
 
     /// <summary>

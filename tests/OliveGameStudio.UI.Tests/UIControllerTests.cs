@@ -280,6 +280,149 @@ public sealed class UIControllerTests
         Assert.False(fired);
     }
 
+    // ---- two buttons that share a name -------------------------------------
+    // IUIController is a singleton, so every screen's buttons live in one node
+    // list. Two screens may each reasonably label a button BACK, CONTINUE or
+    // START, and neither author has any way to know the other did.
+
+    [Fact]
+    public void ButtonsWithTheSameName_AreTrackedIndependently()
+    {
+        UIController controller = new();
+        Button menuBack = new("BACK");
+        Button optionsBack = new("BACK");
+        controller.Add(menuBack);
+        controller.Add(optionsBack);
+
+        controller.Disable(optionsBack);
+
+        Assert.True(controller.IsEnabled(menuBack));
+        Assert.False(controller.IsEnabled(optionsBack));
+    }
+
+    [Fact]
+    public void Release_CommitsThePressedButton_NotItsSameNamedSibling()
+    {
+        UIController controller = new();
+        Button menuBack = new("BACK");
+        Button optionsBack = new("BACK");
+        controller.Add(menuBack);
+        controller.Add(optionsBack);
+
+        List<string> committed = [];
+        controller.OnReleased(menuBack, () => committed.Add("menu"));
+        controller.OnReleased(optionsBack, () => committed.Add("options"));
+
+        controller.Press(menuBack);
+        controller.Release();
+
+        Assert.Equal("menu", Assert.Single(committed));
+    }
+
+    [Fact]
+    public void WiringOneButton_DoesNotOverwriteItsSameNamedSibling()
+    {
+        // the second Add used to create a node nothing could ever reach, so every call
+        // meant for it landed on the first one instead
+        UIController controller = new();
+        Button menuBack = new("BACK");
+        Button optionsBack = new("BACK");
+        controller.Add(menuBack);
+        controller.Add(optionsBack);
+
+        List<string> committed = [];
+        controller.OnReleased(menuBack, () => committed.Add("menu"));
+        controller.OnReleased(optionsBack, () => committed.Add("options"));
+
+        controller.Press(optionsBack);
+        controller.Release();
+
+        Assert.Equal("options", Assert.Single(committed));
+    }
+
+    [Fact]
+    public void AnUnmanagedButton_IsUnmanaged_EvenWhenItsNameMatchesAManagedOne()
+    {
+        // the lookups resolve a button, not a name: sharing a name with something the
+        // controller holds does not make a stranger reachable
+        UIController controller = new();
+        Button managed = new("BACK");
+        controller.Add(managed);
+
+        Assert.Throws<InvalidOperationException>(() => controller.IsEnabled(new Button("BACK")));
+        Assert.Throws<InvalidOperationException>(() => controller.Disable(new Button("BACK")));
+        Assert.Throws<InvalidOperationException>(
+            () => controller.Link(new Button("BACK"), Direction.Down, managed));
+        Assert.Throws<InvalidOperationException>(
+            () => controller.Link(managed, Direction.Down, new Button("BACK")));
+    }
+
+    [Fact]
+    public void AddingTheSameButtonTwice_Throws()
+    {
+        // a second node for a button already managed is unreachable by construction: every
+        // lookup finds the first. Failing here beats a button that silently stops responding.
+        UIController controller = new();
+        Button start = new("start");
+        controller.Add(start);
+
+        Assert.Throws<InvalidOperationException>(() => controller.Add(start));
+    }
+
+    // ---- the button type's own contract -------------------------------------
+
+    [Fact]
+    public void TwoButtonsWithTheSameName_AreNotEqual()
+    {
+        // pinned on the type rather than on the controller: this is what stops a future
+        // lookup written with ==, Contains or a dictionary from reintroducing the defect
+        Button menuBack = new("BACK");
+        Button optionsBack = new("BACK");
+        Button sameButton = menuBack;
+
+        Assert.NotEqual(menuBack, optionsBack);
+        Assert.False(menuBack == optionsBack);
+        Assert.True(menuBack == sameButton);
+    }
+
+    [Fact]
+    public void AButtonIsDistinguishedFromItsSameNamedSibling_InACollection()
+    {
+        Button menuBack = new("BACK");
+        Button optionsBack = new("BACK");
+        List<Button> buttons = [menuBack];
+
+        Assert.Contains(menuBack, buttons);
+        Assert.DoesNotContain(optionsBack, buttons);
+    }
+
+    [Fact]
+    public void SameNamedButtons_AreDistinctKeys()
+    {
+        // GetHashCode has to agree with equality, or a dictionary keyed by button silently
+        // collapses two buttons into one entry
+        Button menuBack = new("BACK");
+        Button optionsBack = new("BACK");
+
+        Dictionary<Button, string> screens = new()
+        {
+            [menuBack] = "menu",
+            [optionsBack] = "options",
+        };
+
+        Assert.Equal("menu", screens[menuBack]);
+        Assert.Equal("options", screens[optionsBack]);
+    }
+
+    [Fact]
+    public void OtherElementsAreIdentitiesToo()
+    {
+        // two images of the same asset are two things on screen, not one, for the same
+        // reason two buttons named BACK are two buttons
+        Assert.NotEqual(new Image("BACKGROUND"), new Image("BACKGROUND"));
+        Assert.NotEqual(new Text("Continue"), new Text("Continue"));
+    }
+
     // ---- graph wiring -------------------------------------------------------
 
     [Fact]
