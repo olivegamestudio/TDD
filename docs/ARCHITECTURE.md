@@ -33,7 +33,7 @@ to know about ships, quests or credits is on the wrong side of this line.
 | `BattleForce2249` | Game host and DI registration. |
 | `BattleForce2249.Abstractions` | Screen interfaces and options. |
 | `BattleForce2249.Company`, `.Menu`, `.Game` | The three screens. |
-| `BattleForce2249.MonoGame` | The MonoGame entry point. |
+| `BattleForce2249.MonoGame` | The MonoGame entry point, and the real keyboard and gamepad bound to `IShipInput`. |
 
 Tests live in `tests/` as `<project>.Tests`, xUnit, targeting `net10.0`.
 
@@ -81,6 +81,7 @@ physics.
 - `IShipInput` — where the pilot's intent comes from. The platform host owns the real device, so
   the engine ships the seam and `NeutralShipInput`, which asks for nothing. A host registers a
   keyboard or gamepad after `AddOliveGameStudio` and wins under the engine's `AddSingleton`.
+- `FirstActiveShipInput` — several devices bound at once, reporting whichever is being used.
 - `ShipMovement` — carries a `Heading` and a `Velocity`, applies thrust along the heading, and
   moves the `Player` by the ground covered. Momentum survives a turn; a turn points the ship
   somewhere new rather than teleporting the velocity there.
@@ -101,6 +102,31 @@ produces it, leaving the ship either short of its stated maximum or walled off b
 frame it is reached rather than the frame after — at 200 units a second, a frame late is a marker
 the player has already passed. Entering the screen resets the ship: the save carries where the
 player is, never how fast they were going.
+
+## At the controls
+
+The bindings are split so that almost none of the work sits where it cannot be tested.
+
+- **What a device means** is engine code and is tested. `ShipControls.FromKeys` turns four held
+  keys into the two axes; opposite keys cancel rather than one winning, so the answer never
+  depends on which key was checked first. `ShipControls.FromStick` applies a dead zone and
+  stretches the travel past it back over the full range, so crossing the dead zone asks for a
+  little rather than jumping to the dead zone's worth.
+- **Which device answers** is `FirstActiveShipInput`: the devices are asked in order and the first
+  one asking for anything wins outright. Two devices bound at once must never have their answers
+  added together — a stick half over plus a held key would read as more than full thrust. The
+  arbitration is per device rather than per axis, because splitting the axes is that same summing
+  in a form that is harder to predict. It is stateless, so letting go of one device hands control
+  straight to the other.
+- **Which keys and which stick** is host wiring, in `BattleForce2249.MonoGame`.
+  `KeyboardShipInput` binds W/A/S/D and the arrow keys as one set. `GamePadShipInput` binds the
+  left stick for both axes, reading MonoGame with `GamePadDeadZone.None` so the dead zone is only
+  applied once. A disconnected pad reports neutral and simply loses, so nothing has to check
+  whether a controller turned up.
+
+`AddDesktopPilot` **must be called after `AddBattleForce`** — the engine registers
+`NeutralShipInput` with `AddSingleton`, so the last registration wins, and calling it first leaves
+the shipping game with nobody flying it. A test pins that ordering in both directions.
 
 ## Saved progress
 
@@ -145,8 +171,12 @@ the session; its `Update` drives the proximity watcher once the session is ready
 
 ## Known gaps
 
-- Nothing binds a real input device. The ship flies from `IShipInput`, and the MonoGame host still
-  resolves the engine's `NeutralShipInput`, so the shipping game has nobody at the controls.
+- No control scheme can be chosen. The keyboard and gamepad bindings are fixed in the host; there
+  is no settings model or menu behind a chooser, and no strafing axis. That is issue #7.
+- Reading the real devices is not covered by a test. `Keyboard.GetState` and `GamePad.GetState`
+  are static calls into MonoGame with nothing to stand in front of them, so the few lines naming
+  the keys and the stick axes are only confirmed by playing the game. Everything they feed is
+  engine code and is tested.
 - Quest triggers are sampled, not swept. `QuestProximityWatcher` measures the player once a frame,
   so a frame long enough to carry the ship further than a trigger's distance steps over it. Quest
   1's markers are sized clear of that at any playable frame rate, but the tolerance is the only

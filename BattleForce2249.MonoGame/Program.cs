@@ -35,6 +35,10 @@ services.AddBattleForce(configuration);
 // implementation; configuration tunes it.
 // services.AddSingleton<IFrameTimeController, ScaledFrameTimeController>();
 
+// The same rule, and the reason this line is not optional: without it the engine's
+// NeutralShipInput stands and the shipping game launches with nobody at the controls.
+services.AddDesktopPilot();
+
 using ServiceProvider provider = services.BuildServiceProvider();
 
 using BattleForceGame game = new(provider.GetRequiredService<IHost>());
