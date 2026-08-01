@@ -16,10 +16,33 @@ public sealed class InMemorySaveProgressService : ISaveProgressService
 
     public Task<string?> Load() => Task.FromResult(Content);
 
+    /// <summary>
+    /// The save that was set aside, so a test can show a refused save is still recoverable.
+    /// </summary>
+    public string? SetAsideContent { get; private set; }
+
+    /// <summary>
+    /// How many times a save was set aside, so a test can show that none was.
+    /// </summary>
+    public int SetAsideCount { get; private set; }
+
     public Task Save(string content)
     {
         Content = content;
         SaveCount++;
+        return Task.CompletedTask;
+    }
+
+    public Task SetAside()
+    {
+        SetAsideCount++;
+
+        if (Content is not null)
+        {
+            SetAsideContent = Content;
+            Content = null;
+        }
+
         return Task.CompletedTask;
     }
 

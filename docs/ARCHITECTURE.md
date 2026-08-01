@@ -71,8 +71,9 @@ Ids are never translated. A save written in one language has to load in another.
 
 ## Saved progress
 
-The engine's `ISaveProgressService` exposes `HasProgress`, `Load` and `Save`, all in terms of
-text. `SaveGame` and `SaveGameSerializer` in `BattleForce2249.Game` decide what that text is.
+The engine's `ISaveProgressService` exposes `HasProgress`, `Load`, `Save` and `SetAside`, all in
+terms of text. `SaveGame` and `SaveGameSerializer` in `BattleForce2249.Game` decide what that text
+is.
 
 Reading is deliberately forgiving: a missing, blank or damaged save deserialises to `null` and is
 reported as "no save", so a corrupt file yields a new game rather than a crash. Quest states are
@@ -89,6 +90,30 @@ the edge, is what lets everything downstream be written against a save that make
 A save the campaign has drifted from is tolerated in both directions: a quest the save knows but
 this build no longer ships is ignored, and a quest added since the save was written starts from
 the beginning.
+
+**A refused save is kept, not destroyed.** `Continue` starts a new game when the serializer
+refuses one, and `StartNewGame` writes a save immediately — so until the new game is written, the
+refused file is the only copy there is. `Continue` calls `ISaveProgressService.SetAside` first,
+which moves it beside the save as `save.json.unreadable` and leaves no save in its place.
+
+This exists because every rule on that boundary is a judgement, and the ones above are drawn over
+files real campaigns are stored in. Without it a rule a shade too strict does not merely decline
+to resume a save — it destroys it on the next launch, and no later build can revisit the decision.
+That is also why the reading rules can afford to be as exact as they are: a mistake is now
+recoverable rather than final.
+
+Moving the file lives in `LocalSaveProgressService` rather than in `BattleForce2249`, because
+where the save lives is the storage's business and the game is not to reach at the file system.
+Which content is unusable stays the game's judgement — the engine never learns what a save
+contains. One generation is kept: a second refusal replaces the file kept for the first, which is
+a real loss in the rare case both matter, and is pinned by a test that says so.
+
+If the file cannot be moved — a folder that permits writes but not renames does exactly this —
+the session gives the player a playable game but holds every write back and reports the failure
+through `SaveError`, rather than overwriting a save it could not first rescue. That is the same
+answer `Continue` already gives for a save it could not read, for the same reason: a game that
+cannot be saved costs the player this session, and a save overwritten costs them every session
+before it.
 
 `GameSession.Continue` recovers from storage getting in the way — a file locked, missing or barred
 — and nothing wider, because catching wider would bury real defects behind "could not save". That

@@ -25,9 +25,25 @@ public sealed class LocalSaveProgressService : ISaveProgressService
     }
 
     /// <summary>
+    /// What is appended to <see cref="FilePath"/> to name the file a set-aside save is kept in.
+    /// </summary>
+    /// <remarks>
+    /// Beside the save rather than in a folder of its own, so that whoever is asked for "your save
+    /// file" finds this next to it without having been told where else to look. The suffix says
+    /// what happened to it rather than what is wrong with it — the game could not read it, which
+    /// is not the same as it being damaged, and that distinction is the whole reason it is kept.
+    /// </remarks>
+    public const string SetAsideSuffix = ".unreadable";
+
+    /// <summary>
     /// Gets the full path of the file progress is saved to.
     /// </summary>
     public string FilePath { get; }
+
+    /// <summary>
+    /// Gets the full path of the file a set-aside save is kept in.
+    /// </summary>
+    public string SetAsideFilePath => FilePath + SetAsideSuffix;
 
     /// <inheritdoc />
     public Task<bool> HasProgress() => Task.FromResult(File.Exists(FilePath));
@@ -53,6 +69,25 @@ public sealed class LocalSaveProgressService : ISaveProgressService
         }
 
         await File.WriteAllTextAsync(FilePath, content);
+    }
+
+    /// <inheritdoc />
+    public Task SetAside()
+    {
+        if (File.Exists(FilePath))
+        {
+            // Moved rather than copied, so that HasProgress goes false and the caller's new game
+            // starts from nothing rather than reading the same unusable file again next launch.
+            //
+            // Overwriting any earlier set-aside save keeps this to one generation. That is a real
+            // cost and worth naming: a second refusal displaces the first file kept, which may
+            // have been the more valuable of the two. It is still the better way round, because
+            // keeping the first instead means one stale file — from a fault fixed several builds
+            // ago — permanently refusing to make room for the failure happening now.
+            File.Move(FilePath, SetAsideFilePath, overwrite: true);
+        }
+
+        return Task.CompletedTask;
     }
 
     /// <summary>

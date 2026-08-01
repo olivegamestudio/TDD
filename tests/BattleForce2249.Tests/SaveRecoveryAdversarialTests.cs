@@ -58,6 +58,18 @@ public class SaveRecoveryAdversarialTests
             SaveCount++;
             return Task.CompletedTask;
         }
+
+        public Task SetAside()
+        {
+            SetAsideContent = Content;
+            Content = null;
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Gets the save that was set aside, so a test can show a locked save was never one.
+        /// </summary>
+        public string? SetAsideContent { get; private set; }
     }
 
     /// <summary>A real save, part-way through quest 1.</summary>

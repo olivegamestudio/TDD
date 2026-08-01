@@ -89,7 +89,23 @@ public sealed class GameSession : IGameSession
         SaveGame? save = SaveGameSerializer.Deserialize(content);
         if (save is null)
         {
-            await StartNewGame();
+            // The file was read; nothing playable came out of it. Set it aside before starting
+            // over, because StartNewGame writes immediately and would otherwise destroy the only
+            // copy — and the refusal may be wrong. Every rule on that boundary is a judgement
+            // about a file someone's campaign is in, and until now getting one slightly too
+            // strict cost the player the campaign with no way back.
+            if (await TrySetAside(content))
+            {
+                await StartNewGame();
+                return;
+            }
+
+            // It could not be moved out of the way. Writing anyway would destroy it for exactly
+            // the reason the copy was being made, so writes are held back instead — the same
+            // answer given above for a save that could not be read. The player still gets a game;
+            // it just does not persist over the one that could not be rescued.
+            Reset();
+            IsReady = true;
             return;
         }
 
@@ -122,6 +138,36 @@ public sealed class GameSession : IGameSession
             // Left saving on: the file may be free again by the next quest, and a game that gives
             // up on saving after one bad moment loses far more than it protects.
             SaveError = error;
+        }
+    }
+
+    /// <summary>
+    /// Sets a refused save aside so it survives the new game about to be written over it,
+    /// recording a storage failure rather than raising it.
+    /// </summary>
+    /// <param name="content">
+    /// What was read. Nothing is set aside when there was no save or it was blank: a first launch
+    /// is not a refusal, and keeping an empty file would suggest something was lost when nothing
+    /// was.
+    /// </param>
+    /// <returns><c>true</c> when the new game is free to write.</returns>
+    async Task<bool> TrySetAside(string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return true;
+        }
+
+        try
+        {
+            await _saveProgressService.SetAside();
+            SaveError = null;
+            return true;
+        }
+        catch (Exception error) when (IsStorageFailure(error))
+        {
+            SaveError = error;
+            return false;
         }
     }
 

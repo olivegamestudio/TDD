@@ -330,6 +330,127 @@ public sealed class GameSessionTests
             $"the quest never started: the player is at {session.Player.Position.X},{session.Player.Position.Y} and can never reach a marker");
     }
 
+    // ---- a save the game refuses ----
+
+    /// <summary>
+    /// A save the serializer refuses, holding progress worth keeping: 700 units in, quest 1 done.
+    /// The blank quest id is what gets it refused; everything beside it is real.
+    /// </summary>
+    const string RefusedSaveWithRealProgress = """
+    { "PlayerX": 0, "PlayerY": 700,
+      "Quests": [ { "QuestId": "quest-1", "State": "Completed" },
+                  { "QuestId": "  ",      "State": "Active"    } ] }
+    """;
+
+    [Fact]
+    public async Task Continue_KeepsARefusedSave_WhereItCanStillBeRecovered()
+    {
+        // #46: refusing a save is not the end of it, because the new game that replaces it is
+        // written immediately. Without setting the old one aside first, every judgement the
+        // serializer makes is final — and the bound added for defect 6 had to be drawn generously
+        // precisely because a save refused in error could never be given back.
+        _saves.Content = RefusedSaveWithRealProgress;
+        GameSession session = CreateSession();
+
+        await session.Continue();
+
+        Assert.Equal(RefusedSaveWithRealProgress, _saves.SetAsideContent);
+    }
+
+    [Fact]
+    public async Task Continue_StillGivesAPlayableNewGame_WhenItSetsARefusedSaveAside()
+    {
+        // the recovery must not become a way for a file the game cannot read to block a start
+        _saves.Content = RefusedSaveWithRealProgress;
+        GameSession session = CreateSession();
+
+        await session.Continue();
+
+        Assert.True(session.IsReady);
+        Assert.NotNull(session.Quests.Find("quest-1"));
+        Assert.Equal(Start, session.Player.Position);
+        Assert.True(session.IsSavingProgress);
+    }
+
+    [Fact]
+    public async Task Continue_DoesNotSetAsideASaveItCouldRead()
+    {
+        // setting one aside is for the file that was refused, not for every launch — a save that
+        // resumes fine must be left exactly where it is
+        _saves.Content = SaveGameSerializer.Serialize(new SaveGame
+        {
+            PlayerY = 700,
+            Quests = [new QuestProgress("quest-1", QuestState.Active)],
+        });
+        GameSession session = CreateSession();
+
+        await session.Continue();
+
+        Assert.Equal(0, _saves.SetAsideCount);
+    }
+
+    [Fact]
+    public async Task Continue_SetsNothingAside_WhenThereWasNoSaveToBeginWith()
+    {
+        // a first launch is not a refusal, and should leave no trace suggesting it was
+        GameSession session = CreateSession();
+
+        await session.Continue();
+
+        Assert.Equal(0, _saves.SetAsideCount);
+        Assert.True(session.IsReady);
+    }
+
+    static FailingSaveProgressService UnmovableRefusedSave() =>
+        new(setAsideError: new UnauthorizedAccessException("Access to the path is denied."))
+        {
+            Content = RefusedSaveWithRealProgress,
+        };
+
+    [Fact]
+    public async Task Continue_StillGivesAPlayableGame_WhenARefusedSaveCannotBeSetAside()
+    {
+        // storage failures stay narrow: a file that will not move must not stop the game starting
+        GameSession session = CreateSession(UnmovableRefusedSave());
+
+        await session.Continue();
+
+        Assert.True(session.IsReady);
+        Assert.NotNull(session.Quests.Find("quest-1"));
+        Assert.Equal(Start, session.Player.Position);
+    }
+
+    [Fact]
+    public async Task Continue_DoesNotWriteOverARefusedSave_ThatItCouldNotSetAside()
+    {
+        // The point of setting it aside is that the refusal may be wrong. If the copy cannot be
+        // made, writing anyway destroys the file for exactly the reason the copy existed — so
+        // writes are held back instead, the same answer this session already gives for a save it
+        // could not read. The player still gets a game; it just does not persist over the old one.
+        FailingSaveProgressService saves = UnmovableRefusedSave();
+        GameSession session = CreateSession(saves);
+
+        await session.Continue();
+        session.Quests.Find("quest-1")!.Start();
+        await session.PendingSave;
+
+        Assert.False(session.IsSavingProgress);
+        Assert.Equal(0, saves.SaveCount);
+        Assert.Equal(RefusedSaveWithRealProgress, saves.Content);
+    }
+
+    [Fact]
+    public async Task Continue_ReportsWhyARefusedSaveCouldNotBeSetAside()
+    {
+        // a session that has quietly stopped saving has to say why, or the next quest to complete
+        // vanishes with no explanation anywhere
+        GameSession session = CreateSession(UnmovableRefusedSave());
+
+        await session.Continue();
+
+        Assert.IsType<UnauthorizedAccessException>(session.SaveError);
+    }
+
     // ---- a save that cannot be read ----
 
     static FailingSaveProgressService LockedSave() =>

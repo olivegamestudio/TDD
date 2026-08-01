@@ -9,7 +9,15 @@ namespace BattleForce2249.Tests;
 /// </summary>
 /// <param name="loadError">Thrown by <see cref="Load"/>, or <c>null</c> to let reads succeed.</param>
 /// <param name="saveError">Thrown by <see cref="Save"/>, or <c>null</c> to let writes succeed.</param>
-public sealed class FailingSaveProgressService(Exception? loadError = null, Exception? saveError = null)
+/// <param name="setAsideError">
+/// Thrown by <see cref="SetAside"/>, or <c>null</c> to let it succeed. A save can be readable and
+/// still refuse to be moved — a folder the player can write files into but not rename them in does
+/// exactly that — and the game has to survive it.
+/// </param>
+public sealed class FailingSaveProgressService(
+    Exception? loadError = null,
+    Exception? saveError = null,
+    Exception? setAsideError = null)
     : ISaveProgressService
 {
     /// <summary>
@@ -39,4 +47,21 @@ public sealed class FailingSaveProgressService(Exception? loadError = null, Exce
         SaveCount++;
         return Task.CompletedTask;
     }
+
+    public Task SetAside()
+    {
+        if (setAsideError is not null)
+        {
+            throw setAsideError;
+        }
+
+        SetAsideContent = Content;
+        Content = null;
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Gets the save that was set aside, or <c>null</c> if none was.
+    /// </summary>
+    public string? SetAsideContent { get; private set; }
 }
