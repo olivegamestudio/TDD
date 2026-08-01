@@ -48,6 +48,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Quest 1's title in seven languages** — English (source), French, Italian, German, Spanish,
   Brazilian Portuguese and Japanese, shipped as `Text/<culture>.json` beside the game. Adding a
   language is a file drop: no rebuild, no satellite assembly. ([#1](https://github.com/olivegamestudio/TDD/issues/1))
+- **Playability cover for the campaign.** `QuestPlayabilityTests` flies every quest the game ships
+  from the menu to a completed save through the shipping composition, with `SeekingPilot` at the
+  controls and nothing reaching in to move the player. It walks `ICampaign.Quests` rather than
+  naming quest 1, so a quest authored later is covered the day it is written, and it asserts on
+  quest ids and states rather than titles, with one playthrough run in a non-source language.
+  ([#8](https://github.com/olivegamestudio/TDD/issues/8))
 - **Project documentation** — this changelog, a README, and the design canon, architecture notes
   and workflow under `docs/`.
 

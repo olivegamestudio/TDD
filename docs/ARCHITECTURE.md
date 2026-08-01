@@ -132,6 +132,33 @@ coincide is a point, so it behaves exactly as measuring the point does.
 `Pilgrimage` is untouched by any of this. It holds no coordinates and measures no distances — the
 quest model declares the rule and the presentation applies it.
 
+## Quests are covered by being played
+
+The quest tests split along the same seams the code does: `BattleForceCampaignTests` covers what is
+authored, `BattleForceWorldTests` covers where the markers stand, `QuestProximityWatcherTests`
+covers the rule being applied, and `GameSessionTests` covers a quest's state being persisted. Each
+holds one part still, and two of them do it against quests invented for the test. None of them
+would notice a campaign whose pieces are all individually correct and cannot be played end to end.
+
+`QuestPlayabilityTests` is the one that would. It runs the shipping composition — company screen,
+a real press of the menu's start button, then frame after frame of `GameScreen` — with a pilot at
+the controls and nothing reaching in to move the player, and asserts that each quest starts,
+finishes, and is still finished after the save is read back. A rendered playthrough is not the only
+playthrough: everything that decides whether a quest can be played is logic, and none of it needs a
+window.
+
+Three rules keep it useful as the campaign grows:
+
+- **The campaign is walked, not named.** The sweep iterates `ICampaign.Quests` and flies
+  `SeekingPilot` at each quest's markers in turn, so a quest authored later is covered the day it
+  is written rather than the day someone remembers to test it. A marker at an angle to the forward
+  axis needs no new test — the pilot turns towards whatever it is pointed at.
+- **Assertions are on ids and states, never on titles.** A quest is the same quest in every
+  language, and one playthrough runs under a non-source culture to prove it.
+- **A quest has to be finished to count as finished.** The sweep is paired with an assertion that
+  nothing completes at a dead stick, so a marker left at the origin by mistake fails rather than
+  passing for free.
+
 ## Saved progress
 
 The engine's `ISaveProgressService` exposes `HasProgress`, `Load` and `Save`, all in terms of
