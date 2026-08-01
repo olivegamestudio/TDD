@@ -74,6 +74,26 @@ public sealed class ServiceRegistrationTests
     }
 
     [Fact]
+    public void ResolvesTheShipyard()
+    {
+        using ServiceProvider provider = BuildProvider();
+
+        Assert.IsType<BattleForceShipyard>(provider.GetRequiredService<IShipyard>());
+    }
+
+    [Fact]
+    public void FliesTheShipItAwards()
+    {
+        // the handling registered for the physics is the awarded hull's own, so the ship the
+        // player is given cannot handle like a different one
+        using ServiceProvider provider = BuildProvider();
+
+        Assert.Same(
+            provider.GetRequiredService<IShipyard>().Starting.Handling,
+            provider.GetRequiredService<ShipHandling>());
+    }
+
+    [Fact]
     public void SharesOneShip_BetweenTheGameScreenAndAnythingElseThatNeedsIt()
     {
         // two ships would each fly their own copy of the player around

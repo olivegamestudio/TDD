@@ -27,7 +27,7 @@ to know about ships, quests or credits is on the wrong side of this line.
 | `OliveGameStudio.UI`, `.UI.Abstractions` | Menu and button navigation. Not ship control. |
 | `OliveGameStudio.FrameRate` | Frame time filtering, so a paused or slowed game holds still while frames keep arriving. |
 | `OliveGameStudio.Progress` | `LocalSaveProgressService`, persisting save text to a file. |
-| `OliveGameStudio.World` | `Position`, `Player`, `Velocity`. The spatial model, and the ship physics that moves through it: `ShipMovement`, `ShipHandling`, `ShipControls`, `IShipInput`. |
+| `OliveGameStudio.World` | `Position`, `Player`, `Velocity`. The spatial model, the ship physics that moves through it — `ShipMovement`, `ShipHandling`, `ShipControls`, `IShipInput` — and `Ship`, the hull a player owns. |
 | `OliveGameStudio.Localisation` | `ITextProvider`, `JsonTextProvider`, `MissingTextException`. |
 | `Pilgrimage` | The quest system. No project references at all, by design. |
 | `BattleForce2249` | Game host and DI registration. |
@@ -102,6 +102,32 @@ frame it is reached rather than the frame after — at 200 units a second, a fra
 the player has already passed. Entering the screen resets the ship: the save carries where the
 player is, never how fast they were going.
 
+## The ship the player owns
+
+`ShipHandling` says how a hull flies; `Ship` says which hull the player has. It is an `Id`, a
+`ShipHandling` and an `AssetKey` — nothing else, because everything about flying already lives in
+the physics. What it adds is ownership: a ship is given, kept, and still there after a reload.
+
+- `Player.Ship` — nullable, and null before a game starts. A player exists before a game does, and
+  a placeholder hull would be a lie every caller then has to check for anyway. `Player.Award`
+  gives them one; it does not move them, because changing ship is not travel.
+- `IShipyard` / `BattleForceShipyard` — the ships the build ships and the one a new game awards,
+  the way `ICampaign` is the seam quests arrive through. It exists because a save names a ship by
+  id and something has to turn that id back into a ship.
+- `DisgracedShip.Starting` — the hull the Disgraced is left with. `Starting` is declared *after*
+  `Handling` on purpose: static initialisers run in written order, so the other way round captures
+  a null handling profile and fails at the first frame of flight rather than at the edit.
+
+**The asset key lives on the model.** A ship arrives already knowing which picture stands for it,
+so whatever draws it has nothing to decide and no table to keep in step. It is an identifier, so
+it is never translated — the same rule quest ids follow.
+
+The DI registration takes the handling off `DisgracedShip.Starting.Handling` rather than beside
+it, so the hull the player is awarded and the hull the physics flies cannot drift apart. That is
+the *shipping* handling, not the *awarded* handling: `ShipMovement` still resolves one
+`ShipHandling` from the container rather than reading `Player.Ship`. With one hull the two are the
+same object; the second hull is what makes the difference matter.
+
 ## Saved progress
 
 The engine's `ISaveProgressService` exposes `HasProgress`, `Load` and `Save`, all in terms of
@@ -114,7 +140,13 @@ the compatibility boundary — changing it changes what older saves can be read 
 
 A save the campaign has drifted from is tolerated in both directions: a quest the save knows but
 this build no longer ships is ignored, and a quest added since the save was written starts from
-the beginning.
+the beginning. The ship is recorded the same way and gets the same tolerance — `SaveGame.ShipId`
+names a hull, and a save naming one this build no longer has, or written before ships were
+recorded at all, falls back to the starting hull rather than refusing to load.
+
+The ship is **recorded, not re-derived**. Awarding the starting hull on every load would work
+today, with one hull, and would quietly take a better one away the moment there are two. Pillar 4
+asks that the persistent record survive; which ship the player earned is part of that record.
 
 ## Localised text
 
@@ -153,6 +185,12 @@ the session; its `Update` drives the proximity watcher once the session is ready
   thing preventing it.
 - Nothing displays a quest title. There is no HUD or quest log; that is a separate `ENGINE`
   issue.
+- Nothing draws the ship. The player is awarded one and it carries the asset key that identifies
+  its graphic, but no renderer reads it; that is issue #16.
+- `ShipMovement` flies the container's `ShipHandling`, not `Player.Ship.Handling`. The two are the
+  same object today because the registration derives from the starting hull, so this is a seam to
+  close before a second hull exists rather than a live defect.
 - Nothing selects a language. Translations are reachable only through the machine's own culture.
-- There is no persistent record (experience, credits, quest history) separate from the saved
-  position. See pillar 4 in `docs/DESIGN.md`.
+- The persistent record is only starting. The save carries the awarded ship as well as position
+  and quest state; experience, credits and quest history are still missing. See pillar 4 in
+  `docs/DESIGN.md`.

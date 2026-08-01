@@ -29,6 +29,29 @@ public sealed class DisgracedShipTests
     }
 
     [Fact]
+    public void TheStartingShipFliesOnTheseNumbers()
+    {
+        // the hull the player is awarded and the numbers it is flown on are one thing, so a
+        // change to the tuning cannot leave the awarded ship handling like the old one
+        Assert.Same(Handling, DisgracedShip.Starting.Handling);
+    }
+
+    [Fact]
+    public void TheStartingShipIsDrawnByTheShipGraphic()
+    {
+        // ship1.png in the content build; #16 draws it, this only says which asset stands for
+        // the ship so nothing downstream has to guess
+        Assert.Equal("ship1", DisgracedShip.Starting.AssetKey);
+    }
+
+    [Fact]
+    public void TheStartingShipIsSavedUnderAStableId()
+    {
+        // saves record this, so changing it orphans every save already written
+        Assert.Equal("disgraced", DisgracedShip.Starting.Id);
+    }
+
+    [Fact]
     public void HasATopSpeed()
     {
         Assert.Equal(200, Handling.MaximumSpeed, 6);

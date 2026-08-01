@@ -36,11 +36,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   [#15](https://github.com/olivegamestudio/TDD/issues/15))
 - **`IWorld` and `QuestProximityWatcher`** in the game — where each quest's markers stand, and the
   per-frame measurement that drives the quest API from the player's position. ([#2](https://github.com/olivegamestudio/TDD/pull/2))
-- **Saved games.** `SaveGame` and `SaveGameSerializer` persist the player's position and every
-  quest's state. Quest states are written by name so reordering the enum cannot silently change a
-  save, and a missing or damaged save reads back as "no save" so a corrupt file yields a new game
-  rather than a crash. `GameSession` saves when a quest starts or completes rather than every
-  frame. ([#1](https://github.com/olivegamestudio/TDD/issues/1))
+- **The player is given a ship on a new game.** `Ship` is a hull someone owns — an id, a
+  `ShipHandling` and the asset key of the graphic that stands for it — and `Player.Award` gives
+  the player one. Entering the game screen for a new game awards `DisgracedShip.Starting`, drawn
+  by `ship1`. `IShipyard` is the seam the game supplies its hulls through, the way `ICampaign`
+  supplies its quests. Nothing draws the ship yet; the model only says which asset should.
+  ([#5](https://github.com/olivegamestudio/TDD/issues/5))
+- **Saved games.** `SaveGame` and `SaveGameSerializer` persist the player's position, the ship
+  they are flying and every quest's state. Quest states are written by name so reordering the enum
+  cannot silently change a save, and a missing or damaged save reads back as "no save" so a
+  corrupt file yields a new game rather than a crash. The ship is recorded rather than re-derived,
+  so a hull earned survives a reload; a save naming a hull this build no longer has, or written
+  before ships were recorded, falls back to the starting one.
+  `GameSession` saves when a quest starts or completes rather than every
+  frame. ([#1](https://github.com/olivegamestudio/TDD/issues/1), [#5](https://github.com/olivegamestudio/TDD/issues/5))
 - **`OliveGameStudio.Localisation`** — `ITextProvider` and a JSON-backed `JsonTextProvider` owning
   the culture fallback chain, caching and the missing-key policy. A language is a file named after
   its culture; fallback is applied per key, and a key present in no language throws

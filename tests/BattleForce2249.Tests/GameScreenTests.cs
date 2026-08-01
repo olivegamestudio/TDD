@@ -58,6 +58,23 @@ public sealed class GameScreenTests : HostTestBase
     }
 
     [Fact]
+    public void EnteringTheScreen_ForANewGame_GivesThePlayerTheDisgracedShip()
+    {
+        ((IActivatable)GameScreen).Enter();
+
+        Assert.Same(DisgracedShip.Starting, Session.Player.Ship);
+    }
+
+    [Fact]
+    public void TheShipThePlayerIsGiven_KnowsWhichGraphicDrawsIt()
+    {
+        // the model says which asset stands for the ship; drawing it is a separate, engine job
+        ((IActivatable)GameScreen).Enter();
+
+        Assert.Equal(DisgracedShip.AssetKey, Session.Player.Ship!.AssetKey);
+    }
+
+    [Fact]
     public void TheGameScreenIsActive_OnceTheMenuRequestsAStart()
     {
         StartTheGame();

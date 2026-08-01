@@ -26,6 +26,18 @@ namespace BattleForce2249;
 public static class DisgracedShip
 {
     /// <summary>
+    /// The identifier the ship is saved under. Save games refer to it, so it must not change, and
+    /// unlike anything the player reads it is never translated.
+    /// </summary>
+    public const string Id = "disgraced";
+
+    /// <summary>
+    /// The asset that draws the ship. An asset key, not a file path: what is on disk is the
+    /// content pipeline's business.
+    /// </summary>
+    public const string AssetKey = "ship1";
+
+    /// <summary>
     /// Gets how the starting ship handles.
     /// </summary>
     /// <remarks>
@@ -43,4 +55,22 @@ public static class DisgracedShip
         Acceleration: 180,
         Drag: 0.9,
         TurnRate: 2.5);
+
+    /// <summary>
+    /// Gets the ship a new game awards the player — the one hull the Disgraced starts with, and
+    /// for now the only one the game ships.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A single instance rather than one per game, because a <see cref="Ship"/> describes a hull
+    /// and holds no state that could differ between two players flying the same one. What varies
+    /// per player is which ship they were given, and that lives on the player.
+    /// </para>
+    /// <para>
+    /// Declared after <see cref="Handling"/> deliberately: static initialisers run in the order
+    /// they are written, so a <c>Starting</c> written above <c>Handling</c> would capture a null
+    /// handling profile and fail at the first frame of flight rather than at the edit.
+    /// </para>
+    /// </remarks>
+    public static Ship Starting { get; } = new(Id, Handling, AssetKey);
 }

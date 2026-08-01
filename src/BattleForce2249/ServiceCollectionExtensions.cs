@@ -54,8 +54,11 @@ public static class BattleForceServiceCollectionExtensions
             .AddOliveGameStudio()
 
             // the ship the game is flown in: the engine owns the physics, the game owns the
-            // numbers that decide how it handles
-            .AddSingleton(DisgracedShip.Handling)
+            // numbers that decide how it handles. The handling comes off the starting ship rather
+            // than beside it, so the hull the player is given and the hull the physics flies
+            // cannot drift apart
+            .AddSingleton<IShipyard, BattleForceShipyard>()
+            .AddSingleton(DisgracedShip.Starting.Handling)
             .AddSingleton<ShipMovement>()
 
             // the quest content, the world its markers stand in, and the watcher that measures
