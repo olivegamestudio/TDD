@@ -1,5 +1,6 @@
 using System.Numerics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using OliveGameStudio;
 using Pilgrimage;
 
@@ -62,7 +63,7 @@ public sealed class GameScreenTests : HostTestBase
             new QuestProximityWatcher(new BattleForceWorld()),
             camera,
             view,
-            new StarField(camera));
+            new StarField(camera, Options.Create(new DisplayOptions())));
 
     [Fact]
     public void Render_DrawsTheShip()

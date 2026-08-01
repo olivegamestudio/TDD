@@ -82,6 +82,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **The game states the widest screen it supports, in one place.** `DisplayOptions` binds from a
+  `Display` section of configuration and carries `WidestSupportedViewportInPixels`, defaulting to
+  7680 — 8K, and wider than any ultrawide sold today. It is a statement about the screen the game
+  promises to look right on, not a window size: the game still draws to whatever viewport the
+  device reports. `StarField` reads its floor from it rather than holding a constant of its own,
+  so `SmallestUsableTileSize` and `WidestSupportedViewportInPixels` are now instance members and
+  `StarField` takes an `IOptions<DisplayOptions>`. A build that declares a different screen gets a
+  star field floored against that screen.
+  ([#50](https://github.com/olivegamestudio/TDD/issues/50))
+
 - **The game window clears to black rather than cornflower blue.** It is space, and it is now a
   background rather than the entire picture. ([#16](https://github.com/olivegamestudio/TDD/issues/16))
 
@@ -110,6 +120,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   what reaching it costs — because no bound on tile size can prevent a low enough
   `PixelsPerUnit` from spanning the cap for tiles of any size. The shipping layers are unaffected.
   ([#40](https://github.com/olivegamestudio/TDD/issues/40))
+
+- **The floor is measured against a screen the game agreed to, not one the star field invented.**
+  `WidestSupportedViewportInPixels` began as a constant of 3840 inside `StarField`, chosen because
+  nothing in the repository declared a display to hold a tile size against. That made it a promise
+  about one screen rather than a safety margin: a layer sown right at the floor covered 3840 and
+  left an empty corner at 5120 and at 7680. The number now comes from `DisplayOptions`, and the
+  coverage test grids the viewport 16 cells across rather than 4 — a grid whose cells are wider
+  than the border being looked for cannot see the border, which is why the coarse grid passed at
+  7680 while the fine one failed. The shipping layers reach a little over 22,000 pixels, which is
+  what bounds how much wider a build can honestly declare.
+  ([#50](https://github.com/olivegamestudio/TDD/issues/50))
 
 - **Quest proximity triggers are swept across the frame, not sampled at the end of it.**
   `QuestProximityWatcher` measured the player once per frame, at whatever position the frame

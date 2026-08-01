@@ -219,6 +219,24 @@ thousands of stars into a band. The other half is a limit on the camera: no boun
 stop a low enough `PixelsPerUnit` from spanning the cap. Note that it does *not* stop mattering at
 that zoom — stars are sized in pixels, so they stay fully visible beside the blank border.
 
+**The screen that floor is taken against is the game's statement, not the star field's.**
+`DisplayOptions.WidestSupportedViewportInPixels` binds from a `Display` section of configuration
+and declares the widest screen the game promises to fill. It is not a window size — the game asks
+for no resolution and sizes itself to whatever viewport the device reports — it is what anything
+that must cover the screen holds itself against, and `StarField` reads its floor from it rather
+than deciding one. That is why `SmallestUsableTileSize` is an instance member: a tile size is not
+usable or unusable on its own, only up to some width, so the floor is only meaningful alongside
+the display it was measured against. The number began as a constant inside `StarField`, which made
+it a promise about one screen that nothing in the game had agreed to; a layer sown at that floor
+covered 3840 pixels and left an empty corner on anything wider.
+
+Two consequences worth knowing. Raising the declaration raises the floor, so content sown against
+a narrower screen starts being refused — deliberately, at the line that was changed rather than on
+a display nobody owns. And the shipping star layers are *not* re-validated against a configured
+screen, because they are the game's content rather than a caller's; what bounds an honest
+declaration is their reach, a little over 22,000 pixels, which a test pins so raising the number
+is a decision rather than a silent band.
+
 `StarField` is registered as itself rather than behind an interface. Nothing outside the drawing
 sets anything on it, so an interface would be a name for the container's benefit and no one else's.
 

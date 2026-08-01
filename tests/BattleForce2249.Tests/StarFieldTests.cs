@@ -1,4 +1,5 @@
 using System.Numerics;
+using Microsoft.Extensions.Options;
 using OliveGameStudio;
 
 namespace BattleForce2249.Tests;
@@ -29,8 +30,24 @@ public sealed class StarFieldTests
     /// </summary>
     const float Tolerance = 0.05f;
 
+    /// <summary>
+    /// The screen the game declares it supports. Passed explicitly rather than defaulted, because
+    /// every floor these tests assert on is measured against it and a test that did not say which
+    /// screen it meant would be asserting on a number from somewhere else.
+    /// </summary>
+    /// <param name="widestInPixels">
+    /// The declared width to measure against. Left null, the width the game actually ships with.
+    /// </param>
+    static IOptions<DisplayOptions> Declaring(float? widestInPixels = null) =>
+        Options.Create(widestInPixels is null
+            ? new DisplayOptions()
+            : new DisplayOptions { WidestSupportedViewportInPixels = widestInPixels.Value });
+
     static StarField FieldOf(ICamera camera, params StarLayer[] layers) =>
-        new(camera) { Layers = layers };
+        new(camera, Declaring()) { Layers = layers };
+
+    /// <summary>The field the game ships — the default layers, and the declared screen.</summary>
+    static StarField ShippingField(ICamera camera) => new(camera, Declaring());
 
     static Sprite[] RenderTo(RecordingRenderer renderer, StarField field)
     {
@@ -119,7 +136,7 @@ public sealed class StarFieldTests
 
         RecordingRenderer renderer = new();
 
-        new StarField(new Camera2D()).Render(renderer);
+        ShippingField(new Camera2D()).Render(renderer);
 
         Assert.True(
             renderer.Drawn.Count > Sparse,
@@ -132,7 +149,7 @@ public sealed class StarFieldTests
         // one texture serves every star at every distance; loading it per layer or per frame is
         // work that does not need doing
         RecordingRenderer renderer = new();
-        StarField field = new(new Camera2D());
+        StarField field = ShippingField(new Camera2D());
 
         field.Render(renderer);
         field.Render(renderer);
@@ -145,7 +162,7 @@ public sealed class StarFieldTests
     {
         // criterion one: with the ship stationary, the stars are on screen and they are still
         RecordingRenderer renderer = new();
-        StarField field = new(new Camera2D());
+        StarField field = ShippingField(new Camera2D());
 
         Sprite[] first = RenderTo(renderer, field);
         Sprite[] second = RenderTo(renderer, field);
@@ -314,7 +331,7 @@ public sealed class StarFieldTests
         // criterion six. A field held as a list of positions would fail this by growing; a field
         // derived from the tiles the viewport covers cannot.
         Camera2D camera = new();
-        StarField field = new(camera);
+        StarField field = ShippingField(camera);
         RecordingRenderer renderer = new();
 
         int atTheStart = RenderTo(renderer, field).Length;
@@ -371,7 +388,7 @@ public sealed class StarFieldTests
         Camera2D camera = new() { PixelsPerUnit = pixelsPerUnit };
         RecordingRenderer renderer = new();
 
-        new StarField(camera).Render(renderer);
+        ShippingField(camera).Render(renderer);
 
         Assert.Empty(renderer.Drawn);
     }
@@ -382,7 +399,7 @@ public sealed class StarFieldTests
         // a window can report nothing before it is shown; the field should wait rather than throw
         RecordingRenderer renderer = new() { ViewportSize = Vector2.Zero };
 
-        new StarField(new Camera2D()).Render(renderer);
+        ShippingField(new Camera2D()).Render(renderer);
 
         Assert.Empty(renderer.Drawn);
     }
@@ -473,7 +490,7 @@ public sealed class StarFieldTests
         Camera2D camera = new() { PixelsPerUnit = float.NaN };
         RecordingRenderer renderer = new();
 
-        new StarField(camera).Render(renderer);
+        ShippingField(camera).Render(renderer);
 
         Assert.Empty(renderer.Drawn);
     }
@@ -483,7 +500,7 @@ public sealed class StarFieldTests
     {
         RecordingRenderer renderer = new() { ViewportSize = new Vector2(float.NaN, 600f) };
 
-        new StarField(new Camera2D()).Render(renderer);
+        ShippingField(new Camera2D()).Render(renderer);
 
         Assert.Empty(renderer.Drawn);
     }
@@ -508,7 +525,8 @@ public sealed class StarFieldTests
     public void Layers_AcceptsTheSmallestTileSizeThatCanFillTheScreen()
     {
         // the bound has to be reachable, or it is a ban on small tiles rather than a bound
-        float smallest = StarField.SmallestUsableTileSize(3f);
+        StarField shipping = ShippingField(new Camera2D());
+        float smallest = shipping.SmallestUsableTileSize(3f);
 
         StarField field = FieldOf(new Camera2D(), new StarLayer(1f, smallest, 1, 3f));
 
@@ -519,21 +537,146 @@ public sealed class StarFieldTests
     public void Render_CoversTheWidestSupportedViewport_AtTheSmallestUsableTileSize()
     {
         // and what makes the bound honest rather than a number: a layer sown right at it still
-        // fills the widest screen the game claims to support, with the cap in force
+        // fills the widest screen the game says it supports, with the cap in force.
+        //
+        // Sixteen cells across, not four. #50 is here because the field was floored against a
+        // screen the game had never agreed to, and a 4x4 grid did not notice: the band the cap
+        // clips the field to still reached into the outer cells of a coarse grid, so the same
+        // assertion passed at 7680 while a 16x16 grid found the corner empty. A grid whose cells
+        // are wider than the border being looked for cannot see the border.
         const float StarSize = 3f;
-        const int Cells = 4;
+        const int Cells = 16;
 
-        StarField field = FieldOf(
-            new Camera2D(),
-            new StarLayer(1f, StarField.SmallestUsableTileSize(StarSize), 1, StarSize));
+        StarField field = new StarField(new Camera2D(), Declaring())
+        {
+            Layers = [new StarLayer(1f, ShippingField(new Camera2D()).SmallestUsableTileSize(StarSize), 1, StarSize)],
+        };
 
         RecordingRenderer renderer = new(
-            StarField.WidestSupportedViewportInPixels,
-            StarField.WidestSupportedViewportInPixels);
+            field.WidestSupportedViewportInPixels,
+            field.WidestSupportedViewportInPixels);
 
         field.Render(renderer);
 
         AssertNoEmptyCell(renderer, Cells, Cells, "at the smallest usable tile size");
+    }
+
+    [Theory]
+    [InlineData(1920f)]
+    [InlineData(3840f)]
+    [InlineData(5120f)]
+    [InlineData(7680f)]
+    public void Render_CoversWhateverScreenIsDeclared_AtTheSmallestUsableTileSize(float widest)
+    {
+        // The floor is only as good as the screen it was taken against — that is the whole of #50.
+        // Declare a different screen and the floor has to move with it, or the layer it accepts
+        // bands on exactly the display the declaration promised. Measured at the four widths worth
+        // caring about rather than only at the one the game ships with, so raising the declaration
+        // is a change this test answers rather than a number nobody re-checks.
+        const float StarSize = 3f;
+        const int Cells = 16;
+
+        StarField field = new StarField(new Camera2D(), Declaring(widest))
+        {
+            Layers = [new StarLayer(1f, new StarField(new Camera2D(), Declaring(widest))
+                .SmallestUsableTileSize(StarSize), 1, StarSize)],
+        };
+
+        RecordingRenderer renderer = new(widest, widest);
+
+        field.Render(renderer);
+
+        AssertNoEmptyCell(renderer, Cells, Cells, $"at the floor for a declared {widest}-pixel screen");
+    }
+
+    [Theory]
+    [InlineData(5120f)]
+    [InlineData(7680f)]
+    public void Render_BandsOnAScreenWiderThanTheOneItsFloorWasTakenAgainst(float actual)
+    {
+        // #50 reproduced rather than described. Sow a layer right at the floor for a 3840-pixel
+        // screen — which is what the field used to be floored against, by a constant nothing in
+        // the game had agreed to — and put it on a wider display. The corner comes up empty: the
+        // floor is not a safety margin, it is a promise about a particular screen, and past that
+        // screen the layer draws tens of thousands of stars into a band and leaves the border #40
+        // was raised for.
+        //
+        // This is the test that says why the number had to move out of the star field and into
+        // something the game states. Delete the declaration and this passes again by accident.
+        const float StarSize = 3f;
+        const int Cells = 16;
+
+        float flooredAgainst4K = new StarField(new Camera2D(), Declaring(3840f))
+            .SmallestUsableTileSize(StarSize);
+
+        StarField field = new StarField(new Camera2D(), Declaring(3840f))
+        {
+            Layers = [new StarLayer(1f, flooredAgainst4K, 1, StarSize)],
+        };
+
+        RecordingRenderer renderer = new(actual, actual);
+        field.Render(renderer);
+
+        Assert.Throws<Xunit.Sdk.TrueException>(
+            () => AssertNoEmptyCell(renderer, Cells, Cells, "floored against 3840"));
+    }
+
+    [Fact]
+    public void SmallestUsableTileSize_RisesWithTheScreenTheGameDeclares()
+    {
+        // and the mechanism behind it, said directly: the floor is derived from the declaration,
+        // not compiled in. A layer that clears the floor for a 4K screen is refused once the game
+        // says it supports an 8K one — which is the failure landing where the number was changed,
+        // rather than on a display nobody owns.
+        const float StarSize = 3f;
+
+        float atFourK = new StarField(new Camera2D(), Declaring(3840f)).SmallestUsableTileSize(StarSize);
+        float atEightK = new StarField(new Camera2D(), Declaring(7680f)).SmallestUsableTileSize(StarSize);
+
+        Assert.True(atEightK > atFourK, $"A wider screen must raise the floor, but {atEightK} <= {atFourK}.");
+
+        Assert.Throws<ArgumentException>(() =>
+        {
+            _ = new StarField(new Camera2D(), Declaring(7680f))
+            {
+                Layers = [new StarLayer(1f, atFourK, 1, StarSize)],
+            };
+        });
+    }
+
+    [Fact]
+    public void WidestSupportedViewportInPixels_IsWhateverTheGameDeclares()
+    {
+        // the one place the number lives is DisplayOptions; this is the field reading it rather
+        // than holding a second copy that can drift out of agreement with it
+        DisplayOptions display = new() { WidestSupportedViewportInPixels = 5120f };
+
+        StarField field = new(new Camera2D(), Options.Create(display));
+
+        Assert.Equal(5120f, field.WidestSupportedViewportInPixels);
+        Assert.Equal(7680f, new DisplayOptions().WidestSupportedViewportInPixels);
+    }
+
+    [Theory]
+    [InlineData(0f)]
+    [InlineData(-1920f)]
+    [InlineData(float.NaN)]
+    [InlineData(float.PositiveInfinity)]
+    public void Constructor_RefusesAScreenNothingCanBeMeasuredAgainst(float widest)
+    {
+        // Every bound on a layer is measured against this, so a declaration of zero or of NaN does
+        // not fail here — it makes the floor meaningless and lets any layer at all through, which
+        // is #40's shape again one level up. NaN in particular would pass the floor check silently,
+        // because an ordered comparison against it is false whichever way round it is written.
+        ArgumentException error = Assert.Throws<ArgumentException>(() =>
+        {
+            _ = new StarField(new Camera2D(), Declaring(widest));
+        });
+
+        Assert.Contains(
+            nameof(DisplayOptions.WidestSupportedViewportInPixels),
+            error.Message,
+            StringComparison.Ordinal);
     }
 
     [Theory]
@@ -546,7 +689,7 @@ public sealed class StarFieldTests
         // origin and a long way from it
         const int Cells = 3;
 
-        StarField field = new(new Camera2D { Target = new Vector2(x, y) });
+        StarField field = ShippingField(new Camera2D { Target = new Vector2(x, y) });
         RecordingRenderer renderer = new();
 
         field.Render(renderer);
@@ -603,18 +746,45 @@ public sealed class StarFieldTests
     public void DefaultLayers_CanEachFillTheScreen()
     {
         // the shipping layers are nowhere near the cap, and this is what says so out loud
-        StarField field = new(new Camera2D());
+        StarField field = ShippingField(new Camera2D());
 
         Assert.All(field.Layers, layer => Assert.True(
-            layer.TileSizeInWorldUnits >= StarField.SmallestUsableTileSize(layer.SizeInPixels),
+            layer.TileSizeInWorldUnits >= field.SmallestUsableTileSize(layer.SizeInPixels),
             $"A tile size of {layer.TileSizeInWorldUnits} cannot fill the screen."));
+    }
+
+    [Fact]
+    public void DefaultLayers_StateHowMuchWiderAScreenCouldBeDeclared()
+    {
+        // #50's third criterion, and the number DisplayOptions quotes back at anyone raising the
+        // declaration. The shipping layers are not re-validated against a configured screen — they
+        // are the game's content, not a caller's — so what stops a wider declaration quietly
+        // banding the shipping field is knowing where its reach runs out. The finest layer is 90
+        // world units, and MaxTilesPerAxis - 4 of those is a little over 22,000 pixels.
+        const float Stated = 22_000f;
+
+        StarField field = ShippingField(new Camera2D());
+
+        float reach = field.Layers.Min(layer =>
+            (layer.TileSizeInWorldUnits * (StarField.MaxTilesPerAxis - 4f)) - (2f * layer.SizeInPixels));
+
+        Assert.True(
+            reach >= Stated,
+            $"DisplayOptions says the shipping layers cover a little over {Stated} pixels, "
+            + $"but they reach {reach}.");
+
+        // and the declaration the game actually ships with is comfortably inside that
+        Assert.True(
+            field.WidestSupportedViewportInPixels < reach,
+            $"The declared {field.WidestSupportedViewportInPixels}-pixel screen is wider than the "
+            + $"{reach} pixels the shipping layers cover.");
     }
 
     [Fact]
     public void DefaultLayers_AreSownAtDifferentDepths()
     {
         // one layer moving is a texture sliding past; the depth is in the difference between them
-        StarField field = new(new Camera2D());
+        StarField field = ShippingField(new Camera2D());
 
         Assert.True(field.Layers.Count > 1);
         Assert.Equal(field.Layers.Count, field.Layers.Select(layer => layer.Parallax).Distinct().Count());

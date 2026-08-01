@@ -34,6 +34,13 @@ namespace BattleForce2249;
 /// band around the camera and leaves a blank border, which is why <see cref="StarField.Layers"/>
 /// refuses it rather than sowing a field that cannot cover the screen.
 /// </para>
+/// <para>
+/// <b>The floor moves with the screen the game says it supports</b>, because a tile size can only
+/// be judged against a display — see <see cref="DisplayOptions.WidestSupportedViewportInPixels"/>.
+/// A tile size is not usable or unusable on its own; it is usable up to some width and bands past
+/// it. Declaring a wider screen raises the floor, so a layer written against a narrower one has to
+/// be re-sown rather than silently carried over.
+/// </para>
 /// </param>
 /// <param name="StarsPerTile">How many stars stand in each tile.</param>
 /// <param name="SizeInPixels">

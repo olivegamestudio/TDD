@@ -1,4 +1,5 @@
 using System.Numerics;
+using Microsoft.Extensions.Options;
 using OliveGameStudio;
 
 namespace BattleForce2249;
@@ -26,8 +27,7 @@ namespace BattleForce2249;
 /// every direction, and the cost of a frame does not grow with how far the player has flown.
 /// </para>
 /// </remarks>
-/// <param name="camera">The camera the world is drawn through — the same one the ship uses.</param>
-public sealed class StarField(ICamera camera) : IRenderable
+public sealed class StarField : IRenderable
 {
     /// <summary>
     /// The asset key the stars are drawn from. An identifier, not text: it is never translated.
@@ -87,22 +87,18 @@ public sealed class StarField(ICamera camera) : IRenderable
     /// <remarks>
     /// <para>
     /// A layer knows neither the viewport nor the zoom, so a bound on its tile size can only be
-    /// taken against a stated screen. This is the widest the game expects to run on, so the check
-    /// rejects a tile size that could never fill a screen rather than one that merely might not
-    /// fill some particular screen.
+    /// taken against a stated screen. That statement is not the star field's to make — it is what
+    /// the game says it supports — so this is read from
+    /// <see cref="DisplayOptions.WidestSupportedViewportInPixels"/> rather than decided here, and
+    /// #50 is what happens when a rendering type invents the number instead: it was a constant of
+    /// 3840 that nothing in the game agreed to, and every display wider than it banded.
     /// </para>
     /// <para>
-    /// <b>Why it is set this high.</b> Nothing in the repository declares a target resolution —
-    /// the viewport is whatever the device reports — so this is a stated assumption rather than a
-    /// measured one, and the safe direction to be wrong in is upwards. It only ever raises the
-    /// floor under a tile size, and the floor it produces is around 30 world units against
-    /// shipping layers of 90, 150 and 230, so being generous here costs the game nothing while
-    /// being stingy would let a layer through that leaves a blank border on a display wider than
-    /// the one assumed. 7680 covers 8K and every ultrawide sold today; a narrower guess would not
-    /// have covered the 5120-pixel ultrawides that already exist.
+    /// Held as its own value rather than read from the options each time, so the floor a layer was
+    /// accepted against cannot change under a field that has already been sown.
     /// </para>
     /// </remarks>
-    public const float WidestSupportedViewportInPixels = 7680f;
+    public float WidestSupportedViewportInPixels { get; }
 
     /// <summary>
     /// The smallest tile size a layer drawing stars <paramref name="sizeInPixels"/> across can be
@@ -110,16 +106,23 @@ public sealed class StarField(ICamera camera) : IRenderable
     /// <see cref="MaxTilesPerAxis"/> tiles.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// The star's size comes into it because the tile range is widened by a star's width either
     /// side, so that one just off the edge is still drawn while part of it would show.
     /// <c>MaxTilesPerAxis - 4</c> rather than <c>- 1</c> leaves the slack the arithmetic needs: a
     /// tile at each end may be half-covered and counted anyway, and the clamp is a tile wider
     /// below the camera than above it, so a range that only just fits could still lose an edge
     /// depending on where between two tiles the camera happens to stand.
+    /// </para>
+    /// <para>
+    /// An instance member rather than a static one because the screen it is measured against is
+    /// configured, not compiled in — the floor is only meaningful alongside the display it was
+    /// taken from.
+    /// </para>
     /// </remarks>
     /// <param name="sizeInPixels">How big the layer draws each star, in pixels.</param>
     /// <returns>The smallest tile size, in world units, that fills the screen.</returns>
-    public static float SmallestUsableTileSize(float sizeInPixels) =>
+    public float SmallestUsableTileSize(float sizeInPixels) =>
         (WidestSupportedViewportInPixels + (2f * sizeInPixels)) / (MaxTilesPerAxis - 4f);
 
     static readonly StarLayer[] _defaultLayers =
@@ -134,7 +137,46 @@ public sealed class StarField(ICamera camera) : IRenderable
 
     readonly IReadOnlyList<StarLayer> _layers = _defaultLayers;
 
+    readonly ICamera _camera;
+
     ITexture? _texture;
+
+    /// <summary>
+    /// Creates the field the camera looks out through.
+    /// </summary>
+    /// <remarks>
+    /// The declared display is taken once, here, rather than read per frame: it decides which
+    /// layers this field would accept, and a floor that moved after a field was sown would leave
+    /// layers in place that no longer clear it.
+    /// </remarks>
+    /// <param name="camera">The camera the world is drawn through — the same one the ship uses.</param>
+    /// <param name="display">What the game says about the screen it is drawn on.</param>
+    /// <exception cref="ArgumentException">
+    /// The declared widest viewport is not a finite positive number of pixels. Guarded here as
+    /// well as where the options are bound, because a field can be built without going through
+    /// the container, and every bound below divides by this.
+    /// </exception>
+    public StarField(ICamera camera, IOptions<DisplayOptions> display)
+    {
+        ArgumentNullException.ThrowIfNull(camera);
+        ArgumentNullException.ThrowIfNull(display);
+
+        float widest = display.Value.WidestSupportedViewportInPixels;
+
+        if (!IsDrawableExtent(widest))
+        {
+            throw new ArgumentException(
+                $"{DisplayOptions.SectionName}:"
+                + $"{nameof(DisplayOptions.WidestSupportedViewportInPixels)} must be a finite "
+                + $"positive number of pixels, but was {widest}. Every bound on a star layer is "
+                + "measured against it, so a field built on this one would accept any layer at all "
+                + "and then draw a band, or nothing.",
+                nameof(display));
+        }
+
+        _camera = camera;
+        WidestSupportedViewportInPixels = widest;
+    }
 
     /// <summary>
     /// The depths the field is drawn at, furthest first — which is also the order they stack, so
@@ -276,7 +318,7 @@ public sealed class StarField(ICamera camera) : IRenderable
 
         // Nothing is on screen at a zoom of nothing or a viewport of nothing, and both would put
         // the tile arithmetic below through a division that means nothing.
-        if (!IsDrawableExtent(camera.PixelsPerUnit)
+        if (!IsDrawableExtent(_camera.PixelsPerUnit)
             || !IsDrawableExtent(viewport.X)
             || !IsDrawableExtent(viewport.Y))
         {
@@ -305,17 +347,17 @@ public sealed class StarField(ICamera camera) : IRenderable
         ITexture texture,
         Vector2 origin)
     {
-        float pixelsPerUnit = camera.PixelsPerUnit;
+        float pixelsPerUnit = _camera.PixelsPerUnit;
 
         // Where this layer's own middle has reached. A layer takes only its share of the camera's
         // movement, so a distant one has travelled less than the ship has.
-        Vector2 layerCentre = camera.Target * layer.Parallax;
+        Vector2 layerCentre = _camera.Target * layer.Parallax;
 
         // What the layer has *not* taken. Adding it to a star's position and going through the
         // camera lands the star where the layer's lag puts it, which keeps every world-to-screen
         // conversion in the game going through the one transform the ship uses — two transforms
         // that could drift apart is exactly the bug this avoids.
-        Vector2 lag = camera.Target - layerCentre;
+        Vector2 lag = _camera.Target - layerCentre;
 
         // Half the viewport in world units, widened enough that a star just off the edge is still
         // drawn while part of it would show.
@@ -348,7 +390,7 @@ public sealed class StarField(ICamera camera) : IRenderable
                     // Unrotated: a point of light has no orientation to get wrong.
                     renderer.Draw(new Sprite(
                         texture,
-                        camera.WorldToScreen(position + lag, viewport),
+                        _camera.WorldToScreen(position + lag, viewport),
                         0f,
                         origin,
                         scale));

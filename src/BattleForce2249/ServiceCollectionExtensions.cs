@@ -12,22 +12,29 @@ public static class BattleForceServiceCollectionExtensions
 {
     /// <summary>
     /// Adds the game host and the engine services it depends on, binding options from the
-    /// <see cref="CompanyScreenOptions.SectionName"/> section of <paramref name="configuration"/>.
+    /// <see cref="CompanyScreenOptions.SectionName"/> and <see cref="DisplayOptions.SectionName"/>
+    /// sections of <paramref name="configuration"/>.
     /// </summary>
     /// <param name="services">The collection to add the game to.</param>
     /// <param name="configuration">The configuration to bind options from.</param>
     /// <param name="configure">
     /// Optional code configuration, applied after binding so it overrides the configured values.
     /// </param>
+    /// <param name="configureDisplay">
+    /// Optional code configuration of what the game says about the screen, applied after binding
+    /// for the same reason.
+    /// </param>
     /// <returns>The same collection, so calls can be chained.</returns>
     public static IServiceCollection AddBattleForce(
         this IServiceCollection services,
         IConfiguration configuration,
-        Action<CompanyScreenOptions>? configure = null)
+        Action<CompanyScreenOptions>? configure = null,
+        Action<DisplayOptions>? configureDisplay = null)
     {
         services.Configure<CompanyScreenOptions>(configuration.GetSection(CompanyScreenOptions.SectionName));
+        services.Configure<DisplayOptions>(configuration.GetSection(DisplayOptions.SectionName));
 
-        return services.AddBattleForce(configure);
+        return services.AddBattleForce(configure, configureDisplay);
     }
 
     /// <summary>
@@ -35,19 +42,37 @@ public static class BattleForceServiceCollectionExtensions
     /// </summary>
     /// <param name="services">The collection to add the game to.</param>
     /// <param name="configure">Optional configuration of <see cref="CompanyScreenOptions"/>.</param>
+    /// <param name="configureDisplay">Optional configuration of <see cref="DisplayOptions"/>.</param>
     /// <returns>The same collection, so calls can be chained.</returns>
     public static IServiceCollection AddBattleForce(
         this IServiceCollection services,
-        Action<CompanyScreenOptions>? configure = null)
+        Action<CompanyScreenOptions>? configure = null,
+        Action<DisplayOptions>? configureDisplay = null)
     {
         services.AddOptions<CompanyScreenOptions>()
             .Validate(
                 options => options.Duration >= TimeSpan.Zero,
                 "CompanyScreen:Duration cannot be negative.");
 
+        // Refused here rather than left to the first thing that measures itself against it: a
+        // screen of zero, or of NaN, is not a display anyone can draw for, and a game that starts
+        // on one only says so later and somewhere else.
+        services.AddOptions<DisplayOptions>()
+            .Validate(
+                options => float.IsFinite(options.WidestSupportedViewportInPixels)
+                    && options.WidestSupportedViewportInPixels > 0f,
+                $"{DisplayOptions.SectionName}:"
+                + $"{nameof(DisplayOptions.WidestSupportedViewportInPixels)} must be a finite "
+                + "positive number of pixels.");
+
         if (configure is not null)
         {
             services.Configure(configure);
+        }
+
+        if (configureDisplay is not null)
+        {
+            services.Configure(configureDisplay);
         }
 
         services
