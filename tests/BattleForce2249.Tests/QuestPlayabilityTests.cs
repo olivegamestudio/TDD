@@ -187,6 +187,114 @@ public sealed class QuestPlayabilityTests : GameplayTestBase
             saves.Saved!.Quests);
     }
 
+    // ---- from a save with drift in it ----
+
+    /// <summary>
+    /// The shape of the save from the report on #44: real progress standing beside a quest entry
+    /// whose identifier is blank. Both save edges call such an entry drift and skip it, so what the
+    /// player gets back is the progress next to it — and that has to be a game, not just a state.
+    /// </summary>
+    const string SaveHoldingAnEntryThatNamesNoQuest = """
+    { "PlayerX": 0, "PlayerY": 700,
+      "Quests": [ { "QuestId": "quest-1", "State": "Active" },
+                  { "QuestId": "  ",      "State": "Active" } ] }
+    """;
+
+    [Fact]
+    public async Task AGameResumedFromASaveHoldingAnEntryThatNamesNoQuest_CanStillBeFlownToTheEnd()
+    {
+        // Skipping the entry is only worth anything if what survives is a game. The unit cover says
+        // the session comes back ready with the quest in the state the file gave it; that is not the
+        // same claim as the player being able to finish what they were part way through, which is
+        // what the file was keeping for them.
+        InMemorySaveProgressService saves = new() { Content = SaveHoldingAnEntryThatNamesNoQuest };
+        IHost host = StartTheGame(services => services.AddSingleton<ISaveProgressService>(saves));
+        QuestMarkers markers = MarkersFor(Resolve<IWorld>(), BattleForceCampaign.Quest1Id);
+
+        // resumed where the save left off, mid quest, with the entry that names nothing dropped
+        Assert.Equal(new Position(0, 700), Session.Player.Position);
+        Quest quest = Assert.Single(Session.Quests.Active);
+        Assert.Equal(BattleForceCampaign.Quest1Id, quest.Id);
+
+        Assert.True(
+            FlyTowards(host, markers.End, () => quest.IsCompleted),
+            "a quest resumed beside an entry naming no quest could not be flown to its end: the "
+            + $"player flew to {Session.Player.Position} and the exit marker is at {markers.End}.");
+        await Session.PendingSave;
+
+        Assert.Contains(
+            new QuestProgress(BattleForceCampaign.Quest1Id, QuestState.Completed),
+            saves.Saved!.Quests);
+    }
+
+    [Fact]
+    public async Task AQuestCompletedInASaveHoldingAnEntryThatNamesNoQuest_IsNotHandedBack()
+    {
+        // The half the report was actually about: a finished quest surviving the junk beside it. It
+        // has to survive being played on from, not just being loaded — the completed quest's start
+        // marker is the position a new game spawns on, so a quest restored as anything less than
+        // completed would be handed back the moment the player flew home, and saved that way.
+        InMemorySaveProgressService saves = new()
+        {
+            Content = """
+            { "PlayerX": 0, "PlayerY": 700,
+              "Quests": [ { "QuestId": "quest-1", "State": "Completed" },
+                          { "QuestId": "  ",      "State": "Active"    } ] }
+            """,
+        };
+        IHost host = StartTheGame(services => services.AddSingleton<ISaveProgressService>(saves));
+        QuestMarkers markers = MarkersFor(Resolve<IWorld>(), BattleForceCampaign.Quest1Id);
+
+        int handedBack = 0;
+        Session.Quests.QuestStarted += (_, _) => handedBack++;
+
+        Quest quest = Assert.Single(Session.Quests.Completed);
+        Assert.Equal(BattleForceCampaign.Quest1Id, quest.Id);
+
+        // fly all the way back over the marker that starts it, which is where a new game begins
+        Assert.True(
+            FlyTowards(host, markers.Start, () => Session.Player.Position.DistanceTo(markers.Start) < 1),
+            "the player could not be flown back to the start marker.");
+        await Session.PendingSave;
+
+        Assert.Equal(0, handedBack);
+        Assert.True(quest.IsCompleted);
+        Assert.Empty(Session.Quests.Active);
+        // and nothing was written, so a resumed campaign is not re-saved by being played through
+        Assert.Equal(0, saves.SaveCount);
+    }
+
+    [Fact]
+    public async Task ASaveRefusedForAnEntryThatIsNotThere_LeavesACampaignThatCanStillBeFlown()
+    {
+        // The other side of the same line, and the one that decides whether refusing is survivable.
+        // An entry that is not an entry still costs the whole file, so the player loses the campaign
+        // in it — what they must not also lose is the game. A new game is only a recovery if it can
+        // be played, so this flies the replacement rather than asserting the session came back ready.
+        InMemorySaveProgressService saves = new()
+        {
+            Content = """
+            { "PlayerX": 0, "PlayerY": 700,
+              "Quests": [ { "QuestId": "quest-1", "State": "Completed" }, null ] }
+            """,
+        };
+        IHost host = StartTheGame(services => services.AddSingleton<ISaveProgressService>(saves));
+        QuestMarkers markers = MarkersFor(Resolve<IWorld>(), BattleForceCampaign.Quest1Id);
+
+        // the refused file is behind them: back at the world's start, with the campaign to play
+        Assert.Equal(Resolve<IWorld>().PlayerStart, Session.Player.Position);
+        Assert.Empty(Session.Quests.Completed);
+
+        Assert.True(
+            FlyTowards(host, markers.End, () => Session.Quests.Completed.Any()),
+            "the new game that replaced a refused save could not be flown to the end of quest 1.");
+        await Session.PendingSave;
+
+        Assert.Contains(
+            new QuestProgress(BattleForceCampaign.Quest1Id, QuestState.Completed),
+            saves.Saved!.Quests);
+    }
+
     // ---- in whatever language the game is in ----
 
     [Fact]

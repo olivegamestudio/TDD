@@ -40,6 +40,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   quest finishes itself, that completing one by flying is written to the save and not handed back
   on resume, that a game resumed mid-quest can still be flown to the end, and that a playthrough
   works in a language other than the source one. ([#1](https://github.com/olivegamestudio/TDD/issues/1))
+  It also flies the save boundary's two answers about a quest entry naming no quest: a game resumed
+  from a save holding one is still playable to the end and keeps a quest it had already completed,
+  and the new game replacing a save that *is* refused can itself be flown through quest 1 — because
+  a recovery nobody can play is not a recovery. ([#44](https://github.com/olivegamestudio/TDD/issues/44))
 - **Project documentation** — this changelog, a README, and the design canon, architecture notes
   and workflow under `docs/`.
 
