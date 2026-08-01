@@ -69,6 +69,19 @@ The game side supplies where things actually are:
 
 Ids are never translated. A save written in one language has to load in another.
 
+### Keeping quests playable
+
+Each of the pieces above has its own tests, and a campaign whose pieces are each correct can still
+be unplayable — a marker out of reach of the spawn point, an end trigger sitting on a start marker,
+a quest nothing can begin. `QuestPlayabilityTests`, on `GameplayTestBase`, is the cover for that:
+it runs the shipping composition from the menu to a completed quest, and **walks `ICampaign` rather
+than naming quest 1**, so authoring a quest is all it takes to be covered by it. Assertions are on
+ids and states only, never on titles, because a quest is the same quest in every language.
+
+Movement is the one thing those tests stand in for — nothing moves the ship yet (#3), so
+`GameplayTestBase.FlyTowards` steps the player along a straight line each frame. When the control
+and physics layer lands, that method is the single place a real pilot goes behind.
+
 ## Saved progress
 
 The engine's `ISaveProgressService` exposes `HasProgress`, `Load` and `Save`, all in terms of

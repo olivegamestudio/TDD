@@ -33,6 +33,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Quest 1's title in seven languages** — English (source), French, Italian, German, Spanish,
   Brazilian Portuguese and Japanese, shipped as `Text/<culture>.json` beside the game. Adding a
   language is a file drop: no rebuild, no satellite assembly. ([#1](https://github.com/olivegamestudio/TDD/issues/1))
+- **Playability cover for the shipping campaign.** `QuestPlayabilityTests` walks
+  `BattleForceCampaign` rather than naming quest 1, and flies each quest from its start marker to
+  its end marker through the real composition — so a quest authored later is covered the day it is
+  written. It pins the way in (a new game opens inside the opening quest's start trigger), that no
+  quest finishes itself, that completing one by flying is written to the save and not handed back
+  on resume, that a game resumed mid-quest can still be flown to the end, and that a playthrough
+  works in a language other than the source one. ([#1](https://github.com/olivegamestudio/TDD/issues/1))
 - **Project documentation** — this changelog, a README, and the design canon, architecture notes
   and workflow under `docs/`.
 
