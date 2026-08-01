@@ -34,6 +34,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   without a `Ship` base type until a second ship exists to factor one out of.
   ([#3](https://github.com/olivegamestudio/TDD/issues/3),
   [#15](https://github.com/olivegamestudio/TDD/issues/15))
+- **The player is given a ship.** `Ship` (an id, the key of the graphic that stands for it, and its
+  handling) and `IShipyard`, the seam a game supplies its ships through; `BattleForceShipyard`
+  answers with the Disgraced's ship. A new game awards `IShipyard.StartingShip`, and the awarded
+  ship is recorded in the save and restored with it — the ship is something the player has, not
+  something re-derived on every load. A save naming a ship the build no longer has, or written
+  before ships were recorded, loads flying the starting ship. Nothing draws it yet.
+  ([#5](https://github.com/olivegamestudio/TDD/issues/5))
 - **`IWorld` and `QuestProximityWatcher`** in the game — where each quest's markers stand, and the
   per-frame measurement that drives the quest API from the player's position. ([#2](https://github.com/olivegamestudio/TDD/pull/2))
 - **Saved games.** `SaveGame` and `SaveGameSerializer` persist the player's position and every

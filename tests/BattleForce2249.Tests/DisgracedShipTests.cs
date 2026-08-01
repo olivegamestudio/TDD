@@ -19,6 +19,30 @@ public sealed class DisgracedShipTests
         new BattleForceWorld().QuestMarkers.Single(marker => marker.QuestId == BattleForceCampaign.Quest1Id);
 
     [Fact]
+    public void IsSavedUnderAStableIdentifier()
+    {
+        // saves name the ship; changing this is changing what older saves load into, so it is
+        // pinned here rather than left to whoever next tidies up a string
+        Assert.Equal("disgraced", DisgracedShip.ShipId);
+        Assert.Equal(DisgracedShip.ShipId, DisgracedShip.Ship.Id);
+    }
+
+    [Fact]
+    public void IsRepresentedByTheShipGraphic()
+    {
+        // the key the art is built under in the content pipeline. An identifier, not text: it is
+        // the same in every language, and it is what whatever draws the world asks for
+        Assert.Equal("ship1", DisgracedShip.GraphicKey);
+        Assert.Equal(DisgracedShip.GraphicKey, DisgracedShip.Ship.AssetKey);
+    }
+
+    [Fact]
+    public void FliesTheHandlingItIsTunedWith()
+    {
+        Assert.Same(Handling, DisgracedShip.Ship.Handling);
+    }
+
+    [Fact]
     public void CanBeFlown()
     {
         // the same rules ShipMovement enforces, checked against the shipping numbers so a bad

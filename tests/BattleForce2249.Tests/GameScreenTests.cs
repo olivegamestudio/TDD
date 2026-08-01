@@ -58,6 +58,31 @@ public sealed class GameScreenTests : HostTestBase
     }
 
     [Fact]
+    public void ANewGameGivesThePlayerTheDisgracedShip()
+    {
+        // the ticket: entering the game screen on a new game leaves the player holding a ship, and
+        // holding the one whose graphic the game means to draw
+        StartTheGame();
+
+        Assert.Equal(DisgracedShip.Ship, Session.Ship);
+        Assert.Equal(DisgracedShip.GraphicKey, Session.Ship.AssetKey);
+    }
+
+    [Fact]
+    public async Task ThePlayerStillHasTheirShip_AfterTheGameScreenIsEnteredAgain()
+    {
+        // entering the screen resets the flying, not the owning: the ship comes back with the
+        // session rather than being lost with the momentum
+        IHost host = StartTheGame();
+        Play(host, frames: 60);
+
+        ((IActivatable)GameScreen).Enter();
+        await ((GameScreen)GameScreen).Started;
+
+        Assert.Equal(DisgracedShip.Ship, Session.Ship);
+    }
+
+    [Fact]
     public void TheGameScreenIsActive_OnceTheMenuRequestsAStart()
     {
         StartTheGame();

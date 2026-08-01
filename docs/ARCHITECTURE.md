@@ -65,7 +65,8 @@ The game side supplies where things actually are:
   quest API when a trigger fires. It keeps no memory of what it has already fired; the quest
   model absorbs repeat calls.
 - `GameSession` — the game in progress. Starts or resumes, and saves when a quest starts or
-  completes rather than every frame.
+  completes rather than every frame. It also holds what the player has been given: a new game
+  awards `IShipyard.StartingShip`, and `Session.Ship` is what the player is flying.
 
 Ids are never translated. A save written in one language has to load in another.
 
@@ -75,6 +76,13 @@ The engine owns the physics; the game owns the numbers. `ShipHandling` is a game
 drag and turn rate — `DisgracedShip.Handling` supplies the shipping ones — and `ShipMovement`
 is the physics they are flown through. A better ship is another `ShipHandling`, not another
 physics.
+
+`Ship` is a ship the player can be flying: an id, the key of the graphic that stands for it, and
+its handling. `IShipyard` is the seam a game supplies its ships through — every ship it has, which
+one a new game awards, and how a ship named in a save is found again — and `BattleForceShipyard`
+answers with the one ship this game has. The id is an identifier and is written into saves, so it
+never changes and is never translated; the asset key says *which* graphic represents the ship and
+nothing about where, how big or at what angle it is drawn.
 
 - `ShipControls` — a thrust axis and a helm axis, each clamped to `[-1, 1]`. Analogue, because
   that is the shape a stick and a key both fit: a key is a 1, a stick is whatever it is pushed to.
@@ -116,6 +124,11 @@ A save the campaign has drifted from is tolerated in both directions: a quest th
 this build no longer ships is ignored, and a quest added since the save was written starts from
 the beginning.
 
+The player's ship is **recorded** in the save rather than re-derived on load, because it is
+something the player has rather than a fact about where they happen to be — see pillar 4. The same
+tolerance applies: a save naming a ship this build no longer has, or written before ships were
+recorded at all, loads flying the starting ship rather than being thrown away.
+
 ## Localised text
 
 A language is a file named after its culture — `Text/en.json`, `Text/pt-BR.json` — holding a flat
@@ -153,6 +166,12 @@ the session; its `Update` drives the proximity watcher once the session is ready
   thing preventing it.
 - Nothing displays a quest title. There is no HUD or quest log; that is a separate `ENGINE`
   issue.
+- Nothing draws the ship. The player is awarded one and `Session.Ship.AssetKey` says which graphic
+  stands for it, but no renderer reads either yet — that is a separate `ENGINE` issue.
+- The physics is tuned once, from the starting ship. `ShipMovement` is built from
+  `IShipyard.StartingShip.Handling` at composition, so a session flying a different ship would fly
+  it with the starting ship's numbers. Harmless while there is one ship; the second ship has to
+  re-tune the physics as the awarded ship changes.
 - Nothing selects a language. Translations are reachable only through the machine's own culture.
 - There is no persistent record (experience, credits, quest history) separate from the saved
   position. See pillar 4 in `docs/DESIGN.md`.

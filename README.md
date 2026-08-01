@@ -58,9 +58,13 @@ dotnet run --project BattleForce2249.MonoGame
 Engine, screen flow, the quest system and ship movement are in. Quest 1 auto-starts on a new game,
 tracks the player forward through the collapsing debris field, and completes at the exit marker —
 flown there, with thrust and a helm and momentum through the turns — with progress persisted
-across sessions and its title translated into seven languages.
+across sessions and its title translated into seven languages. A new game awards the player their
+ship, and the save remembers which one they were given.
 
 Not yet built:
+
+- **Anything drawn** — the player has a ship and the model says which graphic stands for it, but
+  nothing renders it yet.
 
 - **A real input device** — the ship is flown through `IShipInput`, and the MonoGame host does not
   bind a keyboard or gamepad to it yet, so the shipping game still has nobody at the controls.

@@ -12,6 +12,7 @@ public sealed class GameSession : IGameSession
     readonly ISaveProgressService _saveProgressService;
     readonly ICampaign _campaign;
     readonly IWorld _world;
+    readonly IShipyard _shipyard;
 
     /// <summary>
     /// Whether a quest changing state should write a save. It is turned off while a game is being
@@ -25,11 +26,21 @@ public sealed class GameSession : IGameSession
     /// <param name="saveProgressService">The service the save game is written to and read from.</param>
     /// <param name="campaign">The quests the session plays.</param>
     /// <param name="world">The world it plays them in.</param>
-    public GameSession(ISaveProgressService saveProgressService, ICampaign campaign, IWorld world)
+    /// <param name="shipyard">The ships it can award, and the one a new game starts with.</param>
+    public GameSession(
+        ISaveProgressService saveProgressService,
+        ICampaign campaign,
+        IWorld world,
+        IShipyard shipyard)
     {
         _saveProgressService = saveProgressService;
         _campaign = campaign;
         _world = world;
+        _shipyard = shipyard;
+
+        // before a game is started there is no awarded ship, but a session that reports none would
+        // make every reader handle a state the player can never be in
+        Ship = shipyard.StartingShip;
 
         Quests.QuestStarted += OnQuestChanged;
         Quests.QuestCompleted += OnQuestChanged;
@@ -37,6 +48,9 @@ public sealed class GameSession : IGameSession
 
     /// <inheritdoc />
     public Player Player { get; } = new();
+
+    /// <inheritdoc />
+    public Ship Ship { get; private set; }
 
     /// <inheritdoc />
     public QuestLog Quests { get; } = new();
@@ -70,6 +84,12 @@ public sealed class GameSession : IGameSession
 
         Reset();
         Player.MoveTo(new Position(save.PlayerX, save.PlayerY));
+
+        // a save that names a ship this build no longer has still loads, flying the starting ship:
+        // dropping the player back to a new game because a hull was renamed would cost them
+        // everything else in the save as well
+        Ship = _shipyard.Find(save.ShipId) ?? _shipyard.StartingShip;
+
         Quests.Restore(save.Quests);
 
         _autoSave = true;
@@ -80,12 +100,15 @@ public sealed class GameSession : IGameSession
     public Task Save() => _saveProgressService.Save(SaveGameSerializer.Serialize(Capture()));
 
     /// <summary>
-    /// Returns the session to a freshly registered campaign with the player at the world's start.
+    /// Returns the session to a freshly registered campaign with the player at the world's start,
+    /// flying the ship a new game awards.
     /// </summary>
     void Reset()
     {
         _autoSave = false;
         IsReady = false;
+
+        Ship = _shipyard.StartingShip;
 
         Quests.Clear();
         foreach (QuestDefinition definition in _campaign.Quests)
@@ -103,6 +126,7 @@ public sealed class GameSession : IGameSession
     {
         PlayerX = Player.Position.X,
         PlayerY = Player.Position.Y,
+        ShipId = Ship.Id,
         Quests = Quests.Capture(),
     };
 

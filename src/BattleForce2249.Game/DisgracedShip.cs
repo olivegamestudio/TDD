@@ -26,6 +26,19 @@ namespace BattleForce2249;
 public static class DisgracedShip
 {
     /// <summary>
+    /// The identifier the ship is saved under. Save games refer to it, so it must not change, and
+    /// unlike anything the player reads it is never translated.
+    /// </summary>
+    public const string ShipId = "disgraced";
+
+    /// <summary>
+    /// The key of the graphic that stands for the ship. It is the name the art is built under in
+    /// the content pipeline, not a file path and not text — a save or a screen written against it
+    /// means the same thing in every language and on every platform.
+    /// </summary>
+    public const string GraphicKey = "ship1";
+
+    /// <summary>
     /// Gets how the starting ship handles.
     /// </summary>
     /// <remarks>
@@ -43,4 +56,15 @@ public static class DisgracedShip
         Acceleration: 180,
         Drag: 0.9,
         TurnRate: 2.5);
+
+    /// <summary>
+    /// Gets the ship the player is awarded when a new game begins: the only ship the game has, and
+    /// the one the fiction hands the Disgraced to fly out of the debris field in.
+    /// </summary>
+    /// <remarks>
+    /// Declared after <see cref="Handling"/> on purpose. Static property initialisers run in the
+    /// order they are written, so a ship built above the handling it is built from would be given
+    /// a null one.
+    /// </remarks>
+    public static Ship Ship { get; } = new(ShipId, GraphicKey, Handling);
 }

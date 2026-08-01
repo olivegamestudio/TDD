@@ -44,8 +44,14 @@ public static class SaveGameSerializer
         {
             SaveGame? save = JsonSerializer.Deserialize<SaveGame>(content, Options);
 
-            // a save written as JSON null, or with a null quest list, is still readable
-            return save is null ? null : save with { Quests = save.Quests ?? [] };
+            // a save written as JSON null, or with a null quest list or ship, is still readable
+            return save is null
+                ? null
+                : save with
+                {
+                    ShipId = save.ShipId ?? string.Empty,
+                    Quests = save.Quests ?? [],
+                };
         }
         catch (JsonException)
         {
