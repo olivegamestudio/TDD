@@ -97,6 +97,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A star layer too finely sown to fill the screen is refused rather than accepted.**
+  `StarField.MaxTilesPerAxis` bounds the tiles a frame visits per axis, and past that bound the
+  tile range is clamped around the camera — so a small enough `TileSizeInWorldUnits` drew tens of
+  thousands of stars into a band and left a blank border the whole way round, while passing
+  validation. `StarField.Layers` now holds a tile size against
+  `StarField.SmallestUsableTileSize`, the smallest that fills
+  `StarField.WidestSupportedViewportInPixels` within the cap, and names the number to raise.
+  `MaxTilesPerAxis`'s doc remark had described the cap as reachable only by winding the zoom down
+  absurdly; it is reached whenever the viewport spans that many tiles, which is a joint condition
+  on the viewport, the zoom and the layer. It now says so, and says that clipping to a band is
+  what reaching it costs — because no bound on tile size can prevent a low enough
+  `PixelsPerUnit` from spanning the cap for tiles of any size. The shipping layers are unaffected.
+  ([#40](https://github.com/olivegamestudio/TDD/issues/40))
+
 - **Quest proximity triggers are swept across the frame, not sampled at the end of it.**
   `QuestProximityWatcher` measured the player once per frame, at whatever position the frame
   happened to end at, so a trigger fired only if a frame *landed* inside it — a frame that carried

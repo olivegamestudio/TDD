@@ -43,12 +43,63 @@ public sealed class StarField(ICamera camera) : IRenderable
     /// the camera is zoomed out.
     /// </summary>
     /// <remarks>
-    /// A backstop rather than a design constraint: at a normal zoom the viewport spans a handful
-    /// of tiles, and this is reached only by winding <see cref="ICamera.PixelsPerUnit"/> down far
-    /// enough that a star would be a fraction of a pixel anyway. Without it, that zoom would put
-    /// the frame into a loop measured in millions.
+    /// <para>
+    /// A backstop rather than a design constraint: without it, a wound-out zoom would put the
+    /// frame into a loop measured in millions.
+    /// </para>
+    /// <para>
+    /// <b>What reaching it costs.</b> The tile range is clamped around the tile the camera stands
+    /// in, so past the cap the field stops at a band about the middle of the viewport and leaves
+    /// a blank border the rest of the way out. That is the field failing to be a field, so it is
+    /// worth being exact about when it happens.
+    /// </para>
+    /// <para>
+    /// <b>When it is reached.</b> The cap bites when the viewport spans <c>MaxTilesPerAxis</c>
+    /// tiles of a layer — when <c>viewportInPixels / (PixelsPerUnit × TileSizeInWorldUnits)</c>
+    /// approaches this number. That is a joint condition on the viewport, the zoom
+    /// <em>and</em> the layer, not on the zoom alone: a tile size small enough reaches it at an
+    /// ordinary zoom, and a zoom low enough reaches it for a tile size of any size.
+    /// </para>
+    /// <para>
+    /// <b>Only half of that is prevented.</b> <see cref="Layers"/> refuses a tile size too small
+    /// to fill <see cref="WidestSupportedViewportInPixels"/> at one pixel per unit, so the half
+    /// that is a mistake in the layer fails where the layer is written. The other half cannot be
+    /// prevented by any bound on tile size, because a low enough <see cref="ICamera.PixelsPerUnit"/>
+    /// spans this many tiles whatever their size — at which point a star is a fraction of a pixel
+    /// and the band is the honest thing to draw.
+    /// </para>
     /// </remarks>
     public const int MaxTilesPerAxis = 256;
+
+    /// <summary>
+    /// The widest viewport a layer is required to fill: the reference <see cref="Layers"/> holds a
+    /// tile size against, in pixels at one pixel per unit.
+    /// </summary>
+    /// <remarks>
+    /// A layer knows neither the viewport nor the zoom, so a bound on its tile size can only be
+    /// taken against a stated screen. This is the widest the game expects to run on, so the check
+    /// rejects a tile size that could never fill a screen rather than one that merely might not
+    /// fill some particular screen.
+    /// </remarks>
+    public const float WidestSupportedViewportInPixels = 3840f;
+
+    /// <summary>
+    /// The smallest tile size a layer drawing stars <paramref name="sizeInPixels"/> across can be
+    /// sown at and still cover <see cref="WidestSupportedViewportInPixels"/> within
+    /// <see cref="MaxTilesPerAxis"/> tiles.
+    /// </summary>
+    /// <remarks>
+    /// The star's size comes into it because the tile range is widened by a star's width either
+    /// side, so that one just off the edge is still drawn while part of it would show.
+    /// <c>MaxTilesPerAxis - 4</c> rather than <c>- 1</c> leaves the slack the arithmetic needs: a
+    /// tile at each end may be half-covered and counted anyway, and the clamp is a tile wider
+    /// below the camera than above it, so a range that only just fits could still lose an edge
+    /// depending on where between two tiles the camera happens to stand.
+    /// </remarks>
+    /// <param name="sizeInPixels">How big the layer draws each star, in pixels.</param>
+    /// <returns>The smallest tile size, in world units, that fills the screen.</returns>
+    public static float SmallestUsableTileSize(float sizeInPixels) =>
+        (WidestSupportedViewportInPixels + (2f * sizeInPixels)) / (MaxTilesPerAxis - 4f);
 
     static readonly StarLayer[] _defaultLayers =
     [
@@ -69,14 +120,23 @@ public sealed class StarField(ICamera camera) : IRenderable
     /// a near star is drawn over a far one.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// More than one layer is what makes the field read as depth rather than as a moving texture.
     /// Settable so the field can be sown differently without a new type, and validated here
     /// because a layer with a zero tile size or a parallax of zero fails as a division or as a
     /// field that never moves, neither of which is obvious at the point it was written.
+    /// </para>
+    /// <para>
+    /// <b>A tile size too small is refused too</b>, because it fails in a way that looks like it
+    /// worked: the layer draws tens of thousands of stars and still leaves a blank border, since
+    /// the viewport spans more tiles than <see cref="MaxTilesPerAxis"/> allows. That is a mistake
+    /// in the layer rather than in the zoom, so it belongs where the layer is written.
+    /// </para>
     /// </remarks>
     /// <exception cref="ArgumentException">
-    /// A layer has a parallax outside <c>(0, 1]</c>, a tile size that is not positive, fewer than
-    /// one star per tile, or a size that is not positive.
+    /// A layer has a parallax outside <c>(0, 1]</c>, a tile size that is not positive or is too
+    /// small to fill the screen within <see cref="MaxTilesPerAxis"/> tiles, fewer than one star
+    /// per tile, or a size that is not positive.
     /// </exception>
     public IReadOnlyList<StarLayer> Layers
     {
@@ -113,6 +173,22 @@ public sealed class StarField(ICamera camera) : IRenderable
                 {
                     throw new ArgumentException(
                         $"A star's size must be positive, but was {layer.SizeInPixels}.",
+                        nameof(value));
+                }
+
+                // Last, because the smallest usable tile size is a function of the star's size,
+                // and there is no point deriving it from a size that has just been refused.
+                float smallest = SmallestUsableTileSize(layer.SizeInPixels);
+
+                if (layer.TileSizeInWorldUnits < smallest)
+                {
+                    throw new ArgumentException(
+                        $"A star layer's tile size must be at least {smallest} to fill a "
+                        + $"{WidestSupportedViewportInPixels}-pixel screen within the "
+                        + $"{MaxTilesPerAxis} tiles a frame will visit, but was "
+                        + $"{layer.TileSizeInWorldUnits}. Raise TileSizeInWorldUnits to at least "
+                        + $"{smallest}; a smaller tile draws more stars and still leaves a blank "
+                        + "border, because the field is clipped to a band around the camera.",
                         nameof(value));
                 }
             }

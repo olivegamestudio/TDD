@@ -49,6 +49,35 @@ public sealed class StarFieldTests
         Assert.Contains(drawn, sprite => Vector2.Distance(sprite.Position, position) < Tolerance);
 
     /// <summary>
+    /// Asserts that a grid of <paramref name="columns"/> by <paramref name="rows"/> cells laid
+    /// over the viewport has a star in every one of them — "no gap, no seam" said in a way a
+    /// recording renderer can answer.
+    /// </summary>
+    /// <param name="where">
+    /// What was being drawn, so a failure names the case rather than only the cell.
+    /// </param>
+    static void AssertNoEmptyCell(RecordingRenderer renderer, int columns, int rows, string where)
+    {
+        Vector2 cell = new(renderer.ViewportSize.X / columns, renderer.ViewportSize.Y / rows);
+
+        for (int column = 0; column < columns; column++)
+        {
+            for (int row = 0; row < rows; row++)
+            {
+                Vector2 corner = new(column * cell.X, row * cell.Y);
+
+                Assert.True(
+                    renderer.Drawn.Any(sprite =>
+                        sprite.Position.X >= corner.X
+                        && sprite.Position.X < corner.X + cell.X
+                        && sprite.Position.Y >= corner.Y
+                        && sprite.Position.Y < corner.Y + cell.Y),
+                    $"No star in the cell at column {column}, row {row}, {where}.");
+            }
+        }
+    }
+
+    /// <summary>
     /// Asserts that every star well inside the viewport in <paramref name="before"/> is still
     /// there in <paramref name="after"/>, moved by <paramref name="shift"/> and nothing else.
     /// </summary>
@@ -276,23 +305,7 @@ public sealed class StarFieldTests
 
         field.Render(renderer);
 
-        Vector2 cell = new(renderer.ViewportSize.X / Columns, renderer.ViewportSize.Y / Rows);
-
-        for (int column = 0; column < Columns; column++)
-        {
-            for (int row = 0; row < Rows; row++)
-            {
-                Vector2 corner = new(column * cell.X, row * cell.Y);
-
-                Assert.True(
-                    renderer.Drawn.Any(sprite =>
-                        sprite.Position.X >= corner.X
-                        && sprite.Position.X < corner.X + cell.X
-                        && sprite.Position.Y >= corner.Y
-                        && sprite.Position.Y < corner.Y + cell.Y),
-                    $"No star in the cell at column {column}, row {row}, camera at ({x}, {y}).");
-            }
-        }
+        AssertNoEmptyCell(renderer, Columns, Rows, $"camera at ({x}, {y})");
     }
 
     [Fact]
@@ -419,6 +432,105 @@ public sealed class StarFieldTests
         {
             _ = FieldOf(new Camera2D(), new StarLayer(parallax, tileSize, starsPerTile, sizeInPixels));
         });
+    }
+
+    [Fact]
+    public void Layers_RefusesATileSizeTooSmallToFillTheScreen()
+    {
+        // QA's reproduction on #40, which passed validation before it: at one pixel per unit this
+        // layer draws 65,536 stars into a band in the middle of an 800x600 viewport and leaves a
+        // blank border about 144 pixels wide the whole way round. Drawing more stars than any
+        // shipping layer and still failing "no gap, no seam" is the failure worth catching early.
+        ArgumentException error = Assert.Throws<ArgumentException>(() =>
+        {
+            _ = FieldOf(new Camera2D(), new StarLayer(1f, 2f, 1, 3f));
+        });
+
+        // a message that does not name the number to change only says that something is wrong
+        Assert.Contains(nameof(StarLayer.TileSizeInWorldUnits), error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Layers_AcceptsTheSmallestTileSizeThatCanFillTheScreen()
+    {
+        // the bound has to be reachable, or it is a ban on small tiles rather than a bound
+        float smallest = StarField.SmallestUsableTileSize(3f);
+
+        StarField field = FieldOf(new Camera2D(), new StarLayer(1f, smallest, 1, 3f));
+
+        Assert.Equal(smallest, Assert.Single(field.Layers).TileSizeInWorldUnits);
+    }
+
+    [Fact]
+    public void Render_CoversTheWidestSupportedViewport_AtTheSmallestUsableTileSize()
+    {
+        // and what makes the bound honest rather than a number: a layer sown right at it still
+        // fills the widest screen the game claims to support, with the cap in force
+        const float StarSize = 3f;
+        const int Cells = 4;
+
+        StarField field = FieldOf(
+            new Camera2D(),
+            new StarLayer(1f, StarField.SmallestUsableTileSize(StarSize), 1, StarSize));
+
+        RecordingRenderer renderer = new(
+            StarField.WidestSupportedViewportInPixels,
+            StarField.WidestSupportedViewportInPixels);
+
+        field.Render(renderer);
+
+        AssertNoEmptyCell(renderer, Cells, Cells, "at the smallest usable tile size");
+    }
+
+    [Theory]
+    [InlineData(0f, 0f)]
+    [InlineData(-96_000f, 250_000f)]
+    public void Render_CoversTheWholeViewport_WithTheLayersTheGameShips(float x, float y)
+    {
+        // #40's third criterion: whatever the validation and the doc now say, what the player
+        // actually gets is unchanged — the shipping field still covers the viewport, at the
+        // origin and a long way from it
+        const int Cells = 3;
+
+        StarField field = new(new Camera2D { Target = new Vector2(x, y) });
+        RecordingRenderer renderer = new();
+
+        field.Render(renderer);
+
+        AssertNoEmptyCell(renderer, Cells, Cells, $"shipping layers, camera at ({x}, {y})");
+    }
+
+    [Fact]
+    public void Render_ClipsTheFieldToABandAroundTheCamera_WhenTheZoomOutrunsTheCap()
+    {
+        // what the cap costs, pinned as a test rather than left to prose. No bound on tile size
+        // can prevent this — a low enough zoom spans MaxTilesPerAxis tiles of any size — so
+        // MaxTilesPerAxis is documented as clipping rather than described as unreachable.
+        const float Border = 100f;
+
+        Camera2D camera = new() { PixelsPerUnit = 0.001f };
+        StarField field = FieldOf(camera, new StarLayer(1f, 100f, 1, 3f));
+        RecordingRenderer renderer = new();
+
+        field.Render(renderer);
+
+        Assert.NotEmpty(renderer.Drawn);
+        Assert.All(renderer.Drawn, sprite =>
+        {
+            Assert.InRange(sprite.Position.X, Border, renderer.ViewportSize.X - Border);
+            Assert.InRange(sprite.Position.Y, Border, renderer.ViewportSize.Y - Border);
+        });
+    }
+
+    [Fact]
+    public void DefaultLayers_CanEachFillTheScreen()
+    {
+        // the shipping layers are nowhere near the cap, and this is what says so out loud
+        StarField field = new(new Camera2D());
+
+        Assert.All(field.Layers, layer => Assert.True(
+            layer.TileSizeInWorldUnits >= StarField.SmallestUsableTileSize(layer.SizeInPixels),
+            $"A tile size of {layer.TileSizeInWorldUnits} cannot fill the screen."));
     }
 
     [Fact]
