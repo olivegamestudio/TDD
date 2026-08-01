@@ -26,6 +26,18 @@ namespace BattleForce2249;
 public static class DisgracedShip
 {
     /// <summary>
+    /// The identifier the ship is saved under. Save games refer to it, so it must not change, and
+    /// unlike anything the player reads it is never translated.
+    /// </summary>
+    public const string Id = "disgraced";
+
+    /// <summary>
+    /// The key of the asset that represents the ship on screen — <c>ship1</c>. An identifier
+    /// naming a file, not text, so it is the same in every language.
+    /// </summary>
+    public const string AssetKey = "ship1";
+
+    /// <summary>
     /// Gets how the starting ship handles.
     /// </summary>
     /// <remarks>
@@ -43,4 +55,14 @@ public static class DisgracedShip
         Acceleration: 180,
         Drag: 0.9,
         TurnRate: 2.5);
+
+    /// <summary>
+    /// Gets the ship itself: the thing a new game awards the player and a save game names.
+    /// </summary>
+    /// <remarks>
+    /// Built from <see cref="Handling"/> rather than from a second copy of the numbers, so the
+    /// handling the game registers for the physics and the handling the awarded ship carries cannot
+    /// drift apart into two ships that fly differently.
+    /// </remarks>
+    public static Ship Ship { get; } = new(Id, AssetKey, Handling);
 }

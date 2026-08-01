@@ -58,6 +58,32 @@ public sealed class GameScreenTests : HostTestBase
     }
 
     [Fact]
+    public void EnteringTheScreenForANewGame_AwardsThePlayerTheirShip()
+    {
+        // the issue, through the shipping composition: entering the game screen on a new game
+        // leaves the player flying the Disgraced's ship, which ship1 is the graphic for
+        ((IActivatable)GameScreen).Enter();
+
+        Ship ship = Assert.IsType<Ship>(Session.Player.Ship);
+        Assert.Equal(DisgracedShip.Id, ship.Id);
+        Assert.Equal("ship1", ship.AssetKey);
+    }
+
+    [Fact]
+    public void ThePlayerIsFlyingSomething_BeforeTheFirstFrameIsDrawn()
+    {
+        // whatever draws the player runs on the frame after the screen is entered, so there must
+        // be a ship by then rather than one frame later
+        IHost host = StartTheGame();
+
+        Assert.NotNull(Session.Player.Ship);
+
+        host.Update(TimeSpan.FromSeconds(1 / 60.0));
+
+        Assert.NotNull(Session.Player.Ship);
+    }
+
+    [Fact]
     public void TheGameScreenIsActive_OnceTheMenuRequestsAStart()
     {
         StartTheGame();

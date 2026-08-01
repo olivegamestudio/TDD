@@ -34,6 +34,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   without a `Ship` base type until a second ship exists to factor one out of.
   ([#3](https://github.com/olivegamestudio/TDD/issues/3),
   [#15](https://github.com/olivegamestudio/TDD/issues/15))
+- **A ship the player owns.** `Ship` pairs an identifier and an asset key with a `ShipHandling`,
+  `Player.Ship` is what the player is flying and `Player.Award` is how they come by it. Starting a
+  new game awards the Disgraced's ship — drawn with `ship1` — and the ship is recorded in the save
+  by identifier, so a reload gives it back. Only the identifier is written: a rebalanced ship
+  reaches saved games as well as new ones, and an id this build does not recognise falls back to
+  the starting ship rather than leaving the player flying nothing.
+  ([#5](https://github.com/olivegamestudio/TDD/issues/5))
+- **`IShipYard`** — the game's roster of ships: which one a new game awards, and how a ship named
+  in a save is found again. `BattleForceShipYard` currently holds one.
+  ([#5](https://github.com/olivegamestudio/TDD/issues/5))
 - **`IWorld` and `QuestProximityWatcher`** in the game — where each quest's markers stand, and the
   per-frame measurement that drives the quest API from the player's position. ([#2](https://github.com/olivegamestudio/TDD/pull/2))
 - **Saved games.** `SaveGame` and `SaveGameSerializer` persist the player's position and every
@@ -59,6 +69,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   quest measured against the previous frame's position fires a frame late, which at speed is a
   marker the player has already gone past. Entering the screen also brings the ship to rest, since
   the save carries where the player is and never how fast they were going. ([#3](https://github.com/olivegamestudio/TDD/issues/3))
+- **`SaveGame` gained `ShipId`.** A save written before ships were recorded still loads: the
+  missing ship reads back as "none named" and the player is awarded the starting ship.
+  ([#5](https://github.com/olivegamestudio/TDD/issues/5))
 - **`BattleForceCampaign.Quests` is built on each read** rather than in a field initialiser. The
   campaign is a DI singleton, so a cached list froze the player's language at startup. It is read
   only when a game starts or resumes, so it is not on the frame path. ([#2](https://github.com/olivegamestudio/TDD/pull/2))

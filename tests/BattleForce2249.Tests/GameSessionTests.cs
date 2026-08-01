@@ -20,6 +20,24 @@ public sealed class GameSessionTests
         public IReadOnlyList<QuestMarkers> QuestMarkers { get; } = markers;
     }
 
+    /// <summary>
+    /// A yard with two ships, so the tests can tell "the ship the save named" apart from "the ship
+    /// a new game awards" — with only one ship both answers look the same.
+    /// </summary>
+    sealed class TestShipYard : IShipYard
+    {
+        public static readonly Ship Starter =
+            new("starter", "starter-art", new ShipHandling(Acceleration: 100, Drag: 1, TurnRate: 2));
+
+        public static readonly Ship Earned =
+            new("earned", "earned-art", new ShipHandling(Acceleration: 300, Drag: 1, TurnRate: 3));
+
+        public Ship StartingShip => Starter;
+
+        public Ship? Find(string shipId) =>
+            new[] { Starter, Earned }.FirstOrDefault(ship => ship.Id == shipId);
+    }
+
     static QuestDefinition Quest(string id, bool autoStarts = true) =>
         new(id,
             $"Title of {id}",
@@ -36,7 +54,8 @@ public sealed class GameSessionTests
         return new GameSession(
             _saves,
             new TestCampaign([.. ids.Select(id => Quest(id))]),
-            new TestWorld([.. ids.Select(id => new QuestMarkers(id, Start, End))]));
+            new TestWorld([.. ids.Select(id => new QuestMarkers(id, Start, End))]),
+            new TestShipYard());
     }
 
     // ---- starting a new game ----
@@ -93,6 +112,68 @@ public sealed class GameSessionTests
 
         Assert.Equal(1, _saves.SaveCount);
         Assert.Equal([new QuestProgress("quest-1", QuestState.NotStarted)], _saves.Saved!.Quests);
+    }
+
+    // ---- the ship a new game awards ----
+
+    [Fact]
+    public async Task StartNewGame_AwardsThePlayerTheStartingShip()
+    {
+        GameSession session = CreateSession();
+
+        await session.StartNewGame();
+
+        Assert.Same(TestShipYard.Starter, session.Player.Ship);
+    }
+
+    [Fact]
+    public async Task StartNewGame_AwardsTheShipBeforeTheSessionIsReady()
+    {
+        // nothing flies or draws the player until the session says it is ready, so by that point
+        // there has to be a ship — a ready session with no ship is a player flying nothing
+        GameSession session = CreateSession();
+
+        await session.StartNewGame();
+
+        Assert.True(session.IsReady);
+        Assert.NotNull(session.Player.Ship);
+    }
+
+    [Fact]
+    public async Task StartNewGame_WritesTheAwardedShipIntoTheSave()
+    {
+        GameSession session = CreateSession();
+
+        await session.StartNewGame();
+
+        Assert.Equal(TestShipYard.Starter.Id, _saves.Saved!.ShipId);
+    }
+
+    [Fact]
+    public async Task SavesTheShipThePlayerIsFlying_NotTheOneTheyStartedWith()
+    {
+        GameSession session = CreateSession();
+        await session.StartNewGame();
+
+        session.Player.Award(TestShipYard.Earned);
+        await session.Save();
+
+        Assert.Equal(TestShipYard.Earned.Id, _saves.Saved!.ShipId);
+    }
+
+    [Fact]
+    public async Task SavesTheShipByIdentifier_NotItsContent()
+    {
+        // the ship is content: a later build is free to rebalance it or redraw it, and every saved
+        // game gets the change. Writing the ship whole would freeze it at the day it was written.
+        GameSession session = CreateSession();
+
+        await session.StartNewGame();
+
+        string content = _saves.Content!;
+        Assert.Contains(TestShipYard.Starter.Id, content);
+        Assert.DoesNotContain(TestShipYard.Starter.AssetKey, content);
+        Assert.DoesNotContain(nameof(Ship.Handling), content);
     }
 
     // ---- persisting progress ----
@@ -231,6 +312,81 @@ public sealed class GameSessionTests
         await resumed.Continue();
 
         Assert.Equal(savesAfterFirstGame, _saves.SaveCount);
+    }
+
+    [Fact]
+    public async Task Continue_RestoresTheShipTheSaveWasWrittenWith()
+    {
+        // pillar 4: what the player owns is persistent record, and a reload gives it back
+        GameSession first = CreateSession();
+        await first.StartNewGame();
+        first.Player.Award(TestShipYard.Earned);
+        await first.Save();
+
+        GameSession resumed = CreateSession();
+        await resumed.Continue();
+
+        Assert.Same(TestShipYard.Earned, resumed.Player.Ship);
+    }
+
+    [Fact]
+    public async Task Continue_AwardsTheStartingShip_WhenThereIsNoSave()
+    {
+        GameSession session = CreateSession();
+
+        await session.Continue();
+
+        Assert.Same(TestShipYard.Starter, session.Player.Ship);
+    }
+
+    [Fact]
+    public async Task Continue_AwardsTheStartingShip_WhenTheSaveNamesAShipThisBuildDoesNotHave()
+    {
+        _saves.Content = SaveGameSerializer.Serialize(new SaveGame { ShipId = "a-hull-we-dropped" });
+        GameSession session = CreateSession();
+
+        await session.Continue();
+
+        // a downgraded player is a better outcome than a grounded one
+        Assert.Same(TestShipYard.Starter, session.Player.Ship);
+        Assert.True(session.IsReady);
+    }
+
+    [Fact]
+    public async Task Continue_AwardsTheStartingShip_ForASaveWrittenBeforeShipsWereRecorded()
+    {
+        // an older save has no ship in it at all; it must still load and still be flyable
+        _saves.Content = """
+            {
+              "PlayerX": 0,
+              "PlayerY": 500,
+              "Quests": [ { "QuestId": "quest-1", "State": "Active" } ]
+            }
+            """;
+        GameSession session = CreateSession();
+
+        await session.Continue();
+
+        Assert.Same(TestShipYard.Starter, session.Player.Ship);
+        Assert.Equal(new Position(0, 500), session.Player.Position);
+        Assert.Single(session.Quests.Active);
+    }
+
+    [Fact]
+    public async Task Continue_RestoresThePositionAndTheShipIndependently()
+    {
+        // being awarded a ship must not move the player back to the world start
+        GameSession first = CreateSession();
+        await first.StartNewGame();
+        first.Player.Award(TestShipYard.Earned);
+        first.Player.MoveTo(new Position(12, 340));
+        await first.Save();
+
+        GameSession resumed = CreateSession();
+        await resumed.Continue();
+
+        Assert.Same(TestShipYard.Earned, resumed.Player.Ship);
+        Assert.Equal(new Position(12, 340), resumed.Player.Position);
     }
 
     [Fact]

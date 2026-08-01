@@ -12,6 +12,7 @@ public sealed class GameSession : IGameSession
     readonly ISaveProgressService _saveProgressService;
     readonly ICampaign _campaign;
     readonly IWorld _world;
+    readonly IShipYard _ships;
 
     /// <summary>
     /// Whether a quest changing state should write a save. It is turned off while a game is being
@@ -25,11 +26,17 @@ public sealed class GameSession : IGameSession
     /// <param name="saveProgressService">The service the save game is written to and read from.</param>
     /// <param name="campaign">The quests the session plays.</param>
     /// <param name="world">The world it plays them in.</param>
-    public GameSession(ISaveProgressService saveProgressService, ICampaign campaign, IWorld world)
+    /// <param name="ships">The ships it can award, and can find again when a save names one.</param>
+    public GameSession(
+        ISaveProgressService saveProgressService,
+        ICampaign campaign,
+        IWorld world,
+        IShipYard ships)
     {
         _saveProgressService = saveProgressService;
         _campaign = campaign;
         _world = world;
+        _ships = ships;
 
         Quests.QuestStarted += OnQuestChanged;
         Quests.QuestCompleted += OnQuestChanged;
@@ -70,6 +77,13 @@ public sealed class GameSession : IGameSession
 
         Reset();
         Player.MoveTo(new Position(save.PlayerX, save.PlayerY));
+
+        // a save that names a ship this build does not have — an older save from before ships were
+        // recorded, or one from a build that shipped a hull this one dropped — leaves the player
+        // in the starting ship rather than in nothing. A grounded player is a worse outcome than a
+        // downgraded one, and pillar 4 says the record survives.
+        Player.Award(_ships.Find(save.ShipId) ?? _ships.StartingShip);
+
         Quests.Restore(save.Quests);
 
         _autoSave = true;
@@ -80,8 +94,13 @@ public sealed class GameSession : IGameSession
     public Task Save() => _saveProgressService.Save(SaveGameSerializer.Serialize(Capture()));
 
     /// <summary>
-    /// Returns the session to a freshly registered campaign with the player at the world's start.
+    /// Returns the session to a freshly registered campaign with the player at the world's start,
+    /// flying the ship a new game awards.
     /// </summary>
+    /// <remarks>
+    /// The award happens here rather than only in <see cref="StartNewGame"/> so that resuming a
+    /// save always has a ship to fall back to, and so the player is never left flying nothing.
+    /// </remarks>
     void Reset()
     {
         _autoSave = false;
@@ -94,6 +113,7 @@ public sealed class GameSession : IGameSession
         }
 
         Player.MoveTo(_world.PlayerStart);
+        Player.Award(_ships.StartingShip);
     }
 
     /// <summary>
@@ -103,6 +123,10 @@ public sealed class GameSession : IGameSession
     {
         PlayerX = Player.Position.X,
         PlayerY = Player.Position.Y,
+
+        // the identifier, not the ship: what the player owns is persistent record, what it is
+        // worth is content the next build is free to change
+        ShipId = Player.Ship?.Id ?? "",
         Quests = Quests.Capture(),
     };
 

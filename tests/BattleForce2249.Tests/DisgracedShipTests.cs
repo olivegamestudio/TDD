@@ -19,6 +19,39 @@ public sealed class DisgracedShipTests
         new BattleForceWorld().QuestMarkers.Single(marker => marker.QuestId == BattleForceCampaign.Quest1Id);
 
     [Fact]
+    public void IsDrawnWithShip1()
+    {
+        // the graphic the issue asks for; the model names the asset, the presentation loads it
+        Assert.Equal("ship1", DisgracedShip.Ship.AssetKey);
+    }
+
+    [Fact]
+    public void FliesWithTheHandlingTheGameRegisters()
+    {
+        // the same instance, not a copy: the physics is built from the registered handling and the
+        // awarded ship carries this one, so a divergence would fly a different ship to the one shown
+        Assert.Same(DisgracedShip.Handling, DisgracedShip.Ship.Handling);
+    }
+
+    [Fact]
+    public void IsSavedUnderAnIdentifierThatIsNeverTranslated()
+    {
+        // a save written in one language has to load in another, so the id and the asset key are
+        // fixed strings rather than anything the player reads
+        using (new CultureScope("de"))
+        {
+            Assert.Equal("disgraced", DisgracedShip.Ship.Id);
+            Assert.Equal("ship1", DisgracedShip.Ship.AssetKey);
+        }
+
+        using (new CultureScope("ja"))
+        {
+            Assert.Equal("disgraced", DisgracedShip.Ship.Id);
+            Assert.Equal("ship1", DisgracedShip.Ship.AssetKey);
+        }
+    }
+
+    [Fact]
     public void CanBeFlown()
     {
         // the same rules ShipMovement enforces, checked against the shipping numbers so a bad

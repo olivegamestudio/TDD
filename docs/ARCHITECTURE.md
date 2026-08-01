@@ -27,7 +27,7 @@ to know about ships, quests or credits is on the wrong side of this line.
 | `OliveGameStudio.UI`, `.UI.Abstractions` | Menu and button navigation. Not ship control. |
 | `OliveGameStudio.FrameRate` | Frame time filtering, so a paused or slowed game holds still while frames keep arriving. |
 | `OliveGameStudio.Progress` | `LocalSaveProgressService`, persisting save text to a file. |
-| `OliveGameStudio.World` | `Position`, `Player`, `Velocity`. The spatial model, and the ship physics that moves through it: `ShipMovement`, `ShipHandling`, `ShipControls`, `IShipInput`. |
+| `OliveGameStudio.World` | `Position`, `Player`, `Velocity`. The spatial model, and the ship physics that moves through it: `Ship`, `ShipMovement`, `ShipHandling`, `ShipControls`, `IShipInput`. |
 | `OliveGameStudio.Localisation` | `ITextProvider`, `JsonTextProvider`, `MissingTextException`. |
 | `Pilgrimage` | The quest system. No project references at all, by design. |
 | `BattleForce2249` | Game host and DI registration. |
@@ -102,6 +102,29 @@ frame it is reached rather than the frame after — at 200 units a second, a fra
 the player has already passed. Entering the screen resets the ship: the save carries where the
 player is, never how fast they were going.
 
+## The ship the player owns
+
+`ShipHandling` is how a ship flies; `Ship` is a ship — an identifier, an asset key and a
+`ShipHandling`. `Player.Ship` is what the player is flying, and `Player.Award` is how they come by
+it. Awarding is not a move, so placing a player and giving them a ship are independent and neither
+ordering can quietly teleport them.
+
+Both strings on `Ship` are identifiers rather than text. The id is written into save games and the
+asset key names a file, so translating either would mean a game saved in one language could not be
+loaded in another. A ship's *name*, if the player is ever shown one, is a separate translated
+string and does not live on the model.
+
+`IShipYard` is the game's roster: which ship a new game awards, and how a ship named in a save is
+found again. It exists because of the save rather than the fiction — a save records a ship by id,
+so loading needs somewhere that turns the id back into a ship. `BattleForceShipYard` holds one
+ship, `DisgracedShip.Ship`, built from `DisgracedShip.Handling` rather than a second copy of the
+numbers so the handling the physics is registered with and the handling the awarded ship carries
+cannot drift into two ships that fly differently.
+
+`GameSession` awards the starting ship whenever it resets, so a resumed game always has something
+to fall back to. A save naming a ship this build does not have leaves the player in the starting
+ship: a downgraded player is a better outcome than a grounded one.
+
 ## Saved progress
 
 The engine's `ISaveProgressService` exposes `HasProgress`, `Load` and `Save`, all in terms of
@@ -114,7 +137,10 @@ the compatibility boundary — changing it changes what older saves can be read 
 
 A save the campaign has drifted from is tolerated in both directions: a quest the save knows but
 this build no longer ships is ignored, and a quest added since the save was written starts from
-the beginning.
+the beginning. The same applies to the ship: only its identifier is written, so a rebalanced ship
+reaches saved games as well as new ones, and an identifier this build does not recognise — an
+older save from before ships were recorded, or a hull since dropped — falls back to the starting
+ship rather than failing to load.
 
 ## Localised text
 
@@ -153,6 +179,12 @@ the session; its `Update` drives the proximity watcher once the session is ready
   thing preventing it.
 - Nothing displays a quest title. There is no HUD or quest log; that is a separate `ENGINE`
   issue.
+- Nothing draws the ship. The player is awarded one and it names the asset that represents it,
+  but no renderer reads `Player.Ship.AssetKey` yet — that is `ENGINE` issue #16.
+- `ShipMovement` is built from the `ShipHandling` registered in the composition root rather than
+  from the ship the player is currently flying. The two are the same instance today and a test
+  holds that line, but awarding a *different* ship mid-game would not change how it flies. Worth
+  closing when there is a second ship to award.
 - Nothing selects a language. Translations are reachable only through the machine's own culture.
 - There is no persistent record (experience, credits, quest history) separate from the saved
   position. See pillar 4 in `docs/DESIGN.md`.

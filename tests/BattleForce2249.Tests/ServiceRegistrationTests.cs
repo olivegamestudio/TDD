@@ -74,6 +74,29 @@ public sealed class ServiceRegistrationTests
     }
 
     [Fact]
+    public void ResolvesTheShipYard()
+    {
+        using ServiceProvider provider = BuildProvider();
+
+        IShipYard yard = provider.GetRequiredService<IShipYard>();
+
+        Assert.IsType<BattleForceShipYard>(yard);
+        Assert.Same(DisgracedShip.Ship, yard.StartingShip);
+    }
+
+    [Fact]
+    public void FliesTheShipItAwards()
+    {
+        // the physics is built from the registered handling and the player is awarded a ship that
+        // carries its own; two registrations that disagreed would draw one ship and fly another
+        using ServiceProvider provider = BuildProvider();
+
+        Assert.Same(
+            provider.GetRequiredService<ShipHandling>(),
+            provider.GetRequiredService<IShipYard>().StartingShip.Handling);
+    }
+
+    [Fact]
     public void SharesOneShip_BetweenTheGameScreenAndAnythingElseThatNeedsIt()
     {
         // two ships would each fly their own copy of the player around
