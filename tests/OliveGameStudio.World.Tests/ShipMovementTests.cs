@@ -308,6 +308,21 @@ public sealed class ShipMovementTests
     }
 
     [Fact]
+    public void RejectsAShipWhoseNumbersCannotBeRead()
+    {
+        // a NaN in the handling is the content-side twin of a NaN from a device: it would put NaN
+        // into the velocity and then the position, where nothing recovers it. The difference is
+        // that content is authored once, so this is caught at construction rather than read as
+        // hands-off — a ship nobody can fly should fail loudly when it is built.
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new ShipMovement(Handling with { Acceleration = double.NaN }));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new ShipMovement(Handling with { Drag = double.NaN }));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new ShipMovement(Handling with { TurnRate = double.NaN }));
+    }
+
+    [Fact]
     public void RejectsAFrameWithNoPlayerToMove()
     {
         Assert.Throws<ArgumentNullException>(
@@ -344,5 +359,102 @@ public sealed class ShipMovementTests
         Assert.True(double.IsFinite(_player.Position.X));
         Assert.True(double.IsFinite(_player.Position.Y));
         Assert.InRange(_ship.Velocity.Speed, 0, Handling.MaximumSpeed);
+    }
+
+    [Fact]
+    public void AFrameLongerThanTheGameWillEverRun_StillLeavesTheShipSomewhereReal()
+    {
+        // the largest frame a TimeSpan can carry. A debugger paused on a breakpoint hands the next
+        // frame whatever wall clock elapsed, so the frame time is not something the engine gets to
+        // assume is small — and the exponential has to stay finite at the top of the range as well
+        // as the bottom.
+        _ship.Update(_player, new ShipControls(thrust: 1, turn: 1), TimeSpan.MaxValue);
+
+        Assert.True(double.IsFinite(_player.Position.X), "position X is not finite");
+        Assert.True(double.IsFinite(_player.Position.Y), "position Y is not finite");
+        Assert.InRange(_ship.Heading, 0, Math.Tau);
+        Assert.True(
+            _ship.Velocity.Speed <= Handling.MaximumSpeed + 1e-9,
+            $"the ship reached {_ship.Velocity.Speed}, over its maximum of {Handling.MaximumSpeed}");
+    }
+
+    // ---- the helm does not let the ship cheat the physics ----
+
+    [Fact]
+    public void FullBurnWhileSwingingTheHelm_NeverExceedsTheMaximumSpeed()
+    {
+        // NeverExceedsTheShipsMaximumSpeed flies in a straight line, where the limit is easy. A
+        // turning ship is the harder case: thrust is applied along a heading that moved this frame
+        // while the old velocity is still on the books, so an integrator that added the two rather
+        // than decaying between them would let a ship out-run its own top speed by weaving.
+        for (int frame = 0; frame < 6000; frame++)
+        {
+            double helm = frame / 7 % 2 == 0 ? 1 : -1;
+
+            _ship.Update(_player, new ShipControls(thrust: 1, turn: helm), TimeSpan.FromMilliseconds(10));
+
+            Assert.True(
+                _ship.Velocity.Speed <= Handling.MaximumSpeed + 1e-9,
+                $"frame {frame}: the ship reached {_ship.Velocity.Speed}, over its maximum of {Handling.MaximumSpeed}");
+            Assert.InRange(_ship.Heading, 0, Math.Tau);
+        }
+    }
+
+    [Fact]
+    public void CoversTheSameGroundWhateverTheFrameRate_EvenThroughATurn()
+    {
+        // CoversTheSameGroundWhateverTheFrameRate flies straight, where the heading never moves.
+        // Under helm the heading is stepped once a frame, so the frame rate can in principle change
+        // where the ship ends up. What must not change is how far it gets: a player who drops to
+        // 30Hz mid-turn should cover the same ground, not fly a shorter or longer arc.
+        double PathLength(int frames)
+        {
+            Player player = new();
+            ShipMovement ship = new(Handling);
+            TimeSpan frameTime = TimeSpan.FromTicks(TimeSpan.TicksPerSecond / frames);
+            Position previous = player.Position;
+            double travelled = 0;
+
+            for (int frame = 0; frame < frames; frame++)
+            {
+                ship.Update(player, new ShipControls(thrust: 1, turn: 0.5), frameTime);
+                travelled += previous.DistanceTo(player.Position);
+                previous = player.Position;
+            }
+
+            return travelled;
+        }
+
+        double reference = PathLength(1000);
+
+        Assert.Equal(reference, PathLength(30), 2);
+        Assert.Equal(reference, PathLength(60), 2);
+        Assert.Equal(reference, PathLength(144), 2);
+    }
+
+    [Fact]
+    public void ASecondSlicedAHundredThousandWays_LandsWhereAWholeSecondDoes()
+    {
+        // the position term carries (1 - e^(-drag·t)) / drag, and at a short enough frame that
+        // subtraction is two nearly equal numbers — the shape that quietly loses precision. If it
+        // did, the error would compound once per frame, so the failure would look like a ship that
+        // drifts further the higher the frame rate, which is the opposite of what anyone would
+        // suspect. A hundred thousand frames a second is far past any real one and still exact to
+        // six places.
+        double OneSecondOfThrust(int frames)
+        {
+            Player player = new();
+            ShipMovement ship = new(Handling);
+            TimeSpan frameTime = TimeSpan.FromTicks(TimeSpan.TicksPerSecond / frames);
+
+            for (int frame = 0; frame < frames; frame++)
+            {
+                ship.Update(player, new ShipControls(thrust: 1, turn: 0), frameTime);
+            }
+
+            return player.Position.Y;
+        }
+
+        Assert.Equal(OneSecondOfThrust(1), OneSecondOfThrust(100_000), 6);
     }
 }

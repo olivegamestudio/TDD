@@ -58,4 +58,18 @@ public sealed class ShipControlsTests
         Assert.Equal(0, controls.Thrust);
         Assert.Equal(0, controls.Turn);
     }
+
+    [Fact]
+    public void TheDefaultControls_AreHandsOff()
+    {
+        // a struct's zero value skips the constructor entirely, so the clamp never runs on it. That
+        // makes the default the one reading no validation can protect — it has to be safe by
+        // construction. It is what an uninitialised field, an unfilled array element or a
+        // default(ShipControls) in a host that has not read its device yet all deliver.
+        ShipControls unset = default;
+
+        Assert.Equal(0, unset.Thrust);
+        Assert.Equal(0, unset.Turn);
+        Assert.Equal(ShipControls.Neutral, unset);
+    }
 }

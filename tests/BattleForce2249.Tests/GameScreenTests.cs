@@ -307,4 +307,53 @@ public sealed class GameScreenTests : HostTestBase
         Assert.Equal(Velocity.Stationary, ship.Velocity);
         Assert.Equal(0, ship.Heading);
     }
+
+    [Fact]
+    public void ADeviceThatGlitchesForAFewFrames_DoesNotCostThePlayerTheirGame()
+    {
+        // ShipControls reads an unreadable axis as hands-off, and ShipControlsTests pins that in
+        // isolation. This is the same thing through the whole game, because the consequence of
+        // getting it wrong is not a wrong number: a NaN position makes every quest distance NaN, so
+        // no trigger fires again and the player is left flying a ship that can never finish
+        // anything. The failure is silent, so only an end-to-end test says the game survived it.
+        FixedShipInput pilot = new();
+        IHost host = StartTheGame(services => services.AddSingleton<IShipInput>(pilot));
+
+        Play(host, frames: 1);
+        Assert.Single(Session.Quests.Active);
+
+        pilot.Controls = new ShipControls(thrust: double.NaN, turn: double.NaN);
+        Play(host, frames: 10);
+
+        pilot.Controls = FullAhead;
+        Play(host, frames: 60 * 30, until: () => Session.Quests.Completed.Any());
+
+        Quest quest = Assert.Single(Session.Quests.Completed);
+        Assert.Equal(BattleForceCampaign.Quest1Id, quest.Id);
+    }
+
+    [Theory]
+    [InlineData(30)]
+    [InlineData(60)]
+    [InlineData(144)]
+    public void Quest1_IsCompletableAtAnyFrameRateTheGameWillBePlayedAt(int framesPerSecond)
+    {
+        // frame-rate independence is pinned on the physics in isolation; this asks the question the
+        // player actually cares about, which is whether the game can be finished on their machine.
+        // A quest driven by sampling the player once a frame is where a frame rate stops being an
+        // implementation detail, so the acceptance criterion is worth holding across the range
+        // rather than at the 60Hz the other tests all happen to run at.
+        FixedShipInput pilot = new() { Controls = FullAhead };
+        IHost host = StartTheGame(services => services.AddSingleton<IShipInput>(pilot));
+        TimeSpan frameTime = TimeSpan.FromTicks(TimeSpan.TicksPerSecond / framesPerSecond);
+
+        for (int frame = 0; frame < framesPerSecond * 30 && !Session.Quests.Completed.Any(); frame++)
+        {
+            host.Update(frameTime);
+        }
+
+        Quest quest = Assert.Single(Session.Quests.Completed);
+        Assert.Equal(BattleForceCampaign.Quest1Id, quest.Id);
+        Assert.Empty(Session.Quests.Active);
+    }
 }
