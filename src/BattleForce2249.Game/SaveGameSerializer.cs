@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using OliveGameStudio;
 using Pilgrimage;
 
 namespace BattleForce2249;
@@ -76,11 +77,13 @@ public static class SaveGameSerializer
     /// <param name="save">The parsed save.</param>
     /// <returns><c>true</c> when the save can be resumed from.</returns>
     static bool IsPlayable(SaveGame save) =>
-        // Infinity is the dangerous one, and it does not come from a broken file: 1e400 is valid
-        // JSON that overflows on the way in. Every distance measured from there is Infinity, so no
-        // proximity trigger can ever fire again — a quest that can never start and never complete.
-        double.IsFinite(save.PlayerX)
-        && double.IsFinite(save.PlayerY)
+        // The position has to be somewhere the player can play on from, which is a stronger thing
+        // than a number. Infinity does not come from a broken file — 1e400 is valid JSON that
+        // overflows on the way in — but guarding only on that admitted 1e300, which is finite and
+        // just as unplayable: the ship cannot move away from it, so no proximity trigger fires and
+        // the quest can never start or complete. Position owns where that edge is, because it is
+        // the arithmetic that decides, not this game's content.
+        new Position(save.PlayerX, save.PlayerY).IsWithinPlayableSpace
         // A quest entry with no id is not this build's writing, and it is what QuestLog refuses.
         && save.Quests.All(quest => quest is not null && !string.IsNullOrWhiteSpace(quest.QuestId));
 }

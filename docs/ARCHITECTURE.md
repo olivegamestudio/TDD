@@ -94,10 +94,19 @@ the compatibility boundary — changing it changes what older saves can be read 
 
 `SaveGameSerializer` is the only place that decides whether a save can be read, and "can be read"
 means more than "parsed". Content that is well-formed JSON but not a game is refused there too: a
-quest state outside `QuestState`, a quest entry that is absent or names no quest, or a coordinate
-that is not a finite number. All of these used to be handed on as valid and then throw or brick
+quest state outside `QuestState`, a quest entry that is absent or names no quest, or a position the
+player could not play on from. All of these used to be handed on as valid and then throw or brick
 further in, where the player's only symptom was a game that had quietly stopped. Deciding once, at
 the edge, is what lets everything downstream be written against a save that makes sense.
+
+"A position the player could not play on from" is `Position.IsWithinPlayableSpace`, and it is
+deliberately stronger than "a finite number". Beyond `Position.MaxCoordinate` — 2^52 world units,
+where a `double`'s own steps grow as wide as a world unit — a one unit move returns the position it
+started from, so the ship flies and never arrives and no proximity trigger ahead of it can fire.
+That is the same soft-lock as `Infinity`, reached by a value that passes a finiteness check, so the
+bound belongs on the arithmetic rather than on this game's content. `Position.DistanceTo` uses
+`double.Hypot` for the same reason: squaring the gaps first overflows at 1.34e154, and a proximity
+check against `Infinity` does not fail loudly, it answers "not yet" forever.
 
 A save the campaign has drifted from is tolerated in both directions: a quest the save knows but
 this build no longer ships is ignored, and a quest added since the save was written starts from

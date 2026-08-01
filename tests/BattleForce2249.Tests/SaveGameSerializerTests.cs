@@ -1,9 +1,19 @@
+using System.Globalization;
+using OliveGameStudio;
 using Pilgrimage;
 
 namespace BattleForce2249.Tests;
 
 public sealed class SaveGameSerializerTests
 {
+    /// <summary>
+    /// A coordinate written the way JSON needs it, whatever the machine's culture. A culture with a
+    /// comma decimal separator would otherwise put one in the middle of the number and the test
+    /// would be measuring the parser's opinion of malformed JSON instead of the guard.
+    /// </summary>
+    static string Json(double coordinate) =>
+        coordinate.ToString("R", CultureInfo.InvariantCulture);
+
     [Fact]
     public void RoundTrips_ThePlayerPositionAndEveryQuestState()
     {
@@ -83,9 +93,14 @@ public sealed class SaveGameSerializerTests
     // 1e400 is well-formed JSON that overflows to Infinity rather than failing to parse
     [InlineData("1e400")]
     [InlineData("-1e400")]
+    // and these are finite, which is the point: the arithmetic outcome is identical, so guarding on
+    // finiteness alone let the same brick through one character of the file later
+    [InlineData("1e300")]
+    [InlineData("-1e300")]
+    [InlineData("1.7976931348623157e308")]
     public void Deserialize_ReturnsNull_ForAPositionNoPlayerCanBeAt(string coordinate)
     {
-        // a non-finite position is not a crash, it is worse: every distance from it is Infinity, so
+        // a position out here is not a crash, it is worse: the player cannot move away from it, so
         // no proximity trigger can ever fire and the quest can never be started or completed
         string x = $$"""{ "PlayerX": {{coordinate}}, "PlayerY": 0, "Quests": [] }""";
         string y = $$"""{ "PlayerX": 0, "PlayerY": {{coordinate}}, "Quests": [] }""";
@@ -97,14 +112,32 @@ public sealed class SaveGameSerializerTests
     [Fact]
     public void Deserialize_StillReadsASaveAtTheFarEdgeOfTheWorld()
     {
-        // the guard is on values that are not positions at all, not on distant ones
+        // The guard is on positions the player cannot play on from, not on distant ones — and the
+        // far edge is a real place, not a rounding of one. This used to assert double.MaxValue
+        // round-tripped, which proved the serialiser faithful and the save unplayable at the same
+        // time; the campaign's markers sit at ~1e3, so Position.MaxCoordinate is already twelve
+        // orders of magnitude past anything the game produces.
         string content = $$"""
-        { "PlayerX": {{double.MaxValue.ToString("R", System.Globalization.CultureInfo.InvariantCulture)}}, "PlayerY": 0, "Quests": [] }
+        { "PlayerX": {{Json(Position.MaxCoordinate)}}, "PlayerY": {{Json(-Position.MaxCoordinate)}}, "Quests": [] }
         """;
 
         SaveGame? loaded = SaveGameSerializer.Deserialize(content);
 
         Assert.NotNull(loaded);
-        Assert.Equal(double.MaxValue, loaded.PlayerX);
+        Assert.Equal(Position.MaxCoordinate, loaded.PlayerX);
+        Assert.Equal(-Position.MaxCoordinate, loaded.PlayerY);
+    }
+
+    [Fact]
+    public void Deserialize_StillReadsASaveFromOrdinaryDistantPlay()
+    {
+        // the guard rejecting real play would be a worse defect than the one it was written for
+        string content = """{ "PlayerX": -123456.75, "PlayerY": 987654.5, "Quests": [] }""";
+
+        SaveGame? loaded = SaveGameSerializer.Deserialize(content);
+
+        Assert.NotNull(loaded);
+        Assert.Equal(-123456.75, loaded.PlayerX);
+        Assert.Equal(987654.5, loaded.PlayerY);
     }
 }

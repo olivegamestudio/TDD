@@ -281,6 +281,13 @@ public class SaveRecoveryAdversarialTests
         """{ "PlayerX": 1e400, "PlayerY": 0, "Quests": [] }""",
         """{ "PlayerX": 0, "PlayerY": -1e400, "Quests": [] }""",
         """{ "PlayerX": 1e400, "PlayerY": 1e400, "Quests": [ null ] }""",
+        // Finite, so the overflow guard admitted them, and every marker still an unreachable
+        // distance away: 1e400 and 1e300 differ by one character in the file and used to land on
+        // opposite sides of the gate with the same result for the player.
+        """{ "PlayerX": 1e300, "PlayerY": 0, "Quests": [] }""",
+        """{ "PlayerX": 1.7976931348623157e308, "PlayerY": 0, "Quests": [] }""",
+        """{ "PlayerX": 0, "PlayerY": -1e300, "Quests": [] }""",
+        """{ "PlayerX": 1e300, "PlayerY": 1e300, "Quests": [ { "QuestId": "quest-1", "State": "Active" } ] }""",
         """{ "PlayerX": "over there", "PlayerY": 0, "Quests": [] }""",
         """{ "PlayerX": 0, "PlayerY": 0, "Quests": {} }""",
         """{ "PlayerX": 0, "PlayerY": 0, "Quests": [ [] ] }""",
