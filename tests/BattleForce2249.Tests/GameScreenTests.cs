@@ -10,40 +10,9 @@ namespace BattleForce2249.Tests;
 /// Covers the game screen as the seam between the screen lifecycle and gameplay: entering the
 /// screen begins the game, and each frame drives the quests from where the player is.
 /// </summary>
-public sealed class GameScreenTests : HostTestBase
+public sealed class GameScreenTests : GameplayTestBase
 {
-    IGameSession Session => Resolve<IGameSession>();
-
     IGameScreen GameScreen => Resolve<IGameScreen>();
-
-    /// <summary>
-    /// Drives the host through the company screen and a real press of the menu's start button,
-    /// leaving the game screen active — the same path a player takes on a new game launch.
-    /// </summary>
-    IHost StartTheGame()
-    {
-        Configure(services: services => services
-            // the real UI controller, so pressing the start button raises its action
-            .AddSingleton<IUIController, UIController>()
-            // the shipping director, so navigating a screen actually enters it
-            .AddSingleton<IScreenDirector, LifecycleScreenDirector>());
-
-        IHost host = CreateHost();
-        host.Start();
-        host.Update(TimeSpan.FromDays(1));                      // company screen elapses
-
-        MenuScreen menu = (MenuScreen)Resolve<IMenuScreen>();
-        for (int frame = 0; !menu.IsReadyForInput; frame++)
-        {
-            Assert.True(frame < 1000, "the menu never became ready for input");
-            host.Update(TimeSpan.Zero);
-        }
-
-        menu.Press();
-        menu.Release();
-
-        return host;
-    }
 
     [Fact]
     public void EnteringTheScreen_StartsTheGame()
