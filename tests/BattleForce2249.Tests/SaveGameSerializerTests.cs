@@ -67,16 +67,38 @@ public sealed class SaveGameSerializerTests
     [Theory]
     // a null element, rather than a null list — the list was guarded, the elements were not
     [InlineData("""{ "PlayerX": 0, "PlayerY": 0, "Quests": [ null ] }""")]
-    // an entry that names no quest: absent, null, blank
+    // an entry with no id at all: absent, and null
     [InlineData("""{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "State": "Active" } ] }""")]
     [InlineData("""{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "QuestId": null, "State": "Active" } ] }""")]
-    [InlineData("""{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "QuestId": "", "State": "Active" } ] }""")]
-    [InlineData("""{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "QuestId": "   ", "State": "Active" } ] }""")]
     public void Deserialize_ReturnsNull_ForAQuestEntryThisBuildDidNotWrite(string content)
     {
         // these reached QuestLog.Restore as a NullReferenceException and an ArgumentNullException,
-        // neither of which is a storage failure — so they escaped the session and froze the game
+        // neither of which is a storage failure — so they escaped the session and froze the game.
+        // These are exactly the entries Restore throws on; the ones it merely skips are below.
         Assert.Null(SaveGameSerializer.Deserialize(content));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Deserialize_KeepsTheProgressBesideAnEntryNamingNoQuest(string blankId)
+    {
+        // #44. A blank id names no quest this build ships — which is the drift QuestLog.Restore
+        // already documents and skips, and the same drift as an id naming a quest since removed.
+        // Refusing the file for it threw away a completed campaign to spite one entry that carries
+        // no information at all, and the save it refused was then overwritten by the new game that
+        // replaced it, so there was no second chance at it either.
+        string content = $$"""
+        { "PlayerX": 0, "PlayerY": 700,
+          "Quests": [ { "QuestId": "quest-1", "State": "Completed" },
+                      { "QuestId": "{{blankId}}", "State": "Active" } ] }
+        """;
+
+        SaveGame? save = SaveGameSerializer.Deserialize(content);
+
+        Assert.NotNull(save);
+        Assert.Equal(700, save.PlayerY);
+        Assert.Contains(save.Quests, quest => quest.QuestId == "quest-1" && quest.State == QuestState.Completed);
     }
 
     [Theory]

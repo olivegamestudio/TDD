@@ -117,6 +117,14 @@ public sealed class QuestLog
     /// is all-or-nothing: the whole batch is checked before any of it is applied, so a game that
     /// catches one of these still has the log it started with rather than half a save.
     /// </para>
+    /// <para>
+    /// <b>Those two answers are the whole of the rule, and a caller checking a save before it gets
+    /// here should split it the same way</b> — refuse what this throws on, tolerate what it skips.
+    /// Somewhere else deciding that an entry naming no quest makes the whole file unreadable does
+    /// not add safety; it costs the player every other quest in the file, for an entry that says
+    /// nothing. The line is between an entry that cannot be read and one that reads perfectly well
+    /// and names a quest we do not have.
+    /// </para>
     /// </remarks>
     /// <param name="progress">The saved quest states.</param>
     /// <exception cref="ArgumentNullException"><paramref name="progress"/> is <c>null</c>.</exception>

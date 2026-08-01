@@ -66,12 +66,30 @@ public static class SaveGameSerializer
     /// Whether a save that parsed is one the game can actually be resumed from.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Parsing is not the whole of "a save this build can read". Content that is well-formed JSON
-    /// but not a game — a quest entry that is not there, one naming no quest, a coordinate that is
-    /// not a place — used to be handed on as valid and then throw or brick further in, where the
-    /// player's only symptom was a game that quietly stopped. This is the one point that decides,
-    /// so everything downstream can be written against a save that makes sense, and the answer for
-    /// anything that does not is the one the class already promises: no save, so a new game.
+    /// but not a game — a quest entry that is not there, one with no identifier at all, a
+    /// coordinate that is not a place — used to be handed on as valid and then throw or brick
+    /// further in, where the player's only symptom was a game that quietly stopped. This is the one
+    /// point that decides, so everything downstream can be written against a save that makes sense,
+    /// and the answer for anything that does not is the one the class already promises: no save, so
+    /// a new game.
+    /// </para>
+    /// <para>
+    /// <b>The line is drawn where <see cref="QuestLog.Restore"/> draws it</b>, and deliberately:
+    /// this refuses exactly the entries <c>Restore</c> throws on, and tolerates exactly the ones it
+    /// skips. Two edges giving different answers about the same file is how a save came to be
+    /// discarded whole for one junk entry beside good progress (#44). An entry with a
+    /// <em>blank</em> identifier is the tolerated kind — it names no registered quest, which is the
+    /// same drift as an identifier naming a quest this build no longer ships, and drift in either
+    /// direction is already tolerated. Refusing the file for it destroyed a completed campaign over
+    /// an entry that carries no information, and destroyed it permanently, because the refused save
+    /// is overwritten by the new game that replaces it.
+    /// </para>
+    /// <para>
+    /// This is a narrowing of "damaged file, new game" and is meant as one. Damaged still means
+    /// damaged; an entry naming a quest we do not have was never damage.
+    /// </para>
     /// </remarks>
     /// <param name="save">The parsed save.</param>
     /// <returns><c>true</c> when the save can be resumed from.</returns>
@@ -81,6 +99,8 @@ public static class SaveGameSerializer
         // proximity trigger can ever fire again — a quest that can never start and never complete.
         double.IsFinite(save.PlayerX)
         && double.IsFinite(save.PlayerY)
-        // A quest entry with no id is not this build's writing, and it is what QuestLog refuses.
-        && save.Quests.All(quest => quest is not null && !string.IsNullOrWhiteSpace(quest.QuestId));
+        // An entry that is not there, or has no id at all, is not this build's writing and is what
+        // QuestLog throws on. A blank id is not checked here, because QuestLog skips it: whatever
+        // else is in the file is still the player's game.
+        && save.Quests.All(quest => quest is not null && quest.QuestId is not null);
 }

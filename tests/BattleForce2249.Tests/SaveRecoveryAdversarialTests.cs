@@ -274,7 +274,6 @@ public class SaveRecoveryAdversarialTests
         """{ "Quests": [ null, { "QuestId": "quest-1", "State": "Active" } ] }""",
         """{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "State": "Active" } ] }""",
         """{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "QuestId": null, "State": "Active" } ] }""",
-        """{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "QuestId": "", "State": "Active" } ] }""",
         """{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "QuestId": "quest-1", "State": 99 } ] }""",
         """{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "QuestId": "quest-1", "State": null } ] }""",
         """{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "QuestId": "quest-1", "State": "Nonsense" } ] }""",
@@ -302,6 +301,31 @@ public class SaveRecoveryAdversarialTests
         Quest quest = session.Quests.Find("quest-1")!;
         Assert.NotNull(quest);
         Assert.True(double.IsFinite(session.Player.Position.X) && double.IsFinite(session.Player.Position.Y));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task AnEntryNamingNoQuest_DoesNotCostThePlayerTheProgressBesideIt(string blankId)
+    {
+        // #44, pinned end to end rather than at the serializer alone, because the two edges used to
+        // disagree and only running both shows which answer the player actually gets. This file is
+        // not damaged — a blank id names no registered quest, which is the drift Restore skips — so
+        // the completed campaign in it survives the load rather than being started over.
+        string content = $$"""
+        { "PlayerX": 0, "PlayerY": 700,
+          "Quests": [ { "QuestId": "quest-1", "State": "Completed" },
+                      { "QuestId": "{{blankId}}", "State": "Active" } ] }
+        """;
+        GameSession session = CreateSession(new FailingSaveProgressService { Content = content });
+
+        await session.Continue();
+
+        Assert.True(session.IsReady);
+        Assert.True(
+            session.Quests.Find("quest-1")!.IsCompleted,
+            "the completed quest beside the junk entry was thrown away with it");
+        Assert.Equal(700, session.Player.Position.Y);
     }
 
     [Theory]
