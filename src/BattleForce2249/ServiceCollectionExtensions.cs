@@ -55,7 +55,7 @@ public static class BattleForceServiceCollectionExtensions
 
             // the ship the game is flown in: the engine owns the physics, the game owns the
             // numbers that decide how it handles
-            .AddSingleton(BattleForceShip.Handling)
+            .AddSingleton(DisgracedShip.Handling)
             .AddSingleton<ShipMovement>()
 
             // the quest content, the world its markers stand in, and the watcher that measures

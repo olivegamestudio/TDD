@@ -69,7 +69,7 @@ public sealed class ServiceRegistrationTests
     {
         using ServiceProvider provider = BuildProvider();
 
-        Assert.Same(BattleForceShip.Handling, provider.GetRequiredService<ShipHandling>());
+        Assert.Same(DisgracedShip.Handling, provider.GetRequiredService<ShipHandling>());
         Assert.NotNull(provider.GetRequiredService<ShipMovement>());
     }
 

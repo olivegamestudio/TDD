@@ -28,9 +28,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **`IShipInput`** — the seam gameplay input arrives through, because the platform host owns the
   real device. The engine ships `NeutralShipInput` as the default, so a game composes and runs with
   nobody at the controls; a host registers its keyboard or gamepad after `AddOliveGameStudio`. ([#3](https://github.com/olivegamestudio/TDD/issues/3))
-- **`BattleForceShip`** — the game's ship: 180 units per second per second against a drag of 0.9,
+- **`DisgracedShip`** — the Disgraced's ship: 180 units per second per second against a drag of 0.9,
   settling at 200 units a second, and 2.5 radians a second at full helm. Quest 1's exit marker is a
-  run of roughly six seconds at full burn. ([#3](https://github.com/olivegamestudio/TDD/issues/3))
+  run of roughly six seconds at full burn. Named for the pilot rather than the game, and left
+  without a `Ship` base type until a second ship exists to factor one out of.
+  ([#3](https://github.com/olivegamestudio/TDD/issues/3),
+  [#15](https://github.com/olivegamestudio/TDD/issues/15))
 - **`IWorld` and `QuestProximityWatcher`** in the game — where each quest's markers stand, and the
   per-frame measurement that drives the quest API from the player's position. ([#2](https://github.com/olivegamestudio/TDD/pull/2))
 - **Saved games.** `SaveGame` and `SaveGameSerializer` persist the player's position and every

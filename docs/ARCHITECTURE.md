@@ -72,7 +72,7 @@ Ids are never translated. A save written in one language has to load in another.
 ## Flying the ship
 
 The engine owns the physics; the game owns the numbers. `ShipHandling` is a game's acceleration,
-drag and turn rate — `BattleForceShip.Handling` supplies the shipping ones — and `ShipMovement`
+drag and turn rate — `DisgracedShip.Handling` supplies the shipping ones — and `ShipMovement`
 is the physics they are flown through. A better ship is another `ShipHandling`, not another
 physics.
 

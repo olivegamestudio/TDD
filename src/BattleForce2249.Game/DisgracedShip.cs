@@ -7,10 +7,23 @@ namespace BattleForce2249;
 /// feels to fly it.
 /// </summary>
 /// <remarks>
+/// <para>
 /// The physics belongs to the engine; these numbers are game content and belong here. When the
 /// player earns a better ship, that is another set of these, not another physics.
+/// </para>
+/// <para>
+/// Named for the pilot rather than the game. Naming it after the game would say only which
+/// product the type belongs to, which every type in this assembly already shares; the fiction is
+/// more specific — "You are <b>the Disgraced</b>", flying one ship, critically low on everything.
+/// </para>
+/// <para>
+/// Deliberately not derived from a <c>Ship</c> base type. A base class with a single derived type
+/// is a hierarchy invented ahead of anything to factor out of, and the axis this game varies is
+/// equipment rather than hulls. The second ship is what should decide the shape, and by then
+/// there will be two sets of numbers to compare.
+/// </para>
 /// </remarks>
-public static class BattleForceShip
+public static class DisgracedShip
 {
     /// <summary>
     /// Gets how the starting ship handles.

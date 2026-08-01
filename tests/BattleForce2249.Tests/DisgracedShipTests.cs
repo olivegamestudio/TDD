@@ -8,9 +8,9 @@ namespace BattleForce2249.Tests;
 /// but the numbers decide whether the game is flyable, and whether the quests it ships with can
 /// actually be reached.
 /// </summary>
-public sealed class BattleForceShipTests
+public sealed class DisgracedShipTests
 {
-    static readonly ShipHandling Handling = BattleForceShip.Handling;
+    static readonly ShipHandling Handling = DisgracedShip.Handling;
 
     static QuestDefinition Quest1 =>
         new BattleForceCampaign().Quests.Single(quest => quest.Id == BattleForceCampaign.Quest1Id);
