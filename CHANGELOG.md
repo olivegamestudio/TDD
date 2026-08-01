@@ -50,6 +50,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   it so it holds the middle of the viewport however far it flies. Which sprite it draws is
   `IShipView.AssetKey` — set from the awarded ship's own asset key rather than named at the draw
   site — defaulting to `ship1`. ([#16](https://github.com/olivegamestudio/TDD/issues/16))
+- **A star field behind the ship, so flight is visible.** `StarField` draws parallax layers of
+  stars through the same camera the ship uses, before the ship so it stacks behind. The camera
+  holds the ship in the middle of the viewport, so the ship never moves on screen; without a fixed
+  reference to read motion against, full thrust looked exactly like a standstill. The field is
+  derived from the tiles the viewport covers rather than held as a list of positions, so it is
+  continuous however far the player flies and a frame costs the same at any distance from the
+  origin. ([#25](https://github.com/olivegamestudio/TDD/issues/25))
 
 ### Changed
 

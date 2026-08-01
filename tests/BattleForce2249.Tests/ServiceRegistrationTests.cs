@@ -54,6 +54,29 @@ public sealed class ServiceRegistrationTests
 
         Assert.IsType<Camera2D>(provider.GetRequiredService<ICamera>());
         Assert.IsType<ShipView>(provider.GetRequiredService<IShipView>());
+        Assert.NotNull(provider.GetRequiredService<StarField>());
+    }
+
+    [Fact]
+    public void SharesOneCamera_BetweenTheShipAndTheStarsBehindIt()
+    {
+        // two cameras and the stars would slide past a ship that was never where they said it was
+        using ServiceProvider provider = BuildProvider();
+
+        ICamera camera = provider.GetRequiredService<ICamera>();
+        StarField stars = provider.GetRequiredService<StarField>();
+        RecordingRenderer renderer = new();
+
+        camera.Target = new Vector2(0f, 750f);
+        stars.Render(renderer);
+        Vector2[] first = [.. renderer.Drawn.Select(sprite => sprite.Position)];
+
+        renderer.Clear();
+        camera.Target = new Vector2(0f, 1_250f);
+        stars.Render(renderer);
+
+        Assert.NotEmpty(first);
+        Assert.NotEqual(first, renderer.Drawn.Select(sprite => sprite.Position));
     }
 
     [Fact]

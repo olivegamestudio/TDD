@@ -150,6 +150,25 @@ Which sprite is drawn is `IShipView.AssetKey`, set by whatever owns the player's
 ship's own asset key rather than named at the draw site, so the picture follows the ship the
 player was awarded. Changing it takes effect on the next draw.
 
+`StarField` is what the ship flies through, drawn before it so the ship stacks over it. Because
+the camera holds the ship in the middle of the viewport, the ship never moves on screen; the star
+field is the fixed reference the player reads motion against, and without it full thrust looks
+exactly like a standstill. It follows the *camera*, not the ship — nothing in it knows a ship
+exists — so it stays correct the day something else is being followed.
+
+The field is derived rather than stored. The world is unbounded, so a list of star positions would
+run out; each `StarLayer` is instead sown on a grid of square tiles of unbounded extent, and where
+a star stands is a function of the tile it falls in. Only the tiles the viewport covers are
+visited, which is what makes the field continuous in every direction with no seam and no star
+winking out on screen, and what keeps the cost of a frame from growing with how far the player has
+flown. A layer's `Parallax` is the share of the camera's movement it takes: one is fixed in the
+world, and smaller values lag, which is what reads as depth rather than as a texture sliding past.
+Stars are sized in pixels rather than world units — a point of light at an unreachable distance
+should not become a disc when the world is zoomed into.
+
+`StarField` is registered as itself rather than behind an interface. Nothing outside the drawing
+sets anything on it, so an interface would be a name for the container's benefit and no one else's.
+
 ## Screen flow
 
 `BattleForceHost` wires company screen → menu screen → game screen. `IFrameTimeController`
@@ -163,8 +182,6 @@ the session; its `Update` drives the proximity watcher once the session is ready
 - Nothing displays a quest title. There is no HUD or quest log; that is a separate `ENGINE`
   issue. There is no text rendering at all yet — no font is loaded and `IRenderer` draws sprites
   only.
-- Nothing but the ship is drawn. The background is a flat clear, so with the camera following the
-  ship there is no fixed reference to read motion against; a star field is issue #25.
 - The company and menu screens draw nothing. They do not implement `IRenderable`, so they are
   still a black window with working logic behind it.
 - Nothing selects a language. Translations are reachable only through the machine's own culture.

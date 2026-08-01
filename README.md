@@ -59,14 +59,13 @@ Engine, screen flow and the quest system are in. Quest 1 auto-starts on a new ga
 player forward through the collapsing debris field, and completes at the exit marker, with
 progress persisted across sessions and its title translated into seven languages.
 
-The game also draws now: starting a game puts the ship on screen, and the camera follows it.
+The game also draws now: starting a game puts the ship on screen, the camera follows it, and a
+parallax star field slides past behind it so that flying reads as flying.
 
 Not yet built:
 
 - **Ship movement and physics** (#3) — nothing moves the ship in the running game, so Quest 1 is
   currently completable by test rather than by playing, and the ship on screen sits still.
-- **Anything on screen but the ship** — the background is a flat clear, so there is no fixed
-  reference to read motion against (#25).
 - **Any on-screen quest display** — no HUD, no quest log, and no text rendering at all.
 - **Language selection** — translations follow the machine's own culture.
 - **A persistent record** — experience, credits and quest history that survive death, which

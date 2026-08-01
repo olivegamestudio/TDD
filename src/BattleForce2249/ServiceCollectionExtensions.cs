@@ -55,6 +55,11 @@ public static class BattleForceServiceCollectionExtensions
             .AddSingleton<IMenuScreen, MenuScreen>()
             .AddSingleton<IGameScreen, GameScreen>()
             .AddSingleton<IShipView, ShipView>()
+
+            // Registered as itself rather than behind an interface. Nothing outside the drawing
+            // sets anything on it — it reads the camera and nothing else — so an interface would
+            // be a name for the container's benefit and no one else's.
+            .AddSingleton<StarField>()
             .AddSingleton<IHost, BattleForceHost>();
 
         return services;

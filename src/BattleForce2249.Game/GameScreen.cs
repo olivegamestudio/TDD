@@ -8,7 +8,8 @@ namespace BattleForce2249;
 /// </summary>
 /// <param name="camera">The camera the world is drawn through.</param>
 /// <param name="ship">The player's ship.</param>
-public sealed class GameScreen(ICamera camera, IShipView ship) : IGameScreen, IRenderable
+/// <param name="stars">The stars the ship flies through.</param>
+public sealed class GameScreen(ICamera camera, IShipView ship, StarField stars) : IGameScreen, IRenderable
 {
     /// <inheritdoc />
     public void Update(TimeSpan frameTime)
@@ -23,6 +24,11 @@ public sealed class GameScreen(ICamera camera, IShipView ship) : IGameScreen, IR
         // and a ship that has flown off the edge of the screen is indistinguishable from one
         // that was never drawn. The world moves; the ship holds the middle.
         camera.Target = ship.Pose.Position;
+
+        // Before the ship, so the ship is over the stars rather than behind one. It is also what
+        // makes the ship look like it is going anywhere: the camera holds the ship still in the
+        // middle of the viewport, so the only thing that can move is what is behind it.
+        stars.Render(renderer);
 
         ship.Render(renderer);
     }
