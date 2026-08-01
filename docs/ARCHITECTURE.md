@@ -62,8 +62,11 @@ The game side supplies where things actually are:
 - `IWorld` / `BattleForceWorld` — the player's start position and each quest's `QuestMarkers`.
   Forward travel is along the positive Y axis.
 - `QuestProximityWatcher` — measures the player against the markers each frame and calls the
-  quest API when a trigger fires. It keeps no memory of what it has already fired; the quest
-  model absorbs repeat calls.
+  quest API when a trigger fires. It measures the **ground the player covered** during the frame,
+  not the point they finished it at, so a frame long enough to carry a fast ship from one side of
+  a marker to the other still fires it. `GameScreen` passes both ends of the frame; the watcher
+  keeps no memory of where the player was, or of what it has already fired — the quest model
+  absorbs repeat calls.
 - `GameSession` — the game in progress. Starts or resumes, and saves when a quest starts or
   completes rather than every frame.
 
@@ -141,16 +144,13 @@ singleton and a cached list would freeze the player's language at startup.
 
 `BattleForceHost` wires company screen → menu screen → game screen. `IFrameTimeController`
 filters frame time before the screen director sees it. Entering `GameScreen` begins or resumes
-the session; its `Update` drives the proximity watcher once the session is ready.
+the session; its `Update` flies the ship and then drives the proximity watcher over the ground
+that frame covered, once the session is ready.
 
 ## Known gaps
 
 - Nothing binds a real input device. The ship flies from `IShipInput`, and the MonoGame host still
   resolves the engine's `NeutralShipInput`, so the shipping game has nobody at the controls.
-- Quest triggers are sampled, not swept. `QuestProximityWatcher` measures the player once a frame,
-  so a frame long enough to carry the ship further than a trigger's distance steps over it. Quest
-  1's markers are sized clear of that at any playable frame rate, but the tolerance is the only
-  thing preventing it.
 - Nothing displays a quest title. There is no HUD or quest log; that is a separate `ENGINE`
   issue.
 - Nothing selects a language. Translations are reachable only through the machine's own culture.

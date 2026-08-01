@@ -65,6 +65,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Quest proximity triggers are swept across the frame, not sampled at the end of it.**
+  `QuestProximityWatcher` measured the player once per frame, at whatever position the frame
+  happened to end at, so a trigger fired only if a frame *landed* inside it — a frame that carried
+  the ship from just outside one side of a marker to just outside the other flew straight through
+  it. It now measures each marker against the segment the player travelled, through the new
+  `Position.DistanceToSegment`, and `GameScreen` passes both ends of the frame. Triggers fire at
+  any frame length, and the sweep does not widen a trigger sideways: a player who passes wide of a
+  marker still does not fire it. At the shipping numbers this never bit — marker tolerance was the
+  only thing preventing it, which pillar 1 calls the model's problem rather than the content's. ([#8](https://github.com/olivegamestudio/TDD/issues/8))
 - **`LocalSaveProgressService` now really persists**, writing to a file and creating the save
   folder on first write. `HasProgress()` was a hardcoded `return true`, reporting progress it had
   never stored. ([#2](https://github.com/olivegamestudio/TDD/pull/2))

@@ -46,11 +46,16 @@ public sealed class GameScreen(
             return;
         }
 
+        // where the frame began, kept so the quests can be measured against the ground the ship
+        // covered rather than the instant it stopped: a frame long enough to carry the player
+        // from one side of a marker to the other must still fire it
+        Position openedAt = session.Player.Position;
+
         // the ship flies first, so the quests are measured against where the player got to this
         // frame rather than where they were at the end of the last one
         ship.Update(session.Player, pilot.Read(), frameTime);
 
-        questProximity.Update(session.Quests, session.Player.Position);
+        questProximity.Update(session.Quests, openedAt, session.Player.Position);
     }
 
     /// <summary>

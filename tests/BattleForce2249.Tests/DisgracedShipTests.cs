@@ -64,9 +64,11 @@ public sealed class DisgracedShipTests
     [Fact]
     public void AtFullSpeed_AFrameStaysWellInsideQuest1sTriggers()
     {
-        // pillar 1: a trigger a fast ship flies straight through is a bug, not a tuning detail.
-        // The watcher samples the player once a frame, so the ground covered between two frames
-        // has to stay comfortably inside the trigger it is meant to fire.
+        // A tuning check rather than the safeguard it once was: the watcher now sweeps the ground
+        // covered by the frame, so a marker fires whatever the frame length. What this holds is
+        // that a marker is still something the ship spends a frame or more inside at full burn —
+        // a trigger narrower than a frame's travel fires on a single frame's sweep and is gone,
+        // which leaves nothing for a HUD or a sound to be shown against.
         double perFrameAt30Hz = Handling.MaximumSpeed / 30;
 
         Assert.True(

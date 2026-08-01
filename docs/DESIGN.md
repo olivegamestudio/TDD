@@ -74,7 +74,7 @@ exists today.
 
 | Pillar | Standing |
 | ------ | -------- |
-| 1. Flying feels good | Being exercised. The ship has thrust, a helm, momentum through a turn and a frame-rate-independent reach. Two things still short of the pillar: no real input device is bound, so nobody can fly it outside a test, and triggers are sampled once a frame rather than swept, so a long enough frame can still step a fast ship over a marker. Quest 1's markers are sized clear of that at any playable frame rate. |
+| 1. Flying feels good | Being exercised. The ship has thrust, a helm, momentum through a turn and a frame-rate-independent reach, and triggers are swept across the frame rather than sampled at the end of it, so a marker fires at any frame length rather than relying on the markers being tolerant enough. One thing still short of the pillar: no real input device is bound, so nobody can fly it outside a test. |
 | 2. The conspiracy finds you | Held. Quest 1 opens on immediate personal survival. |
 | 3. Locations have layers | Not yet expressed. The world models coordinates, not places; markers are held per quest. |
 | 4. The world was here first | Partly expressed. The save carries position and quest state only — there is no persistent record distinct from perishable position yet, and world progression currently advances from the game screen. |

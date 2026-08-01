@@ -187,6 +187,103 @@ public sealed class QuestProximityWatcherTests
         Assert.Equal(QuestState.Completed, quests.Find("quest-1")!.State);
     }
 
+    // ---- sweeping the frame, rather than sampling the end of it ----
+
+    [Fact]
+    public void StartsTheQuest_WhenOneFrameCarriesThePlayerStraightPastTheStartMarker()
+    {
+        // pillar 1: a trigger a fast ship flies straight through is a bug, not a tuning detail.
+        // Neither end of this frame is inside the 25 unit start trigger; the ground between them
+        // goes through the marker.
+        QuestProximityWatcher watcher = CreateWatcher();
+
+        watcher.Update(_quests, new Position(0, -500), new Position(0, 500));
+
+        Assert.Equal(QuestState.Active, Quest1.State);
+    }
+
+    [Fact]
+    public void CompletesTheQuest_WhenOneFrameCarriesThePlayerStraightPastTheEndMarker()
+    {
+        QuestProximityWatcher watcher = CreateWatcher();
+        Quest1.Start();
+
+        watcher.Update(_quests, new Position(0, 900), new Position(0, 1100));
+
+        Assert.Equal(QuestState.Completed, Quest1.State);
+    }
+
+    [Fact]
+    public void FiresAtAnyFrameLength()
+    {
+        // the point of sweeping: how far the frame carried the player stops mattering
+        QuestProximityWatcher watcher = CreateWatcher();
+        Quest1.Start();
+
+        watcher.Update(_quests, new Position(0, -100_000), new Position(0, 100_000));
+
+        Assert.Equal(QuestState.Completed, Quest1.State);
+    }
+
+    [Fact]
+    public void DoesNotStartTheQuest_WhenTheFramePassesWideOfTheMarker()
+    {
+        // the sweep must not widen the trigger sideways: this frame covers a great deal of ground
+        // and none of it is within 25 units of the start marker
+        QuestProximityWatcher watcher = CreateWatcher();
+
+        watcher.Update(_quests, new Position(-500, 200), new Position(500, 200));
+
+        Assert.Equal(QuestState.NotStarted, Quest1.State);
+    }
+
+    [Fact]
+    public void DoesNotStartTheQuest_WhenTheFrameStopsShortOfTheMarker()
+    {
+        // the segment, not the line it lies on: travelling towards a marker is not arriving at it
+        QuestProximityWatcher watcher = CreateWatcher();
+
+        watcher.Update(_quests, new Position(0, 500), new Position(0, 100));
+
+        Assert.Equal(QuestState.NotStarted, Quest1.State);
+    }
+
+    [Fact]
+    public void StartsAndCompletesInOneFrame_WhenItCrossesBothMarkers()
+    {
+        // a frame long enough to fly the whole quest is still a quest that was played, not skipped
+        QuestProximityWatcher watcher = CreateWatcher();
+
+        watcher.Update(_quests, new Position(0, -100), new Position(0, 1100));
+
+        Assert.Equal(QuestState.Completed, Quest1.State);
+    }
+
+    [Fact]
+    public void RaisesStartedOnce_HoweverManyFramesSweepAcrossTheMarker()
+    {
+        QuestProximityWatcher watcher = CreateWatcher();
+        int started = 0;
+        _quests.QuestStarted += (_, _) => started++;
+
+        for (int frame = 0; frame < 10; frame++)
+        {
+            watcher.Update(_quests, new Position(0, -500), new Position(0, 500));
+        }
+
+        Assert.Equal(1, started);
+    }
+
+    [Fact]
+    public void IgnoresMarkersForAQuestThatIsNotRegistered_WhenSweeping()
+    {
+        QuestProximityWatcher watcher =
+            new(new TestWorld(new QuestMarkers("quest-gone", StartMarker, EndMarker)));
+
+        // must not throw
+        watcher.Update(new QuestLog(), new Position(0, -500), new Position(0, 500));
+    }
+
     [Fact]
     public void IgnoresMarkersForAQuestThatIsNotRegistered()
     {

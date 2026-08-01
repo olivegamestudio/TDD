@@ -203,6 +203,30 @@ public sealed class GameScreenTests : HostTestBase
     }
 
     [Fact]
+    public void ALongFrameThatFliesStraightPastTheExitMarker_StillCompletesQuest1()
+    {
+        // pillar 1, end to end: a stalled frame carries the ship clean past the marker and the
+        // quest still finishes. Ten seconds of full burn from (0, 500) covers about 1780 units, so
+        // the frame begins 500 short of the exit marker and ends well over 1000 beyond it —
+        // neither end of it is inside the 50 unit trigger, only the ground between them.
+        FixedShipInput pilot = new();
+        IHost host = StartTheGame(services => services.AddSingleton<IShipInput>(pilot));
+
+        Play(host, frames: 1);                                  // the start marker begins quest 1
+        Assert.Single(Session.Quests.Active);
+
+        Session.Player.MoveTo(new Position(0, 500));
+        pilot.Controls = FullAhead;
+
+        host.Update(TimeSpan.FromSeconds(10));
+
+        Assert.True(
+            Session.Player.Position.Y > 1050,
+            $"the frame stopped at {Session.Player.Position.Y}, inside the marker rather than past it");
+        Assert.Single(Session.Quests.Completed);
+    }
+
+    [Fact]
     public void EnteringTheScreen_BringsTheShipToRest()
     {
         // the save carries where the player is, never how fast they were going
