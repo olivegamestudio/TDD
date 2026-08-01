@@ -201,15 +201,6 @@ public sealed class QuestLogTests
     }
 
     [Fact]
-    public void Restore_RefusesAnEntryWithNoQuestId()
-    {
-        QuestLog log = new();
-        log.Register(Definition("quest-1"));
-
-        Assert.Throws<ArgumentException>("progress", () => log.Restore([new QuestProgress(null!, QuestState.Active)]));
-    }
-
-    [Fact]
     public void Restore_RefusesAStateThatIsNotAState()
     {
         QuestLog log = new();
@@ -243,18 +234,38 @@ public sealed class QuestLogTests
         Assert.Equal(QuestState.NotStarted, log.Find("quest-2")!.State);
     }
 
-    [Fact]
-    public void Restore_AcceptsAnEntryWithABlankQuestId_AsAQuestItDoesNotHave()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Restore_AcceptsAnEntryNamingNoQuest_AsAQuestItDoesNotHave(string? questId)
     {
-        // blank is not unreadable — it names no registered quest, which is the drift case Restore
-        // already tolerates. A game that never writes blank ids rejects them at its own save
-        // boundary; the library has no business guessing that for it.
+        // None of these is unreadable — they name no registered quest, which is the drift case
+        // Restore already tolerates. An id that is absent names a quest exactly as poorly as a blank
+        // one does, and there is nothing to apply either to; refusing the batch over it would throw
+        // away the progress beside it, which is the whole of what the entry's neighbour is worth.
         QuestLog log = new();
         log.Register(Definition("quest-1"));
 
-        log.Restore([new QuestProgress("", QuestState.Active), new QuestProgress("quest-1", QuestState.Active)]);
+        log.Restore([new QuestProgress(questId!, QuestState.Active), new QuestProgress("quest-1", QuestState.Active)]);
 
         Assert.Equal(QuestState.Active, log.Find("quest-1")!.State);
+    }
+
+    [Fact]
+    public void Restore_KeepsRefusingAnEntryThatIsNotThere_EvenBesideAQuestItKnows()
+    {
+        // The line drawn on either side of Restore: an entry naming no quest is drift and is
+        // skipped; an entry that is not an entry at all is not drift, and the batch is refused.
+        QuestLog log = new();
+        log.Register(Definition("quest-1"));
+
+        Assert.Throws<ArgumentException>("progress", () => log.Restore([
+            new QuestProgress("quest-1", QuestState.Completed),
+            null!,
+        ]));
+
+        Assert.Equal(QuestState.NotStarted, log.Find("quest-1")!.State);
     }
 
     [Fact]

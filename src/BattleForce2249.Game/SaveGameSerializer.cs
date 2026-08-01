@@ -54,7 +54,15 @@ public static class SaveGameSerializer
             // a save written as JSON null, or with a null quest list, is still readable
             save = save with { Quests = save.Quests ?? [] };
 
-            return IsPlayable(save) ? save : null;
+            if (!IsPlayable(save))
+            {
+                return null;
+            }
+
+            // Entries naming no quest are dropped here rather than carried on. They match nothing
+            // the campaign registered, so there is nothing downstream that could act on them, and
+            // dropping them means the rest of the load never has to hold an entry it must ignore.
+            return save with { Quests = [.. save.Quests.Where(NamesAQuest)] };
         }
         catch (JsonException)
         {
@@ -66,12 +74,25 @@ public static class SaveGameSerializer
     /// Whether a save that parsed is one the game can actually be resumed from.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Parsing is not the whole of "a save this build can read". Content that is well-formed JSON
-    /// but not a game — a quest entry that is not there, one naming no quest, a coordinate that is
-    /// not a place — used to be handed on as valid and then throw or brick further in, where the
-    /// player's only symptom was a game that quietly stopped. This is the one point that decides,
-    /// so everything downstream can be written against a save that makes sense, and the answer for
-    /// anything that does not is the one the class already promises: no save, so a new game.
+    /// but not a game — a quest entry that is not there, a coordinate that is not a place — used to
+    /// be handed on as valid and then throw or brick further in, where the player's only symptom
+    /// was a game that quietly stopped. This is the one point that decides, so everything
+    /// downstream can be written against a save that makes sense, and the answer for anything that
+    /// does not is the one the class already promises: no save, so a new game.
+    /// </para>
+    /// <para>
+    /// Refusal is decided per file, not per entry, and the difference is worth stating because the
+    /// two cases look alike. An entry <em>naming no quest</em> — a <see cref="QuestProgress.QuestId"/>
+    /// that is absent, <c>null</c> or blank — is drift between a save and a campaign, which is
+    /// exactly how <see cref="QuestLog.Restore"/> reads it: it names nothing this build ships,
+    /// there is nothing to apply it to, so it is dropped and the progress beside it is kept. An
+    /// entry that is <c>null</c> is not drift; no build wrote it, and it says the file is something
+    /// other than a save, so the whole file is refused. Refusing wider than that costs more than it
+    /// looks: a refused save is overwritten by the new game that replaces it, so a file turned down
+    /// here is a campaign the player does not get back.
+    /// </para>
     /// </remarks>
     /// <param name="save">The parsed save.</param>
     /// <returns><c>true</c> when the save can be resumed from.</returns>
@@ -81,6 +102,16 @@ public static class SaveGameSerializer
         // proximity trigger can ever fire again — a quest that can never start and never complete.
         double.IsFinite(save.PlayerX)
         && double.IsFinite(save.PlayerY)
-        // A quest entry with no id is not this build's writing, and it is what QuestLog refuses.
-        && save.Quests.All(quest => quest is not null && !string.IsNullOrWhiteSpace(quest.QuestId));
+        // A quest entry that is not there is not this build's writing, and it is what QuestLog
+        // refuses too. An entry naming no quest is the other case, and is dropped rather than
+        // refused — see the remark above.
+        && save.Quests.All(quest => quest is not null);
+
+    /// <summary>
+    /// Whether a quest entry names a quest at all. A blank or missing identifier is not a name: no
+    /// quest is registered under one, and no save this build wrote holds one.
+    /// </summary>
+    /// <param name="quest">The parsed quest entry.</param>
+    /// <returns><c>true</c> when the entry names something.</returns>
+    static bool NamesAQuest(QuestProgress quest) => !string.IsNullOrWhiteSpace(quest.QuestId);
 }

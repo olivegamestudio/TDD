@@ -260,8 +260,60 @@ public class SaveRecoveryAdversarialTests
         Assert.Equal(saveOnDisk, saves.Content);
     }
 
+    [Fact]
+    public async Task TheSaveFromTheReport_KeepsTheCampaignBesideTheEntryThatNamesNothing()
+    {
+        // The file QA raised on #44, pinned verbatim. Both edges now call an entry naming no quest
+        // drift and skip it, so what is left is the progress that is real: a completed quest-1 and
+        // the position it was completed at. Refusing this file cost the player the campaign in it,
+        // and cost it permanently, because a refused save is overwritten by the game that replaces
+        // it (#46). Whatever this boundary decides, it decides once.
+        LockableSaveProgressService saves = new()
+        {
+            Content = """
+            { "PlayerX": 0, "PlayerY": 700,
+              "Quests": [ { "QuestId": "quest-1", "State": "Completed" },
+                          { "QuestId": "  ",      "State": "Active"    } ] }
+            """,
+        };
+        GameSession session = CreateSession(saves);
+
+        await session.Continue();
+
+        Assert.True(session.IsReady);
+        Assert.Equal(700, session.Player.Position.Y);
+        Assert.True(session.Quests.Find("quest-1")!.IsCompleted);
+        Assert.Equal(0, saves.SaveCount);
+    }
+
+    [Fact]
+    public async Task ThatSaveWithANullEntryInsteadOfABlankId_IsStillRefused()
+    {
+        // The other half of the same decision. A blank id is a name that names nothing; a null entry
+        // is not an entry, and no build wrote it — so the file is refused and a new game starts.
+        LockableSaveProgressService saves = new()
+        {
+            Content = """
+            { "PlayerX": 0, "PlayerY": 700,
+              "Quests": [ { "QuestId": "quest-1", "State": "Completed" }, null ] }
+            """,
+        };
+        GameSession session = CreateSession(saves);
+
+        await session.Continue();
+
+        Assert.True(session.IsReady);
+        Assert.Equal(Start, session.Player.Position);
+        Assert.Equal(QuestState.NotStarted, session.Quests.Find("quest-1")!.State);
+    }
+
     // ---- the invariant the freezes kept coming back through ----
 
+    /// <summary>
+    /// Files a player should never have, in every shape they have turned up in. Not all of them are
+    /// refused any more — an entry naming no quest is dropped and the rest of the file read — but
+    /// what these theories assert is the same either way: whatever the file says, there is a game.
+    /// </summary>
     public static TheoryData<string> DamagedSaves() =>
     [
         "not json at all",

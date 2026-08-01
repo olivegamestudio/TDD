@@ -292,16 +292,27 @@ public sealed class GameSessionTests
     }
 
     [Fact]
-    public async Task Continue_StartsANewGame_WhenTheSaveHoldsAQuestEntryWithNoId()
+    public async Task Continue_SkipsAQuestEntryWithNoId_AndResumesTheProgressBesideIt()
     {
-        // a quest entry naming no quest is not something this build ever wrote
-        _saves.Content = """{ "PlayerX": 0, "PlayerY": 0, "Quests": [ { "State": "Active" } ] }""";
+        // A quest entry naming no quest is not something this build ever wrote, but it is also not
+        // a reason to throw away the campaign saved next to it: refusing the file used to start a
+        // new game over a completed quest, and the refused file is overwritten immediately after.
+        _saves.Content = """
+        {
+          "PlayerX": 0, "PlayerY": 700,
+          "Quests": [
+            { "QuestId": "quest-1", "State": "Completed" },
+            { "State": "Active" }
+          ]
+        }
+        """;
         GameSession session = CreateSession();
 
         await session.Continue();
 
         Assert.True(session.IsReady);
-        Assert.NotNull(session.Quests.Find("quest-1"));
+        Assert.Equal(700, session.Player.Position.Y);
+        Assert.True(session.Quests.Find("quest-1")!.IsCompleted);
     }
 
     [Fact]

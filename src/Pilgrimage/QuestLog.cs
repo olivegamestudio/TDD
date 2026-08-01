@@ -109,7 +109,10 @@ public sealed class QuestLog
     /// Saves and campaigns drift apart over a game's life, and both directions are tolerated: a
     /// quest the save knows about but this build no longer ships is ignored, and a quest added
     /// since the save was written simply starts from the beginning. An entry naming no registered
-    /// quest — including one whose identifier is blank — is drift of the same kind and is skipped.
+    /// quest is drift of the same kind and is skipped — and an identifier that is <c>null</c> or
+    /// blank names a quest exactly as poorly as one that is merely unknown, so those are skipped
+    /// too. There is nothing to apply them to, and refusing the batch over one of them would throw
+    /// away the progress standing beside it, which is the part that was real.
     /// </para>
     /// <para>
     /// Progress that cannot be read at all is a different matter and is refused, because a log left
@@ -117,12 +120,17 @@ public sealed class QuestLog
     /// is all-or-nothing: the whole batch is checked before any of it is applied, so a game that
     /// catches one of these still has the log it started with rather than half a save.
     /// </para>
+    /// <para>
+    /// A game reading its own save file draws the same line one step earlier, and deliberately: an
+    /// entry naming no quest is dropped there and never reaches here, while an entry that is not
+    /// there at all makes the file refused. Two edges giving different answers about the same entry
+    /// is how a save that only needed one line skipping came to be discarded whole.
+    /// </para>
     /// </remarks>
     /// <param name="progress">The saved quest states.</param>
     /// <exception cref="ArgumentNullException"><paramref name="progress"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentException">
-    /// <paramref name="progress"/> holds an entry that is <c>null</c>, or one whose
-    /// <see cref="QuestProgress.QuestId"/> is <c>null</c>.
+    /// <paramref name="progress"/> holds an entry that is <c>null</c>.
     /// </exception>
     /// <exception cref="ArgumentOutOfRangeException">
     /// <paramref name="progress"/> holds a state that is not one of the states a quest has.
@@ -143,12 +151,6 @@ public sealed class QuestLog
                     "The saved progress holds an entry that is not there.", nameof(progress));
             }
 
-            if (saved.QuestId is null)
-            {
-                throw new ArgumentException(
-                    "The saved progress holds an entry that names no quest.", nameof(progress));
-            }
-
             if (!Enum.IsDefined(saved.State))
             {
                 throw new ArgumentOutOfRangeException(
@@ -158,7 +160,13 @@ public sealed class QuestLog
 
         foreach (QuestProgress saved in entries)
         {
-            Find(saved.QuestId)?.Restore(saved.State);
+            // Asked in full rather than left to Find: Find refuses a null identifier by contract,
+            // because nothing in a running game looks up a quest it cannot name. A save is not a
+            // running game — it can hold an entry that names nothing — and that is skipped here.
+            if (!string.IsNullOrWhiteSpace(saved.QuestId))
+            {
+                Find(saved.QuestId)?.Restore(saved.State);
+            }
         }
     }
 

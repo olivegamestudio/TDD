@@ -46,6 +46,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **One junk quest entry no longer discards the progress saved beside it.** `SaveGameSerializer`
+  refused a whole save when any quest entry had a missing, `null` or blank id, so a file holding a
+  completed campaign and one line naming no quest started a new game — and, because a refused save
+  is overwritten by the game that replaces it, lost the campaign for good. An entry naming no quest
+  is now dropped and the rest of the file read, which is the answer `QuestLog.Restore` already gave
+  for the same input; `Restore` skips a `null` id on the same grounds it already skipped a blank
+  one. An entry that is `null` is not drift and is still refused whole. ([#44](https://github.com/olivegamestudio/TDD/issues/44))
 - **`LocalSaveProgressService` now really persists**, writing to a file and creating the save
   folder on first write. `HasProgress()` was a hardcoded `return true`, reporting progress it had
   never stored. ([#2](https://github.com/olivegamestudio/TDD/pull/2))
