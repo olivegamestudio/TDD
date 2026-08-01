@@ -219,6 +219,21 @@ thousands of stars into a band. The other half is a limit on the camera: no boun
 stop a low enough `PixelsPerUnit` from spanning the cap. Note that it does *not* stop mattering at
 that zoom — stars are sized in pixels, so they stay fully visible beside the blank border.
 
+A tile size is bounded at the far end too, against `LargestUsableTileSize` — half
+`NarrowestSupportedViewportInPixels`, since a screen two tiles across always spans a whole tile and
+so is certain to be shown that tile's stars. A layer sown more thinly than that draws a handful of
+stars and can put none of them on screen: the same "passed validation and shows the player nothing"
+failure as the blank border, reached from the opposite direction. Both bounds are taken against
+stated screen sizes rather than measured ones, because nothing in the game declares a display size
+([#50](https://github.com/olivegamestudio/TDD/issues/50)); they are two constants in one file, and
+the bounds follow whatever that issue settles on.
+
+Layer validation checks that each number **is a number** before it checks any range, and `Render`
+asks the same of the zoom and the viewport. Every range check is an ordered comparison and an
+ordered comparison against `NaN` is false, so a `NaN` satisfies a guard by saying nothing about it
+and goes on to put the whole field at a `NaN` position — a blank screen from a layer the type had
+accepted.
+
 `StarField` is registered as itself rather than behind an interface. Nothing outside the drawing
 sets anything on it, so an interface would be a name for the container's benefit and no one else's.
 

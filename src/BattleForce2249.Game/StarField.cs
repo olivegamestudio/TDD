@@ -122,6 +122,48 @@ public sealed class StarField(ICamera camera) : IRenderable
     public static float SmallestUsableTileSize(float sizeInPixels) =>
         (WidestSupportedViewportInPixels + (2f * sizeInPixels)) / (MaxTilesPerAxis - 4f);
 
+    /// <summary>
+    /// The narrowest side of the smallest viewport a layer is required to put a star on, in pixels
+    /// at one pixel per unit.
+    /// </summary>
+    /// <remarks>
+    /// The companion to <see cref="WidestSupportedViewportInPixels"/> and the same kind of stated
+    /// assumption: nothing in the repository declares a display size, so a bound on a tile size can
+    /// only be taken against a screen someone names. It is the narrowest <em>side</em> rather than
+    /// a width because a tile is square and has to fit the shorter axis. The safe direction to be
+    /// wrong in is the opposite one here — too small a guess only tightens the ceiling, while too
+    /// large a one would admit a layer that shows the player an empty sky on a smaller display.
+    /// </remarks>
+    public const float NarrowestSupportedViewportInPixels = 720f;
+
+    /// <summary>
+    /// The largest tile size a layer can be sown at and still be certain to put a star on screen.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Half <see cref="NarrowestSupportedViewportInPixels"/>, because a span of two tile widths
+    /// contains one whole tile whatever it is aligned against: a viewport at least two tiles across
+    /// always has a tile entirely inside it, and that tile has at least one star, so at least one
+    /// star is on screen wherever the camera stands.
+    /// </para>
+    /// <para>
+    /// <b>This is the bound that can be proved, not the last one that works.</b> Measured against
+    /// the hash as it stands, a layer only starts leaving the screen empty at around seven tenths
+    /// of a screen per tile rather than a half, so tile sizes between the two are refused although
+    /// they would in fact draw. That slack is deliberate: where a star lands inside its tile is a
+    /// property of <see cref="Hash"/>, so the seven tenths moves the day the hash is changed and
+    /// the half does not. A bound that holds only while the pseudo-randomness cooperates is the
+    /// kind of "passes and still looks broken" this validation exists to prevent.
+    /// </para>
+    /// <para>
+    /// <b>Why the far end needs a bound too.</b> A tile size too small draws tens of thousands of
+    /// stars into a band and leaves a blank border; a tile size too large draws a handful and can
+    /// leave the sky empty. Both are a layer accepted while being described as safe, which is what
+    /// #40 was raised about, so both ends are closed rather than only the one noticed first.
+    /// </para>
+    /// </remarks>
+    public const float LargestUsableTileSize = NarrowestSupportedViewportInPixels / 2f;
+
     static readonly StarLayer[] _defaultLayers =
     [
         // Far to near, which is also the order they are drawn in: the near layer stacks over the
@@ -154,6 +196,12 @@ public sealed class StarField(ICamera camera) : IRenderable
     /// in the layer rather than in the zoom, so it belongs where the layer is written.
     /// </para>
     /// <para>
+    /// <b>And so is a tile size too large</b>, which is the same failure from the other side: past
+    /// <see cref="LargestUsableTileSize"/> the layer draws a handful of stars and the screen can
+    /// fall between them, so the player is shown an empty sky by a layer that passed every other
+    /// check.
+    /// </para>
+    /// <para>
     /// <b>Finiteness is checked before any of the bounds, and separately from them.</b> Every
     /// bound below is an ordered comparison, and an ordered comparison against <c>NaN</c> is false
     /// whichever way round it is written — so <c>NaN</c> would satisfy each guard that reads as
@@ -167,9 +215,10 @@ public sealed class StarField(ICamera camera) : IRenderable
     /// </remarks>
     /// <exception cref="ArgumentException">
     /// A layer has a parallax, a tile size or a star size that is not a finite number; a parallax
-    /// outside <c>(0, 1]</c>; a tile size that is not positive or is too small to fill the screen
-    /// within <see cref="MaxTilesPerAxis"/> tiles; fewer than one star per tile; or a size that is
-    /// not positive.
+    /// outside <c>(0, 1]</c>; a tile size that is not positive, is too small to fill the screen
+    /// within <see cref="MaxTilesPerAxis"/> tiles, or is larger than
+    /// <see cref="LargestUsableTileSize"/>; fewer than one star per tile; or a star size that is
+    /// not positive or is so large that no tile size satisfies both bounds.
     /// </exception>
     public IReadOnlyList<StarLayer> Layers
     {
@@ -219,6 +268,19 @@ public sealed class StarField(ICamera camera) : IRenderable
                 // and there is no point deriving it from a size that has just been refused.
                 float smallest = SmallestUsableTileSize(layer.SizeInPixels);
 
+                // A star wide enough to push the floor above the ceiling leaves no tile size that
+                // would work, so the tile size is not the thing to change, and saying it is would
+                // send the reader into a wall.
+                if (smallest > LargestUsableTileSize)
+                {
+                    throw new ArgumentException(
+                        $"A star {layer.SizeInPixels} pixels across needs tiles of at least "
+                        + $"{smallest} to fill the widest supported screen, which is past the "
+                        + $"{LargestUsableTileSize} a tile can be and still be spanned by the "
+                        + "narrowest one — no tile size would work. Lower SizeInPixels.",
+                        nameof(value));
+                }
+
                 if (layer.TileSizeInWorldUnits < smallest)
                 {
                     throw new ArgumentException(
@@ -228,6 +290,18 @@ public sealed class StarField(ICamera camera) : IRenderable
                         + $"{layer.TileSizeInWorldUnits}. Raise TileSizeInWorldUnits to at least "
                         + $"{smallest}; a smaller tile draws more stars and still leaves a blank "
                         + "border, because the field is clipped to a band around the camera.",
+                        nameof(value));
+                }
+
+                if (layer.TileSizeInWorldUnits > LargestUsableTileSize)
+                {
+                    throw new ArgumentException(
+                        $"A star layer's tile size must be at most {LargestUsableTileSize} for a "
+                        + $"{NarrowestSupportedViewportInPixels}-pixel screen to be certain of "
+                        + $"spanning a whole tile, but was {layer.TileSizeInWorldUnits}. Lower "
+                        + $"TileSizeInWorldUnits to at most {LargestUsableTileSize}; a larger tile "
+                        + "draws fewer stars and the screen can fall between them, leaving the sky "
+                        + "empty.",
                         nameof(value));
                 }
             }

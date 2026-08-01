@@ -34,6 +34,12 @@ namespace BattleForce2249;
 /// band around the camera and leaves a blank border, which is why <see cref="StarField.Layers"/>
 /// refuses it rather than sowing a field that cannot cover the screen.
 /// </para>
+/// <para>
+/// There is a ceiling for the opposite reason — see
+/// <see cref="StarField.LargestUsableTileSize"/>. A tile wider than half the screen need not have
+/// a star anywhere the player is looking, so a layer sown that thinly can show an empty sky while
+/// passing every other check. <see cref="StarField.Layers"/> refuses that end too.
+/// </para>
 /// </param>
 /// <param name="StarsPerTile">How many stars stand in each tile.</param>
 /// <param name="SizeInPixels">
