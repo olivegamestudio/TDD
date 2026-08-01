@@ -58,6 +58,23 @@ public class SaveRecoveryAdversarialTests
             SaveCount++;
             return Task.CompletedTask;
         }
+
+        /// <summary>
+        /// What a set-aside moved out of the way, so a test can show a refused save survived the
+        /// new game that replaced it.
+        /// </summary>
+        public string? SetAsideContent { get; private set; }
+
+        public Task SetAside()
+        {
+            if (Content is not null)
+            {
+                SetAsideContent = Content;
+                Content = null;
+            }
+
+            return Task.CompletedTask;
+        }
     }
 
     /// <summary>A real save, part-way through quest 1.</summary>

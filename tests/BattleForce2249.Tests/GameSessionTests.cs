@@ -277,6 +277,119 @@ public sealed class GameSessionTests
         Assert.True(quest.IsCompleted);
     }
 
+    // ---- a save the game refuses ----
+
+    /// <summary>
+    /// A save holding 700 units of real progress that this build refuses, because a quest state of
+    /// 99 is not a state. QA's reproduction on #46, and the case that matters: the file is not
+    /// gibberish, it is progress written in a shape this build will not take — exactly what a later
+    /// build, or a less strict boundary, might read perfectly well.
+    /// </summary>
+    const string RefusedSave = """
+    { "PlayerX": 0, "PlayerY": 700, "Quests": [ { "QuestId": "quest-1", "State": 99 } ] }
+    """;
+
+    [Fact]
+    public async Task Continue_SetsARefusedSaveAside_RatherThanWritingOverIt()
+    {
+        // the whole issue: refusing a save is a judgement, and every judgement was final while the
+        // new game landed on top of the file. 700 units of progress used to become a fresh save.
+        _saves.Content = RefusedSave;
+        GameSession session = CreateSession();
+
+        await session.Continue();
+
+        Assert.Equal(RefusedSave, _saves.SetAsideContent);
+    }
+
+    [Fact]
+    public async Task Continue_StillStartsAndSavesANewGame_AfterSettingARefusedSaveAside()
+    {
+        // recovering the old file must not cost the player the new game; the save that was in the
+        // way is gone, so writing is safe again
+        _saves.Content = RefusedSave;
+        GameSession session = CreateSession();
+
+        await session.Continue();
+
+        Assert.True(session.IsReady);
+        Assert.True(session.IsSavingProgress);
+        Assert.Equal(Start, session.Player.Position);
+
+        // and what landed on disk is the new game, not the refused one
+        SaveGame written = Assert.IsType<SaveGame>(_saves.Saved);
+        Assert.Equal(0, written.PlayerY);
+    }
+
+    [Fact]
+    public async Task Continue_SetsNothingAside_WhenThereIsNoSaveAtAll()
+    {
+        // a first-time player has nothing to preserve, and must not be left an empty file that
+        // looks like a recoverable one
+        GameSession session = CreateSession();
+
+        await session.Continue();
+
+        Assert.Null(_saves.SetAsideContent);
+        Assert.Equal(1, _saves.SaveCount);
+    }
+
+    [Fact]
+    public async Task Continue_SetsNothingAside_WhenTheSaveIsBlank()
+    {
+        // there is nothing in a blank file for a later build to read, so keeping it would only be
+        // a file the player has to wonder about
+        _saves.Content = "   ";
+        GameSession session = CreateSession();
+
+        await session.Continue();
+
+        Assert.Null(_saves.SetAsideContent);
+        Assert.True(session.IsSavingProgress);
+    }
+
+    [Fact]
+    public async Task Continue_LeavesTheRefusedSaveWhereItIs_WhenItCannotBeSetAside()
+    {
+        // the fallback that decides what this is worth. If the file cannot be moved out of the
+        // way, writing the new game over it would destroy the very thing being protected — so the
+        // player gets a playable game and nothing is written, the same answer a locked save gets.
+        FailingSaveProgressService saves = new(setAsideError: new IOException("The process cannot access the file."))
+        {
+            Content = RefusedSave,
+        };
+        GameSession session = CreateSession(saves);
+
+        await session.Continue();
+
+        Assert.True(session.IsReady);
+        Assert.Equal(RefusedSave, saves.Content);
+        Assert.Equal(0, saves.SaveCount);
+        Assert.False(session.IsSavingProgress);
+        Assert.IsType<IOException>(session.SaveError);
+    }
+
+    [Fact]
+    public async Task Continue_KeepsThatGamePlayable_WhenTheRefusedSaveCannotBeSetAside()
+    {
+        // "playable" has to mean playable, not merely constructed: the quests are there and they
+        // still run, they simply are not written down
+        FailingSaveProgressService saves = new(setAsideError: new IOException("locked"))
+        {
+            Content = RefusedSave,
+        };
+        GameSession session = CreateSession(saves);
+        await session.Continue();
+
+        Quest quest = Assert.Single(session.Quests.Quests);
+        quest.Start();
+        await session.PendingSave;
+
+        Assert.True(quest.IsActive);
+        Assert.Equal(0, saves.SaveCount);
+        Assert.Equal(RefusedSave, saves.Content);
+    }
+
     // ---- a save that cannot be read ----
 
     static FailingSaveProgressService LockedSave() =>

@@ -29,6 +29,21 @@ public sealed class LocalSaveProgressService : ISaveProgressService
     /// </summary>
     public string FilePath { get; }
 
+    /// <summary>
+    /// Gets the full path a save is moved to by <see cref="SetAside"/>: the save file's name with
+    /// <c>.corrupt</c> before its extension, in the same folder — <c>save.json</c> becomes
+    /// <c>save.corrupt.json</c>.
+    /// </summary>
+    /// <remarks>
+    /// Beside the save rather than anywhere else, so a player who finds one finds the other, and
+    /// keeping the extension so it still opens in whatever reads the save. Public because it is
+    /// the answer to "where did my game go" — a support question this type would otherwise be the
+    /// only thing able to answer.
+    /// </remarks>
+    public string SetAsideFilePath => Path.Combine(
+        Path.GetDirectoryName(FilePath) ?? string.Empty,
+        Path.GetFileNameWithoutExtension(FilePath) + ".corrupt" + Path.GetExtension(FilePath));
+
     /// <inheritdoc />
     public Task<bool> HasProgress() => Task.FromResult(File.Exists(FilePath));
 
@@ -53,6 +68,25 @@ public sealed class LocalSaveProgressService : ISaveProgressService
         }
 
         await File.WriteAllTextAsync(FilePath, content);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// One generation: a second set-aside replaces the first. An unbounded pile of them is its own
+    /// kind of mess in a folder the player may go looking through, and the most recent refusal is
+    /// the one a later build would be asked to read.
+    /// </remarks>
+    public Task SetAside()
+    {
+        if (!File.Exists(FilePath))
+        {
+            return Task.CompletedTask;
+        }
+
+        // Move rather than copy-then-delete: the point is that no save is left behind, and a move
+        // cannot leave both files sitting there if it fails halfway.
+        File.Move(FilePath, SetAsideFilePath, overwrite: true);
+        return Task.CompletedTask;
     }
 
     /// <summary>

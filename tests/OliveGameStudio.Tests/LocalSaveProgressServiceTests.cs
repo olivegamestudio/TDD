@@ -77,6 +77,68 @@ public sealed class LocalSaveProgressServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task SetAside_MovesTheSaveOutOfTheWay_LeavingNoneBehind()
+    {
+        // the point of it: after this the game may write a new save without destroying the old one
+        LocalSaveProgressService service = CreateService();
+        await service.Save("the game that could not be read");
+
+        await service.SetAside();
+
+        Assert.False(await service.HasProgress());
+        Assert.Null(await service.Load());
+        Assert.Equal("the game that could not be read", await File.ReadAllTextAsync(service.SetAsideFilePath));
+    }
+
+    [Fact]
+    public void SetAside_NamesTheFileBesideTheSave_KeepingItsExtension()
+    {
+        // support has to be able to ask for it by name, and the player has to be able to see what
+        // it is; save.json becomes save.corrupt.json rather than something with no extension
+        LocalSaveProgressService service = CreateService();
+
+        Assert.Equal(Path.Combine(_directory, "save.corrupt.json"), service.SetAsideFilePath);
+    }
+
+    [Fact]
+    public async Task SetAside_DoesNothing_WhenThereIsNoSave()
+    {
+        // starting a genuinely new game must not leave an empty file behind pretending to be a
+        // recoverable one
+        LocalSaveProgressService service = CreateService();
+
+        await service.SetAside();
+
+        Assert.False(File.Exists(service.SetAsideFilePath));
+    }
+
+    [Fact]
+    public async Task SetAside_KeepsTheLatestGeneration_WhenItHappensTwice()
+    {
+        // one generation, deliberately: an unbounded pile of them is its own kind of mess, and the
+        // most recent refusal is the one a later build would be asked to read
+        LocalSaveProgressService service = CreateService();
+        await service.Save("first refusal");
+        await service.SetAside();
+        await service.Save("second refusal");
+
+        await service.SetAside();
+
+        Assert.Equal("second refusal", await File.ReadAllTextAsync(service.SetAsideFilePath));
+    }
+
+    [Fact]
+    public async Task SetAside_LeavesTheSetAsideFileReadableByAnotherInstance()
+    {
+        // it survives the process, or it is not recovery
+        LocalSaveProgressService first = CreateService();
+        await first.Save("persisted");
+        await first.SetAside();
+
+        Assert.Equal("persisted", await File.ReadAllTextAsync(CreateService().SetAsideFilePath));
+    }
+
+    [Fact]
     public void DefaultsToAFileUnderTheUsersApplicationData()
     {
         LocalSaveProgressService service = new();
