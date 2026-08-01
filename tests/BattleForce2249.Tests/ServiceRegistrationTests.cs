@@ -1,6 +1,7 @@
 using System.Numerics;
 using Microsoft.Extensions.DependencyInjection;
 using OliveGameStudio;
+using Pilgrimage;
 
 namespace BattleForce2249.Tests;
 
@@ -79,6 +80,59 @@ public sealed class ServiceRegistrationTests
         using ServiceProvider provider = BuildProvider();
 
         Assert.Same(provider.GetRequiredService<IShipView>(), provider.GetRequiredService<IShipView>());
+    }
+
+    [Fact]
+    public void ResolvesTheQuestSystem()
+    {
+        using ServiceProvider provider = BuildProvider();
+
+        Assert.IsType<GameSession>(provider.GetRequiredService<IGameSession>());
+        Assert.IsType<BattleForceCampaign>(provider.GetRequiredService<ICampaign>());
+    }
+
+    [Fact]
+    public void SharesOneQuestSession_BetweenTheGameScreenAndAnythingElseThatNeedsIt()
+    {
+        using ServiceProvider provider = BuildProvider();
+
+        Assert.Same(provider.GetRequiredService<IGameSession>(), provider.GetRequiredService<IGameSession>());
+    }
+
+    [Fact]
+    public void ResolvesTheShip()
+    {
+        using ServiceProvider provider = BuildProvider();
+
+        Assert.Same(DisgracedShip.Handling, provider.GetRequiredService<ShipHandling>());
+        Assert.NotNull(provider.GetRequiredService<ShipMovement>());
+    }
+
+    [Fact]
+    public void SharesOneShip_BetweenTheGameScreenAndAnythingElseThatNeedsIt()
+    {
+        // two ships would each fly their own copy of the player around
+        using ServiceProvider provider = BuildProvider();
+
+        Assert.Same(provider.GetRequiredService<ShipMovement>(), provider.GetRequiredService<ShipMovement>());
+    }
+
+    [Fact]
+    public void DefaultsToNobodyAtTheControls()
+    {
+        // the platform host owns the real device, so the engine ships a seam and not a keyboard
+        using ServiceProvider provider = BuildProvider();
+
+        Assert.IsType<NeutralShipInput>(provider.GetRequiredService<IShipInput>());
+    }
+
+    [Fact]
+    public void HonoursAShipInputRegisteredByTheHostApplication()
+    {
+        using ServiceProvider provider = BuildProvider(services =>
+            services.AddSingleton<IShipInput>(new FixedShipInput()));
+
+        Assert.IsType<FixedShipInput>(provider.GetRequiredService<IShipInput>());
     }
 
     [Fact]

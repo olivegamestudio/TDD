@@ -1,17 +1,80 @@
+using System.Numerics;
 using OliveGameStudio;
 
 namespace BattleForce2249;
 
 /// <summary>
-/// The screen the game is played on. It composes what is in the world and draws it; what moves
-/// the ship belongs elsewhere and reaches the screen through <see cref="IShipView.Pose"/>.
+/// The screen the game is played on. Entering it begins or resumes the game session; every frame
+/// it flies the ship, measures the player against the quest markers and drives the quest API from
+/// what it finds — proximity is the presentation's job, not the quest model's — and then hands the
+/// result to the drawing side as a pose. Drawing follows the ship rather than leading it.
 /// </summary>
+/// <param name="session">The game in progress.</param>
+/// <param name="ship">The ship's physics, which carries the player around the world.</param>
+/// <param name="pilot">Where the pilot's intent comes from this frame.</param>
+/// <param name="questProximity">Applies the quests' proximity triggers against the world.</param>
 /// <param name="camera">The camera the world is drawn through.</param>
-/// <param name="ship">The player's ship.</param>
-public sealed class GameScreen(ICamera camera, IShipView ship) : IGameScreen, IRenderable
+/// <param name="view">The ship on screen, which draws whatever pose it was last given.</param>
+public sealed class GameScreen(
+    IGameSession session,
+    ShipMovement ship,
+    IShipInput pilot,
+    QuestProximityWatcher questProximity,
+    ICamera camera,
+    IShipView view)
+    : IGameScreen, IActivatable, IRenderable
 {
+    /// <summary>
+    /// Gets the task that begins the game, so a caller can await the save being read. Loading
+    /// happens off the frame loop; nothing drives the session until it has finished.
+    /// </summary>
+    public Task Started { get; private set; } = Task.CompletedTask;
+
+    /// <summary>
+    /// Begins the game: the saved game is resumed, or a new one is started when there is no save.
+    /// </summary>
+    /// <returns>Always <see cref="EnterResult.Stay"/>; this screen is where gameplay happens.</returns>
+    public EnterResult Enter()
+    {
+        // a fresh flight every time the screen is entered: the save carries where the player is,
+        // never how fast they were going, so nothing should be inherited from a previous session
+        ship.Reset();
+
+        Started = session.Continue();
+        return EnterResult.Stay;
+    }
+
     /// <inheritdoc />
     public void Update(TimeSpan frameTime)
+    {
+        if (!session.IsReady)
+        {
+            // frames arrive while the save is still being read; there is no position to draw yet,
+            // so the view keeps the pose it has rather than being shown a half loaded game
+            return;
+        }
+
+        // where the frame began, kept so the quests can be measured against the ground the ship
+        // covered rather than the instant it stopped: a frame long enough to carry the player
+        // from one side of a marker to the other must still fire it
+        Position openedAt = session.Player.Position;
+
+        // the ship flies first, so the quests are measured against where the player got to this
+        // frame rather than where they were at the end of the last one
+        ship.Update(session.Player, pilot.Read(), frameTime);
+
+        questProximity.Update(session.Quests, openedAt, session.Player.Position);
+
+        // and last, what the frame produced is handed to the drawing side. The pose is the whole
+        // of what the two stages agree about: the physics has no idea a screen exists, and the
+        // view has no idea physics does.
+        view.Pose = PoseOf(session.Player.Position, ship.Heading);
+    }
+
+    /// <summary>
+    /// Leaves the game screen. Progress is saved as quests change, so there is nothing to flush here.
+    /// </summary>
+    public void Exit()
     {
     }
 
@@ -22,8 +85,25 @@ public sealed class GameScreen(ICamera camera, IShipView ship) : IGameScreen, IR
         // a fixed viewport is left behind within seconds of the player touching the throttle,
         // and a ship that has flown off the edge of the screen is indistinguishable from one
         // that was never drawn. The world moves; the ship holds the middle.
-        camera.Target = ship.Pose.Position;
+        camera.Target = view.Pose.Position;
 
-        ship.Render(renderer);
+        view.Render(renderer);
     }
+
+    /// <summary>
+    /// Converts what the physics produced into the pose the drawing side draws from.
+    /// </summary>
+    /// <remarks>
+    /// The heading passes through untouched, and that is a decision rather than an omission. Both
+    /// sides measure the same angle the same way — zero is straight forward along the positive
+    /// world Y axis, and the angle increases to starboard — so a correction here would turn the
+    /// ship the wrong way. Nothing in either type can enforce that agreement, which is why it is
+    /// written down here and asserted in <c>GameScreenTests</c> rather than left to be noticed.
+    ///
+    /// The narrowing to <see cref="float"/> is the world model keeping its precision while the
+    /// drawing side takes what a graphics device can use. At the sizes a viewport spans, the
+    /// difference is far below a pixel.
+    /// </remarks>
+    static ShipPose PoseOf(Position position, double heading) =>
+        new(new Vector2((float)position.X, (float)position.Y), (float)heading);
 }

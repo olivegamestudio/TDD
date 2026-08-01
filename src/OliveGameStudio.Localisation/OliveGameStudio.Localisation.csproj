@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <RootNamespace>OliveGameStudio</RootNamespace>
+    </PropertyGroup>
+
+    <!--
+      No project references by design. Reading translated text depends on nothing else in the
+      engine, and a game supplies the text files themselves.
+    -->
+
+</Project>

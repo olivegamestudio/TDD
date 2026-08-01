@@ -1,0 +1,8 @@
+{
+  // The source language. Every key the game asks for must appear here, because this is what any
+  // untranslated language falls back to. Notes above a string are context for translators.
+
+  // Quest 1 title, shown to the player. An urgent radio-style order to the pilot, who is inside a
+  // collapsing debris field. Keep it short and urgent; two clipped sentences.
+  "Quest1Title": "Get out. The debris field is collapsing around you."
+}

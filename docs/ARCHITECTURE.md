@@ -29,7 +29,7 @@ to know about ships, quests or credits is on the wrong side of this line.
 | `OliveGameStudio.Rendering` | `Camera2D`. The world-to-screen transform, and nothing else. |
 | `OliveGameStudio.MonoGame` | The MonoGame adapter: `MonoGameRenderer`, `MonoGameTextureLoader`, `MonoGameTexture`. The only engine project that names a MonoGame type. |
 | `OliveGameStudio.Progress` | `LocalSaveProgressService`, persisting save text to a file. |
-| `OliveGameStudio.World` | `Position`, `Player`. The spatial model. |
+| `OliveGameStudio.World` | `Position`, `Player`, `Velocity`. The spatial model, and the ship physics that moves through it: `ShipMovement`, `ShipHandling`, `ShipControls`, `IShipInput`. |
 | `OliveGameStudio.Localisation` | `ITextProvider`, `JsonTextProvider`, `MissingTextException`. |
 | `Pilgrimage` | The quest system. No project references at all, by design. |
 | `BattleForce2249` | Game host and DI registration. |
@@ -64,12 +64,50 @@ The game side supplies where things actually are:
 - `IWorld` / `BattleForceWorld` — the player's start position and each quest's `QuestMarkers`.
   Forward travel is along the positive Y axis.
 - `QuestProximityWatcher` — measures the player against the markers each frame and calls the
-  quest API when a trigger fires. It keeps no memory of what it has already fired; the quest
-  model absorbs repeat calls.
+  quest API when a trigger fires. It measures the **ground the player covered** during the frame,
+  not the point they finished it at, so a frame long enough to carry a fast ship from one side of
+  a marker to the other still fires it. `GameScreen` passes both ends of the frame; the watcher
+  keeps no memory of where the player was, or of what it has already fired — the quest model
+  absorbs repeat calls.
 - `GameSession` — the game in progress. Starts or resumes, and saves when a quest starts or
   completes rather than every frame.
 
 Ids are never translated. A save written in one language has to load in another.
+
+## Flying the ship
+
+The engine owns the physics; the game owns the numbers. `ShipHandling` is a game's acceleration,
+drag and turn rate — `DisgracedShip.Handling` supplies the shipping ones — and `ShipMovement`
+is the physics they are flown through. A better ship is another `ShipHandling`, not another
+physics.
+
+- `ShipControls` — a thrust axis and a helm axis, each clamped to `[-1, 1]`. Analogue, because
+  that is the shape a stick and a key both fit: a key is a 1, a stick is whatever it is pushed to.
+- `IShipInput` — where the pilot's intent comes from. The platform host owns the real device, so
+  the engine ships the seam and `NeutralShipInput`, which asks for nothing. A host registers a
+  keyboard or gamepad after `AddOliveGameStudio` and wins under the engine's `AddSingleton`.
+- `ShipMovement` — carries a `Heading` and a `Velocity`, applies thrust along the heading, and
+  moves the `Player` by the ground covered. Momentum survives a turn; a turn points the ship
+  somewhere new rather than teleporting the velocity there.
+
+Two decisions worth knowing before changing this:
+
+**Drag is integrated, not stepped.** Velocity follows `v(t) = terminal + (v₀ - terminal)·e^(-drag·t)`,
+the exact answer for a constant thrust against linear drag, and the position moves by that
+velocity's integral over the frame. `e^(-k·a)·e^(-k·b)` is `e^(-k·(a+b))`, so two half frames land
+exactly where one whole frame does. A ship whose reach depends on the frame rate is a bug against
+pillar 1, not a tuning detail.
+
+**Top speed is derived, not configured.** `ShipHandling.MaximumSpeed` is `Acceleration / Drag`,
+the speed the two settle at. A separate top speed could be set to disagree with the physics that
+produces it, leaving the ship either short of its stated maximum or walled off below it.
+
+`GameScreen.Update` flies the ship **before** it measures the quests, so a trigger fires on the
+frame it is reached rather than the frame after — at 200 units a second, a frame late is a marker
+the player has already passed. Entering the screen resets the ship: the save carries where the
+player is, never how fast they were going. What the frame produced then leaves for the drawing
+side as an `IShipView.Pose` — see **Drawing** — which is the only thing the physics and the screen
+agree about.
 
 ## Saved progress
 
@@ -138,7 +176,10 @@ flies, a fixed viewport is left behind within seconds, and a ship that has flown
 the screen is indistinguishable from one that was never drawn.
 
 `IShipView` is the seam between the logic and engine stages for the ship: the logic sets a
-`ShipPose` — a position and a heading — and the view draws whatever it last said. A heading of
+`ShipPose` — a position and a heading — and the view draws whatever it last said. `GameScreen`
+sets it at the end of `Update`, after the ship has flown and the quests have been measured, so
+what is drawn is what this frame produced rather than what the last one did. A frame that arrives
+while the save is still loading sets nothing, because there is no position to draw yet. A heading of
 zero is straight forward, up the screen, and the angle increases to starboard, which matches the
 artwork's own orientation and lets the heading pass through to the sprite untouched. `ShipMovement`
 measures its heading the same way, so nothing corrects it on the way in. The sense of that angle
@@ -154,12 +195,14 @@ player was awarded. Changing it takes effect on the next draw.
 
 `BattleForceHost` wires company screen → menu screen → game screen. `IFrameTimeController`
 filters frame time before the screen director sees it. Entering `GameScreen` begins or resumes
-the session; its `Update` drives the proximity watcher once the session is ready.
+the session; its `Update` flies the ship, drives the proximity watcher over the ground that frame
+covered, and hands the result to `IShipView` as a pose, once the session is ready. Its `Render`
+points the camera at that pose and draws the ship.
 
 ## Known gaps
 
-- Nothing moves the ship. Quest 1 is completable by test, not by playing — movement and physics
-  are issue #3.
+- Nothing binds a real input device. The ship flies from `IShipInput`, and the MonoGame host still
+  resolves the engine's `NeutralShipInput`, so the shipping game has nobody at the controls.
 - Nothing displays a quest title. There is no HUD or quest log; that is a separate `ENGINE`
   issue. There is no text rendering at all yet — no font is loaded and `IRenderer` draws sprites
   only.
