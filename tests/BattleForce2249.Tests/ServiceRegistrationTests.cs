@@ -1,3 +1,4 @@
+using System.Numerics;
 using Microsoft.Extensions.DependencyInjection;
 using OliveGameStudio;
 
@@ -44,6 +45,40 @@ public sealed class ServiceRegistrationTests
         Assert.IsType<LifecycleScreenDirector>(provider.GetRequiredService<IScreenDirector>());
         Assert.IsType<UIController>(provider.GetRequiredService<IUIController>());
         Assert.IsType<LocalSaveProgressService>(provider.GetRequiredService<ISaveProgressService>());
+    }
+
+    [Fact]
+    public void ResolvesTheDrawingServices()
+    {
+        using ServiceProvider provider = BuildProvider();
+
+        Assert.IsType<Camera2D>(provider.GetRequiredService<ICamera>());
+        Assert.IsType<ShipView>(provider.GetRequiredService<IShipView>());
+    }
+
+    [Fact]
+    public void SharesOneCamera_BetweenTheShipAndTheScreenThatFollowsIt()
+    {
+        // two cameras would draw the ship in one place and everything else relative to another
+        using ServiceProvider provider = BuildProvider();
+
+        ICamera camera = provider.GetRequiredService<ICamera>();
+        IShipView ship = provider.GetRequiredService<IShipView>();
+        var screen = (GameScreen)provider.GetRequiredService<IGameScreen>();
+
+        ship.Pose = new ShipPose(new Vector2(500f, 600f), 0f);
+        screen.Render(new RecordingRenderer());
+
+        Assert.Equal(new Vector2(500f, 600f), camera.Target);
+    }
+
+    [Fact]
+    public void SharesOneShip_BetweenWhateverFliesItAndWhatDrawsIt()
+    {
+        // the logic side sets a pose on the ship it resolves; it has to be the one on screen
+        using ServiceProvider provider = BuildProvider();
+
+        Assert.Same(provider.GetRequiredService<IShipView>(), provider.GetRequiredService<IShipView>());
     }
 
     [Fact]

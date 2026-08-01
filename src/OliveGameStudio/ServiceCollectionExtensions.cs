@@ -8,8 +8,8 @@ namespace OliveGameStudio;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Adds the default engine services: screen direction, UI control, save progress, and
-    /// frame time filtering.
+    /// Adds the default engine services: screen direction, UI control, save progress, frame
+    /// time filtering, and the camera the world is drawn through.
     /// </summary>
     /// <remarks>
     /// Services are registered with <c>AddSingleton</c>, so a caller that registers its own
@@ -25,6 +25,10 @@ public static class ServiceCollectionExtensions
             .AddSingleton<IScreenDirector, LifecycleScreenDirector>()
             .AddSingleton<IUIController, UIController>()
             .AddSingleton<ISaveProgressService, LocalSaveProgressService>()
+
+            // one camera for the whole game: everything drawn in the world has to agree about
+            // where the viewport is, or two things at the same world position draw apart
+            .AddSingleton<ICamera, Camera2D>()
 
             // real time straight through; register another after this call to scale or pause
             .AddSingleton<IFrameTimeController, PassThroughFrameTimeController>();

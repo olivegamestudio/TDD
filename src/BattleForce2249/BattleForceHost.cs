@@ -40,4 +40,14 @@ public class BattleForceHost(
     {
         screenDirector.Update(frameTimeController.Filter(frameTime));
     }
+
+    /// <summary>
+    /// Draws the current screen. The frame time controller has no part in this: pausing the
+    /// game stops it advancing, and a paused game is still on screen.
+    /// </summary>
+    /// <param name="renderer">The frame's renderer, owned by the platform host.</param>
+    public void Draw(IRenderer renderer)
+    {
+        screenDirector.Draw(renderer);
+    }
 }

@@ -35,8 +35,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   language is a file drop: no rebuild, no satellite assembly. ([#1](https://github.com/olivegamestudio/TDD/issues/1))
 - **Project documentation** — this changelog, a README, and the design canon, architecture notes
   and workflow under `docs/`.
+- **A drawing path through the engine.** `IHost.Draw` and `IScreenDirector.Draw` take an
+  `IRenderer` for the frame, and a screen with something to show implements `IRenderable`
+  alongside `IScreen`. Drawing is a separate path from `Update`, so logic still lands tested and
+  headless. ([#16](https://github.com/olivegamestudio/TDD/issues/16))
+- **`OliveGameStudio.Rendering`** — `Camera2D`, the world-to-screen transform. It is the one
+  place the world's forward axis is reconciled with the screen's downward one, and the one place
+  world units become pixels. ([#16](https://github.com/olivegamestudio/TDD/issues/16))
+- **`OliveGameStudio.MonoGame`** — the platform adapter: `MonoGameRenderer` over a sprite batch,
+  `MonoGameTextureLoader` over the content pipeline, and `MonoGameTexture` behind `ITexture`. The
+  only engine project that names a MonoGame type. ([#16](https://github.com/olivegamestudio/TDD/issues/16))
+- **The ship is drawn.** `ShipView` puts `ship1` on screen at the pose the logic side sets
+  through `IShipView`, sized in world units and turned to its heading, with the camera following
+  it so it holds the middle of the viewport however far it flies. ([#16](https://github.com/olivegamestudio/TDD/issues/16))
 
 ### Changed
+
+- **The game window clears to black rather than cornflower blue.** It is space, and it is now a
+  background rather than the entire picture. ([#16](https://github.com/olivegamestudio/TDD/issues/16))
 
 - **`ISaveProgressService` gained `Load` and `Save`**, both in terms of text, so the engine stays
   agnostic about what a save contains and the same service works for any game built on it. ([#2](https://github.com/olivegamestudio/TDD/pull/2))

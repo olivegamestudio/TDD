@@ -26,6 +26,8 @@ to know about ships, quests or credits is on the wrong side of this line.
 | `OliveGameStudio.Screen` | `ScreenDirector`, `LifecycleScreenDirector`. |
 | `OliveGameStudio.UI`, `.UI.Abstractions` | Menu and button navigation. Not ship control. |
 | `OliveGameStudio.FrameRate` | Frame time filtering, so a paused or slowed game holds still while frames keep arriving. |
+| `OliveGameStudio.Rendering` | `Camera2D`. The world-to-screen transform, and nothing else. |
+| `OliveGameStudio.MonoGame` | The MonoGame adapter: `MonoGameRenderer`, `MonoGameTextureLoader`, `MonoGameTexture`. The only engine project that names a MonoGame type. |
 | `OliveGameStudio.Progress` | `LocalSaveProgressService`, persisting save text to a file. |
 | `OliveGameStudio.World` | `Position`, `Player`. The spatial model. |
 | `OliveGameStudio.Localisation` | `ITextProvider`, `JsonTextProvider`, `MissingTextException`. |
@@ -104,6 +106,44 @@ Anything that *holds* a translated string, though, has to re-read it: `BattleFor
 builds its list on each read rather than in a field initialiser, because the campaign is a DI
 singleton and a cached list would freeze the player's language at startup.
 
+## Drawing
+
+Update and draw are separate paths, and they meet only at the platform host. `IHost.Draw` and
+`IScreenDirector.Draw` take an `IRenderer` supplied by the platform for that frame; a screen with
+something to show implements `IRenderable` alongside `IScreen`, and a screen without one is
+skipped. Nothing about drawing reaches into `Update`, which is what keeps logic landing tested
+and headless while the drawing arrives as its own issue.
+
+**The renderer describes; the platform draws.** `IRenderer.Draw` takes a `Sprite` — texture,
+screen position, rotation, origin, scale — already in screen space. `MonoGameRenderer` translates
+that into a sprite batch call and decides nothing, because nothing in it can be covered by a
+test: a sprite batch needs a real graphics device. Everything that could be got wrong lives above
+it, where a recording `IRenderer` sees exactly what was drawn.
+
+Textures hang off the renderer rather than the container. Both belong to the same graphics
+device, and that device does not exist until the platform host has a window — later than the
+container is built — so a drawable loads on its first draw, by which time the device is certainly
+there. Asset keys are identifiers and are never translated.
+
+`Camera2D` is the one place the world's axes are reconciled with the screen's. The world's
+positive Y axis is forward and the screen's positive Y axis is down, so `WorldToScreen` negates
+it: fly forward, and the world moves down the screen. `PixelsPerUnit` converts world units to
+pixels once, at the end, which is what stops a zoom or a resized window being a change to the
+physics. The viewport size is passed per call rather than held, so a resized window needs no
+notification to stay correct.
+
+The camera follows the ship. `GameScreen` points it at `IShipView.Pose` before drawing, so the
+ship holds the middle of the viewport and the world moves under it. At the speeds this ship
+flies, a fixed viewport is left behind within seconds, and a ship that has flown off the edge of
+the screen is indistinguishable from one that was never drawn.
+
+`IShipView` is the seam between the logic and engine stages for the ship: the logic sets a
+`ShipPose` — a position and a heading — and the view draws whatever it last said. A heading of
+zero is straight forward, up the screen, and the angle increases to starboard, which matches the
+artwork's own orientation and lets the heading pass through to the sprite untouched. The sense of
+that angle is a convention rather than something the type can enforce; a model that measures its
+heading the other way round negates it on the way in.
+
 ## Screen flow
 
 `BattleForceHost` wires company screen → menu screen → game screen. `IFrameTimeController`
@@ -115,7 +155,12 @@ the session; its `Update` drives the proximity watcher once the session is ready
 - Nothing moves the ship. Quest 1 is completable by test, not by playing — movement and physics
   are issue #3.
 - Nothing displays a quest title. There is no HUD or quest log; that is a separate `ENGINE`
-  issue.
+  issue. There is no text rendering at all yet — no font is loaded and `IRenderer` draws sprites
+  only.
+- Nothing but the ship is drawn. The background is a flat clear, so with the camera following the
+  ship there is no fixed reference to read motion against; a star field is issue #25.
+- The company and menu screens draw nothing. They do not implement `IRenderable`, so they are
+  still a black window with working logic behind it.
 - Nothing selects a language. Translations are reachable only through the machine's own culture.
 - There is no persistent record (experience, credits, quest history) separate from the saved
   position. See pillar 4 in `docs/DESIGN.md`.

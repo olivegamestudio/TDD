@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 
 namespace OliveGameStudio.Tests;
 
@@ -99,6 +100,54 @@ public sealed class LifecycleScreenDirectorTests
         Assert.Contains("Update:A", log);
     }
 
+    [Fact]
+    public void Draw_RendersTheCurrentScreen()
+    {
+        List<string> log = [];
+        LifecycleScreenDirector director = new(NullLogger<LifecycleScreenDirector>.Instance);
+        RecordingScreen a = new("A", log);
+        director.NavigateTo(a);
+
+        director.Draw(Mock.Of<IRenderer>());
+
+        Assert.Contains("Render:A", log);
+    }
+
+    [Fact]
+    public void Draw_SkipsAScreenWithNothingToDraw()
+    {
+        // a screen that does not implement IRenderable is not a screen that fails to draw
+        LifecycleScreenDirector director = new(NullLogger<LifecycleScreenDirector>.Instance);
+        director.NavigateTo(new PlainScreen());
+
+        director.Draw(Mock.Of<IRenderer>());
+    }
+
+    [Fact]
+    public void Draw_DoesNothing_BeforeFirstNavigation()
+    {
+        // the platform draws every frame, including the ones before anything is on screen
+        LifecycleScreenDirector director = new(NullLogger<LifecycleScreenDirector>.Instance);
+
+        director.Draw(Mock.Of<IRenderer>());
+    }
+
+    [Fact]
+    public void Draw_FollowsNavigation_ToTheNewScreen()
+    {
+        List<string> log = [];
+        LifecycleScreenDirector director = new(NullLogger<LifecycleScreenDirector>.Instance);
+        RecordingScreen a = new("A", log);
+        RecordingScreen b = new("B", log);
+        director.NavigateTo(a);
+        director.NavigateTo(b);
+
+        director.Draw(Mock.Of<IRenderer>());
+
+        Assert.Contains("Render:B", log);
+        Assert.DoesNotContain("Render:A", log);         // the screen left behind is not drawn
+    }
+
     // ---- fakes ----
 
     sealed class PlainScreen : IScreen
@@ -106,7 +155,7 @@ public sealed class LifecycleScreenDirectorTests
         public void Update(TimeSpan frameTime) { }
     }
 
-    sealed class RecordingScreen(string name, List<string> log) : IScreen, IActivatable
+    sealed class RecordingScreen(string name, List<string> log) : IScreen, IActivatable, IRenderable
     {
         IScreen? _redirect;
 
@@ -128,5 +177,7 @@ public sealed class LifecycleScreenDirectorTests
         public void Exit() => log.Add($"Exit:{name}");
 
         public void Update(TimeSpan frameTime) => log.Add($"Update:{name}");
+
+        public void Render(IRenderer renderer) => log.Add($"Render:{name}");
     }
 }

@@ -16,6 +16,7 @@
       <ProjectReference Include="..\OliveGameStudio.Abstractions\OliveGameStudio.Abstractions.csproj" />
       <ProjectReference Include="..\OliveGameStudio.FrameRate\OliveGameStudio.FrameRate.csproj" />
       <ProjectReference Include="..\OliveGameStudio.Progress\OliveGameStudio.Progress.csproj" />
+      <ProjectReference Include="..\OliveGameStudio.Rendering\OliveGameStudio.Rendering.csproj" />
       <ProjectReference Include="..\OliveGameStudio.Screen\OliveGameStudio.Screen.csproj" />
       <ProjectReference Include="..\OliveGameStudio.UI\OliveGameStudio.UI.csproj" />
     </ItemGroup>

@@ -19,6 +19,12 @@ public sealed class ScreenDirector(ILogger<ScreenDirector> logger) : IScreenDire
     }
 
     /// <inheritdoc />
+    public void Draw(IRenderer renderer)
+    {
+        (Current as IRenderable)?.Render(renderer);
+    }
+
+    /// <inheritdoc />
     public void NavigateTo(IScreen screen)
     {
         logger.LogInformation("Navigate to '{screenName}'.", screen.GetType());

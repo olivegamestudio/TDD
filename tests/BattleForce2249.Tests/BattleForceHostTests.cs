@@ -52,6 +52,66 @@ public sealed class BattleForceHostTests : HostTestBase
     }
 
     [Fact]
+    public void DrawsNothing_OnTheSplashAndTheMenu()
+    {
+        // neither screen draws yet; the host must survive being asked to draw them anyway,
+        // because the platform draws every frame from the first one
+        IHost game = CreateHost();
+        RecordingRenderer renderer = new();
+
+        game.Start();
+        game.Draw(renderer);
+
+        Assert.Empty(renderer.Drawn);
+    }
+
+    [Fact]
+    public void DrawsTheShip_OnceTheGameScreenIsCurrent()
+    {
+        // end to end through the real composition: host, director, screen, ship, renderer
+        IHost game = CreateHost();
+        RecordingRenderer renderer = new();
+
+        game.Start();
+        ScreenDirector.NavigateTo(Resolve<IGameScreen>());
+        game.Draw(renderer);
+
+        Assert.Equal([ShipView.TextureKey], renderer.Textures.Requested);
+    }
+
+    [Fact]
+    public void KeepsDrawing_FrameAfterFrame()
+    {
+        // a sprite drawn once and then dropped is a ship that flickers and vanishes
+        IHost game = CreateHost();
+        RecordingRenderer renderer = new();
+
+        game.Start();
+        ScreenDirector.NavigateTo(Resolve<IGameScreen>());
+        game.Draw(renderer);
+        renderer.Clear();
+        game.Draw(renderer);
+
+        Assert.Single(renderer.Drawn);
+    }
+
+    [Fact]
+    public void PausingTheGame_DoesNotStopItBeingDrawn()
+    {
+        // the frame time controller filters updates, not frames: a paused game is still on screen
+        IHost game = CreateHost();
+        RecordingRenderer renderer = new();
+        FrameTime.TimeScale = 0;
+
+        game.Start();
+        ScreenDirector.NavigateTo(Resolve<IGameScreen>());
+        game.Update(TimeSpan.FromSeconds(1));
+        game.Draw(renderer);
+
+        Assert.Single(renderer.Drawn);
+    }
+
+    [Fact]
     public void ResumesAdvancingScreens_WhenUnpaused()
     {
         IHost game = CreateHost();

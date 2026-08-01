@@ -54,6 +54,7 @@ public static class BattleForceServiceCollectionExtensions
             .AddSingleton<ICompanyScreen, CompanyScreen>()
             .AddSingleton<IMenuScreen, MenuScreen>()
             .AddSingleton<IGameScreen, GameScreen>()
+            .AddSingleton<IShipView, ShipView>()
             .AddSingleton<IHost, BattleForceHost>();
 
         return services;

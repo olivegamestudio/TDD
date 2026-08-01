@@ -1,4 +1,4 @@
-﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework;
 using OliveGameStudio;
 
 namespace BattleForce2249;
@@ -11,9 +11,14 @@ namespace BattleForce2249;
 public class BattleForceGame : Game
 {
     readonly GraphicsDeviceManager _graphics;
-    //SpriteBatch _spriteBatch;
 
     readonly IHost _host;
+
+    /// <summary>
+    /// The frame's renderer. Created in <see cref="LoadContent"/> rather than in the
+    /// constructor, because it needs a graphics device and MonoGame has not made one yet.
+    /// </summary>
+    MonoGameRenderer? _renderer;
 
     public BattleForceGame(IHost host)
     {
@@ -33,7 +38,7 @@ public class BattleForceGame : Game
 
     protected override void LoadContent()
     {
-        //_spriteBatch = new SpriteBatch(GraphicsDevice);
+        _renderer = new MonoGameRenderer(GraphicsDevice, new MonoGameTextureLoader(Content));
     }
 
     protected override void Update(GameTime gameTime)
@@ -44,10 +49,24 @@ public class BattleForceGame : Game
 
     protected override void Draw(GameTime gameTime)
     {
-        GraphicsDevice.Clear(Color.CornflowerBlue);
+        // Space, not cornflower blue. Everything the player sees is drawn over this.
+        GraphicsDevice.Clear(Color.Black);
 
-        // TODO: Add your drawing code here
+        if (_renderer is not null)
+        {
+            _renderer.BeginFrame();
+            _host.Draw(_renderer);
+            _renderer.EndFrame();
+        }
 
         base.Draw(gameTime);
+    }
+
+    protected override void UnloadContent()
+    {
+        _renderer?.Dispose();
+        _renderer = null;
+
+        base.UnloadContent();
     }
 }

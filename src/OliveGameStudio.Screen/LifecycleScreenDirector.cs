@@ -18,6 +18,12 @@ public sealed class LifecycleScreenDirector(ILogger<LifecycleScreenDirector> log
         Current?.Update(frameTime);
     }
 
+    /// <inheritdoc />
+    public void Draw(IRenderer renderer)
+    {
+        (Current as IRenderable)?.Render(renderer);
+    }
+
     /// <summary>
     /// Exits the current active screen if it implements <see cref="IActivatable"/>.
     /// This method invokes the <see cref="IActivatable.Exit"/> method on the current screen,

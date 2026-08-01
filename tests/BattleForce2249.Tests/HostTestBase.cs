@@ -48,7 +48,11 @@ public abstract class HostTestBase : IDisposable
         });
     }
 
-    T Resolve<T>() where T : notnull => _provider.Value.GetRequiredService<T>();
+    /// <summary>
+    /// Resolves a service from the same container the host was built from, so a test asserting
+    /// on one gets the instance the host is actually using rather than a fresh one.
+    /// </summary>
+    protected T Resolve<T>() where T : notnull => _provider.Value.GetRequiredService<T>();
 
     /// <summary>
     /// Configures the host before it is built. Must be called before the first resolve.

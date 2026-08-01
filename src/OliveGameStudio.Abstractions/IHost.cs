@@ -24,4 +24,12 @@ public interface IHost
     /// updates in game logic, animations, and other time-dependent processes.
     /// </param>
     void Update(TimeSpan frameTime);
+
+    /// <summary>
+    /// Draws the current state of the game. Called by the platform host after
+    /// <see cref="Update"/>, and separately from it: the platform decides how often a frame is
+    /// drawn, and a frame it chooses to skip must leave the game where it would otherwise be.
+    /// </summary>
+    /// <param name="renderer">The frame's renderer, owned by the platform host.</param>
+    void Draw(IRenderer renderer);
 }
