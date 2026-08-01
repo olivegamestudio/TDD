@@ -22,10 +22,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **`IWorld` and `QuestProximityWatcher`** in the game — where each quest's markers stand, and the
   per-frame measurement that drives the quest API from the player's position. ([#2](https://github.com/olivegamestudio/TDD/pull/2))
 - **Saved games.** `SaveGame` and `SaveGameSerializer` persist the player's position and every
-  quest's state. Quest states are written by name so reordering the enum cannot silently change a
-  save, and a missing or damaged save reads back as "no save" so a corrupt file yields a new game
-  rather than a crash. `GameSession` saves when a quest starts or completes rather than every
+  quest's state. Quest states are written by name — and read by name only — so neither reordering
+  the enum nor a number in the file can silently change a saved state, and a missing or damaged
+  save reads back as "no save" so a corrupt file yields a new game rather than a crash.
+  `GameSession` saves when a quest starts or completes rather than every
   frame. ([#1](https://github.com/olivegamestudio/TDD/issues/1))
+- **`IGameSession.SaveError` and `IGameSession.IsSavingProgress`** report whether the player's
+  progress is being kept and what went wrong when it is not, so the state is readable rather than
+  guessed at. Nothing displays them yet — that needs a HUD. ([#1](https://github.com/olivegamestudio/TDD/issues/1), [#2](https://github.com/olivegamestudio/TDD/pull/2))
 - **`OliveGameStudio.Localisation`** — `ITextProvider` and a JSON-backed `JsonTextProvider` owning
   the culture fallback chain, caching and the missing-key policy. A language is a file named after
   its culture; fallback is applied per key, and a key present in no language throws
@@ -46,6 +50,28 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A save the game could not read no longer freezes it, and is no longer overwritten.**
+  `Continue` documented a fallback to a new game when the save "cannot be read" but only recovered
+  from damaged *content*; the read itself was unguarded, so an `IOException` from a file locked by
+  cloud sync came straight out into a task nothing holds — the session never became ready, every
+  frame turned straight back, and the game had quietly stopped with no crash and no log. Damaged
+  and unreadable are now distinguished: a damaged save is replaced, because its content is already
+  gone, while an unreadable save is played over **without being written to**, because it may be
+  perfectly intact. A save that cannot be *written* no longer stops the game either, and leaves
+  saving on so the next quest tries again. Only `IOException` and `UnauthorizedAccessException`
+  count as storage getting in the way — anything else is a defect and is still
+  thrown. ([#1](https://github.com/olivegamestudio/TDD/issues/1), [#2](https://github.com/olivegamestudio/TDD/pull/2))
+- **A quest state that is not a state no longer bricks the quest.** `JsonStringEnumConverter` reads
+  numbers as well as names and does not check that the number names a defined member, so
+  `"State": 99` deserialised to `(QuestState)99` — a quest that could never start and never
+  complete, dead for the rest of the game. Refused at both layers: the serializer reads states by
+  name only (`allowIntegerValues: false`), so a numeric state is treated as a save this build
+  cannot read, and `Quest.Restore` rejects an undefined state with `ArgumentOutOfRangeException`
+  rather than holding one. ([#1](https://github.com/olivegamestudio/TDD/issues/1), [#2](https://github.com/olivegamestudio/TDD/pull/2))
+- **`GameScreen` no longer drops the task that begins the game**, logging a failed start through
+  `ILogger` before rethrowing. The session recovers from the save failures that are expected, so
+  anything reaching the log is a defect — but one somebody can now
+  see. ([#1](https://github.com/olivegamestudio/TDD/issues/1), [#2](https://github.com/olivegamestudio/TDD/pull/2))
 - **`LocalSaveProgressService` now really persists**, writing to a file and creating the save
   folder on first write. `HasProgress()` was a hardcoded `return true`, reporting progress it had
   never stored. ([#2](https://github.com/olivegamestudio/TDD/pull/2))

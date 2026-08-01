@@ -59,11 +59,16 @@ Engine, screen flow and the quest system are in. Quest 1 auto-starts on a new ga
 player forward through the collapsing debris field, and completes at the exit marker, with
 progress persisted across sessions and its title translated into seven languages.
 
+A save the game cannot read never stops it and is never written over: a damaged save is replaced,
+but one that was merely locked is played over and left alone, because it may be intact. See
+[the saved progress notes](docs/ARCHITECTURE.md#saved-progress).
+
 Not yet built:
 
 - **Ship movement and physics** (#3) — nothing moves the ship in the running game, so Quest 1 is
   currently completable by test rather than by playing.
-- **Any on-screen quest display** — no HUD, no quest log.
+- **Any on-screen quest display** — no HUD, no quest log. The session knows when the player's
+  progress is not being saved, but there is nowhere yet to tell them.
 - **Language selection** — translations follow the machine's own culture.
 - **A persistent record** — experience, credits and quest history that survive death, which
   pillar 4 calls for.

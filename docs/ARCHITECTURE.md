@@ -52,7 +52,11 @@ corrected once already — a quest library that owns a player and a position is 
 - `Quest` — the lifecycle `NotStarted → Active → Completed`, driven only through `Start()` and
   `Complete()`. Both are safe to call every frame; `Started` and `Completed` are raised once per
   quest, not once per frame spent on a marker. `Restore` reinstates a saved state silently,
-  because the player already lived those moments.
+  because the player already lived those moments — but it refuses a state that is not one of the
+  states a quest has, with `ArgumentOutOfRangeException`. A quest holding an undefined state can
+  neither start nor complete and nothing downstream would report it, so a restore that would brick
+  the quest fails where it happens rather than somewhere the player discovers it. Pilgrimage is a
+  library other games will use; it should not quietly hold a state that does not exist.
 - `QuestLog` — the player's quests, republishing their events so subscribers listen in one place.
   `Capture`/`Restore` keep quest persistence a quest concern.
 - `ICampaign` — the seam a game supplies quests through.
@@ -76,12 +80,49 @@ text. `SaveGame` and `SaveGameSerializer` in `BattleForce2249.Game` decide what 
 
 Reading is deliberately forgiving: a missing, blank or damaged save deserialises to `null` and is
 reported as "no save", so a corrupt file yields a new game rather than a crash. Quest states are
-written by name, so reordering `QuestState` cannot silently change a save. `SaveGame`'s shape is
-the compatibility boundary — changing it changes what older saves can be read back into.
+written by name and read by name *only* — `JsonStringEnumConverter` is built with
+`allowIntegerValues: false`, because left to itself it also reads numbers and does not check that
+the number names a state at all. Reordering `QuestState` cannot silently change a save, and
+`"State": 99` is treated as a save this build cannot read rather than loading as a quest stuck
+outside its own lifecycle. `SaveGame`'s shape is the compatibility boundary — changing it changes
+what older saves can be read back into.
 
 A save the campaign has drifted from is tolerated in both directions: a quest the save knows but
 this build no longer ships is ignored, and a quest added since the save was written starts from
 the beginning.
+
+### A save that cannot be read is not a save that is gone
+
+These are two different failures and `GameSession` does not treat them the same. The distinction
+matters because a save locked for a moment by cloud sync or antivirus is probably still perfectly
+intact, and starting a new game on top of it is its own kind of data loss — the one pillar 4 in
+`docs/DESIGN.md` calls a design failure rather than a robustness one.
+
+| The save is… | What happens |
+| ------------ | ------------ |
+| absent | a new game, saved normally |
+| **damaged** — unparseable, or a state that is not a state | a new game, saved normally: the content is already gone, so replacing it loses nothing |
+| **unreadable** — locked, or barred by permissions | a playable game that **does not write over the save**, which may be intact |
+
+The session reports which it is rather than leaving it to be guessed at:
+
+- `IGameSession.SaveError` — the exception from the last read or write, or `null` when the save is
+  healthy.
+- `IGameSession.IsSavingProgress` — whether quest progress is actually being written. It is
+  `false` for the stand-in game played over an unreadable save.
+
+A save that cannot be *written* does not stop the game either. Automatic saves go through an
+internal `TrySave` that records the failure and **leaves saving on**, because the file may well be
+free again by the next quest; giving up for the rest of the session would cost the player more
+than the one write that failed. The public `Save()` still raises, for callers that want to know.
+
+Only `IOException` and `UnauthorizedAccessException` count as the storage getting in the way.
+Anything else is a defect and is still thrown — catching wider would bury real bugs behind a
+"could not save" message.
+
+Nothing reads `SaveError` yet. Telling the player their save is locked needs a HUD, which does not
+exist; the information is recorded so that whatever gains the ability to say it has something to
+read.
 
 ## Localised text
 
@@ -110,12 +151,19 @@ singleton and a cached list would freeze the player's language at startup.
 filters frame time before the screen director sees it. Entering `GameScreen` begins or resumes
 the session; its `Update` drives the proximity watcher once the session is ready.
 
+Loading happens off the frame loop, and nothing in the shipping game holds the task `Enter()`
+starts — so `GameScreen` logs a failure through `ILogger` before rethrowing rather than dropping
+it. The session already recovers from the save failures that are expected, so anything reaching
+the log is a defect; the point is that it is a defect somebody can see. A failure swallowed here
+leaves the session never ready, every frame turning straight back, and the player in front of a
+game that has quietly stopped.
+
 ## Known gaps
 
 - Nothing moves the ship. Quest 1 is completable by test, not by playing — movement and physics
   are issue #3.
 - Nothing displays a quest title. There is no HUD or quest log; that is a separate `ENGINE`
-  issue.
+  issue. `IGameSession.SaveError` is unread for the same reason — there is nowhere to say it.
 - Nothing selects a language. Translations are reachable only through the machine's own culture.
 - There is no persistent record (experience, credits, quest history) separate from the saved
   position. See pillar 4 in `docs/DESIGN.md`.
