@@ -64,6 +64,10 @@ public sealed class UIController : IUIController
     /// The <c>Held</c> property represents the button that is actively
     /// engaged between a press and release action. This property will
     /// return <c>null</c> if no button is being held at the moment.
+    /// The button held is the one that was pressed, not whichever button
+    /// happens to be focused: a pressed action is free to move focus, and
+    /// doing so must not transfer the press. Cancelling the press, or
+    /// disabling the held button, clears this before the release.
     /// </remarks>
     public Button? Held => _pressing;
 
@@ -93,26 +97,34 @@ public sealed class UIController : IUIController
     {
         if (button is not null)
         {
-            Node target = Require(button);
-            if (!target.Enabled)
+            if (!Require(button).Enabled)
             {
                 return;
             }
-            
+
             FocusOn(button);
         }
-        
-        if (_focusedElement is not null)
+
+        if (_focusedElement is null)
         {
-            Node node = Require(_focusedElement);
-            if (!node.Enabled)
-            {
-                return;
-            }
-            
-            node.PressedAction?.Invoke();
-            _pressing = _focusedElement;
+            return;
         }
+
+        // The press belongs to the button held down, which is not necessarily whatever
+        // is focused once the pressed action has run: the action is free to move focus,
+        // and disabling a button re-homes focus as a side effect. Capture the button
+        // first so the release commits the one the player actually pressed.
+        Button pressed = _focusedElement;
+        Node node = Require(pressed);
+        if (!node.Enabled)
+        {
+            return;
+        }
+
+        // Armed before the action runs so that a pressed action which aborts the press —
+        // by cancelling it or by disabling its own button — is not overwritten afterwards.
+        _pressing = pressed;
+        node.PressedAction?.Invoke();
     }
 
     /// <summary>
@@ -186,6 +198,11 @@ public sealed class UIController : IUIController
     /// Disables the specified button, preventing it from receiving input or triggering actions.
     /// </summary>
     /// <param name="button">The button to be disabled.</param>
+    /// <remarks>
+    /// Disabling the button currently being held cancels that press, so the release
+    /// commits nothing. Disabling the focused button re-homes focus to the first
+    /// enabled button, or clears it when none remain.
+    /// </remarks>
     public void Disable(Button button) => SetEnabled(button, false);
 
     /// <summary>
@@ -213,7 +230,16 @@ public sealed class UIController : IUIController
     {
         Node node = Require(button);
         node.Enabled = enabled;
-    
+
+        if (!enabled && _pressing == button)
+        {
+            // A button that can no longer be interacted with does not own a press.
+            // Cancelling outright — rather than leaving Release() to notice the button
+            // is disabled and swallow the commit — means the outcome does not depend on
+            // whether something re-enables the button before the player lets go.
+            Cancel();
+        }
+
         if (!enabled && _focusedElement == button)
         {
             // disabling the focused button → re-home to the first enabled, or clear

@@ -222,6 +222,164 @@ public sealed class UIControllerTests
         Assert.False(fired);
     }
 
+    // ---- press actions that change the controller's own state ---------------
+    // The press action runs while the press is still open, so it can move focus
+    // or disable a button out from under the hold. The hold belongs to the button
+    // the player pressed, and nothing the action does may transfer it elsewhere.
+
+    [Fact]
+    public void Held_TracksThePressedButton_EvenIfThePressActionMovesFocus()
+    {
+        UIController controller = new();
+        Button a = new("a");
+        Button b = new("b");
+        controller.Add(a);
+        controller.Add(b);
+
+        controller.OnPressed(a, () => controller.FocusOn(b));
+
+        controller.Press(a);
+
+        Assert.Same(a, controller.Held);        // the press is a's, wherever focus went
+        Assert.Same(b, controller.Focused);     // the action's focus move still stands
+    }
+
+    [Fact]
+    public void PressAction_ThatMovesFocus_StillCommitsThePressedButton()
+    {
+        UIController controller = new();
+        Button a = new("a");
+        Button b = new("b");
+        controller.Add(a);
+        controller.Add(b);
+
+        Button? released = null;
+        controller.OnPressed(a, () => controller.FocusOn(b));
+        controller.OnReleased(a, () => released = a);
+        controller.OnReleased(b, () => released = b);
+
+        controller.Press(a);
+        controller.Release();
+
+        Assert.Same(a, released);
+    }
+
+    [Fact]
+    public void PressAction_ThatDisablesItsOwnButton_MustNotCommitADifferentButton()
+    {
+        // MenuScreen.OnStartReleased already uses this idiom: disable the button as it
+        // activates so it cannot be triggered twice. Doing that on the DOWN hook must not
+        // hand the press over to whichever button focus re-homes to.
+        UIController controller = new();
+        Button start = new("start");
+        Button options = new("options");
+        controller.Add(start);                  // auto-focused
+        controller.Add(options);
+
+        List<string> committed = [];
+        controller.OnPressed(start, () => controller.Disable(start));
+        controller.OnReleased(start, () => committed.Add("start"));
+        controller.OnReleased(options, () => committed.Add("options"));
+
+        controller.Press(start);
+        controller.Release();
+
+        Assert.Empty(committed);
+    }
+
+    [Fact]
+    public void PressAction_ThatCancels_AbortsTheHold()
+    {
+        // The press is armed before the action runs, so an action that aborts the
+        // press mid-flight stays aborted rather than being re-armed underneath it.
+        UIController controller = new();
+        Button start = new("start");
+        controller.Add(start);
+
+        bool fired = false;
+        controller.OnPressed(start, () => controller.Cancel());
+        controller.OnReleased(start, () => fired = true);
+
+        controller.Press();
+
+        Assert.Null(controller.Held);
+
+        controller.Release();
+
+        Assert.False(fired);
+    }
+
+    // ---- disabling a button that is currently held --------------------------
+    // Settled here rather than left to Release()'s enabled check: a button that
+    // cannot be interacted with does not own a press.
+
+    [Fact]
+    public void DisablingTheHeldButton_CancelsTheHold()
+    {
+        UIController controller = new();
+        Button start = new("start");
+        Button options = new("options");
+        controller.Add(start);
+        controller.Add(options);
+
+        bool fired = false;
+        controller.OnReleased(start, () => fired = true);
+
+        controller.Press(start);
+        controller.Disable(start);              // withdrawn mid-press
+
+        Assert.Null(controller.Held);
+
+        controller.Release();
+
+        Assert.False(fired);
+    }
+
+    [Fact]
+    public void ReEnablingAfterDisablingTheHeldButton_DoesNotResurrectTheCommit()
+    {
+        // The hold is gone for good — a button that flickers back on mid-press does
+        // not inherit a press the player can no longer see they are making.
+        UIController controller = new();
+        Button start = new("start");
+        controller.Add(start);
+
+        bool fired = false;
+        controller.OnReleased(start, () => fired = true);
+
+        controller.Press(start);
+        controller.Disable(start);
+        controller.Enable(start);
+
+        Assert.Null(controller.Held);
+
+        controller.Release();
+
+        Assert.False(fired);
+    }
+
+    [Fact]
+    public void DisablingAnUnheldButton_LeavesTheHoldAlone()
+    {
+        UIController controller = new();
+        Button start = new("start");
+        Button options = new("options");
+        controller.Add(start);
+        controller.Add(options);
+
+        bool fired = false;
+        controller.OnReleased(start, () => fired = true);
+
+        controller.Press(start);
+        controller.Disable(options);            // a sibling goes away — not our press
+
+        Assert.Same(start, controller.Held);
+
+        controller.Release();
+
+        Assert.True(fired);
+    }
+
     // ---- mouse / touch through Press(button) -------------------------------
 
     [Fact]
