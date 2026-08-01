@@ -8,8 +8,8 @@ namespace OliveGameStudio;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Adds the default engine services: screen direction, UI control, save progress, and
-    /// frame time filtering.
+    /// Adds the default engine services: screen direction, UI control, save progress, ship input,
+    /// and frame time filtering.
     /// </summary>
     /// <remarks>
     /// Services are registered with <c>AddSingleton</c>, so a caller that registers its own
@@ -25,6 +25,10 @@ public static class ServiceCollectionExtensions
             .AddSingleton<IScreenDirector, LifecycleScreenDirector>()
             .AddSingleton<IUIController, UIController>()
             .AddSingleton<ISaveProgressService, LocalSaveProgressService>()
+
+            // nobody at the controls until the platform host binds a real keyboard or gamepad,
+            // because the device is the host's to own; register another after this call
+            .AddSingleton<IShipInput, NeutralShipInput>()
 
             // real time straight through; register another after this call to scale or pause
             .AddSingleton<IFrameTimeController, PassThroughFrameTimeController>();

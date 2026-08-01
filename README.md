@@ -55,14 +55,18 @@ dotnet run --project BattleForce2249.MonoGame
 
 ## Status
 
-Engine, screen flow and the quest system are in. Quest 1 auto-starts on a new game, tracks the
-player forward through the collapsing debris field, and completes at the exit marker, with
-progress persisted across sessions and its title translated into seven languages.
+Engine, screen flow, the quest system and ship movement are in. Quest 1 auto-starts on a new game,
+tracks the player forward through the collapsing debris field, and completes at the exit marker —
+flown there, with thrust and a helm and momentum through the turns — with progress persisted
+across sessions and its title translated into seven languages.
 
 Not yet built:
 
-- **Ship movement and physics** (#3) — nothing moves the ship in the running game, so Quest 1 is
-  currently completable by test rather than by playing.
+- **A real input device** — the ship is flown through `IShipInput`, and the MonoGame host does not
+  bind a keyboard or gamepad to it yet, so the shipping game still has nobody at the controls.
+- **Swept quest triggers** — the player is sampled once a frame, so a badly stalled frame can step
+  a fast ship over a marker. Quest 1's markers are sized well clear of it at any playable frame
+  rate.
 - **Any on-screen quest display** — no HUD, no quest log.
 - **Language selection** — translations follow the machine's own culture.
 - **A persistent record** — experience, credits and quest history that survive death, which

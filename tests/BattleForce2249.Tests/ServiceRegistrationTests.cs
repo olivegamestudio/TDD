@@ -65,6 +65,42 @@ public sealed class ServiceRegistrationTests
     }
 
     [Fact]
+    public void ResolvesTheShip()
+    {
+        using ServiceProvider provider = BuildProvider();
+
+        Assert.Same(BattleForceShip.Handling, provider.GetRequiredService<ShipHandling>());
+        Assert.NotNull(provider.GetRequiredService<ShipMovement>());
+    }
+
+    [Fact]
+    public void SharesOneShip_BetweenTheGameScreenAndAnythingElseThatNeedsIt()
+    {
+        // two ships would each fly their own copy of the player around
+        using ServiceProvider provider = BuildProvider();
+
+        Assert.Same(provider.GetRequiredService<ShipMovement>(), provider.GetRequiredService<ShipMovement>());
+    }
+
+    [Fact]
+    public void DefaultsToNobodyAtTheControls()
+    {
+        // the platform host owns the real device, so the engine ships a seam and not a keyboard
+        using ServiceProvider provider = BuildProvider();
+
+        Assert.IsType<NeutralShipInput>(provider.GetRequiredService<IShipInput>());
+    }
+
+    [Fact]
+    public void HonoursAShipInputRegisteredByTheHostApplication()
+    {
+        using ServiceProvider provider = BuildProvider(services =>
+            services.AddSingleton<IShipInput>(new FixedShipInput()));
+
+        Assert.IsType<FixedShipInput>(provider.GetRequiredService<IShipInput>());
+    }
+
+    [Fact]
     public void DefaultsToThePassThroughFrameTimeController()
     {
         using ServiceProvider provider = BuildProvider();

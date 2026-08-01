@@ -18,6 +18,7 @@
       <ProjectReference Include="..\OliveGameStudio.Progress\OliveGameStudio.Progress.csproj" />
       <ProjectReference Include="..\OliveGameStudio.Screen\OliveGameStudio.Screen.csproj" />
       <ProjectReference Include="..\OliveGameStudio.UI\OliveGameStudio.UI.csproj" />
+      <ProjectReference Include="..\OliveGameStudio.World\OliveGameStudio.World.csproj" />
     </ItemGroup>
 
 </Project>
