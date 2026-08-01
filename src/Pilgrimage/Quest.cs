@@ -88,5 +88,19 @@ public sealed class Quest(QuestDefinition definition)
     /// <see cref="Started"/> or <see cref="Completed"/> — the player already lived those moments.
     /// </summary>
     /// <param name="state">The state the quest was saved in.</param>
-    public void Restore(QuestState state) => State = state;
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="state"/> is not one of the states a quest has. A quest holding a state that
+    /// does not exist can never be started and can never be completed, and nothing downstream would
+    /// report it — so a restore that would brick the quest is refused where it happens instead.
+    /// </exception>
+    public void Restore(QuestState state)
+    {
+        if (!Enum.IsDefined(state))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(state), state, $"'{(int)state}' is not a quest state.");
+        }
+
+        State = state;
+    }
 }

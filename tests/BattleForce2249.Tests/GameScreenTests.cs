@@ -1,4 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using OliveGameStudio;
 using Pilgrimage;
 
@@ -112,5 +114,84 @@ public sealed class GameScreenTests : HostTestBase
         screen.Update(TimeSpan.FromSeconds(1));
 
         Assert.Empty(Session.Quests.Quests);
+    }
+
+    [Fact]
+    public async Task AnUnreadableSave_DoesNotSilentlyFreezeTheGameScreen()
+    {
+        // Nothing in the shipping game holds the task Enter() starts, so a load that threw would
+        // leave the session never ready and every frame turning straight back — no crash, no
+        // message, just a game that stopped.
+        GameSession session = new(
+            new FailingSaveProgressService(loadError: new IOException("The process cannot access the file.")),
+            new BattleForceCampaign(),
+            new BattleForceWorld());
+        GameScreen screen = new(session, new QuestProximityWatcher(new BattleForceWorld()), NullLogger<GameScreen>.Instance);
+
+        screen.Enter();
+        await screen.Started;
+        screen.Update(TimeSpan.FromMilliseconds(16));
+        screen.Update(TimeSpan.FromMilliseconds(16));
+
+        Assert.True(session.IsReady, "the game screen never became ready, so no frame will ever do anything");
+        Quest quest = Assert.Single(session.Quests.Active);
+        Assert.Equal(BattleForceCampaign.Quest1Id, quest.Id);
+    }
+
+    [Fact]
+    public async Task AGameThatFailsToStart_IsLoggedRatherThanLostSilently()
+    {
+        // the session recovers from a save it cannot read, so anything left is a defect — and a
+        // defect nobody can see is what made this silent rather than merely broken
+        FakeLogger<GameScreen> logger = new();
+        GameScreen screen = new(new ThrowingGameSession(), new QuestProximityWatcher(new BattleForceWorld()), logger);
+
+        screen.Enter();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => screen.Started);
+
+        Assert.Contains(logger.Errors, entry => entry is InvalidOperationException);
+    }
+
+    sealed class ThrowingGameSession : IGameSession
+    {
+        public Player Player { get; } = new();
+
+        public QuestLog Quests { get; } = new();
+
+        public bool IsReady => false;
+
+        public Task PendingSave => Task.CompletedTask;
+
+        public Exception? SaveError => null;
+
+        public bool IsSavingProgress => false;
+
+        public Task StartNewGame() => throw new InvalidOperationException("a defect");
+
+        public Task Continue() => throw new InvalidOperationException("a defect");
+
+        public Task Save() => throw new InvalidOperationException("a defect");
+    }
+
+    sealed class FakeLogger<T> : ILogger<T>
+    {
+        public List<Exception?> Errors { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            if (logLevel is LogLevel.Error)
+            {
+                Errors.Add(exception);
+            }
+        }
     }
 }

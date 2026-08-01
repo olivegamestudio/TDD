@@ -48,6 +48,12 @@ public sealed class GameSession : IGameSession
     public Task PendingSave { get; private set; } = Task.CompletedTask;
 
     /// <inheritdoc />
+    public Exception? SaveError { get; private set; }
+
+    /// <inheritdoc />
+    public bool IsSavingProgress => _autoSave;
+
+    /// <inheritdoc />
     public async Task StartNewGame()
     {
         Reset();
@@ -55,13 +61,32 @@ public sealed class GameSession : IGameSession
         _autoSave = true;
         IsReady = true;
 
-        await Save();
+        await TrySave();
     }
 
     /// <inheritdoc />
     public async Task Continue()
     {
-        SaveGame? save = SaveGameSerializer.Deserialize(await _saveProgressService.Load());
+        SaveError = null;
+
+        string? content;
+        try
+        {
+            content = await _saveProgressService.Load();
+        }
+        catch (Exception error) when (IsStorageFailure(error))
+        {
+            // The save was not readable this time, which does not mean it is not there. Give the
+            // player a game to play, but hold every write back: overwriting a save that was only
+            // locked for a moment loses a game that was never actually lost.
+            SaveError = error;
+
+            Reset();
+            IsReady = true;
+            return;
+        }
+
+        SaveGame? save = SaveGameSerializer.Deserialize(content);
         if (save is null)
         {
             await StartNewGame();
@@ -78,6 +103,35 @@ public sealed class GameSession : IGameSession
 
     /// <inheritdoc />
     public Task Save() => _saveProgressService.Save(SaveGameSerializer.Serialize(Capture()));
+
+    /// <summary>
+    /// Saves, recording a storage failure rather than raising it. Every automatic save runs through
+    /// here, because the alternative is a write failing on a background task nobody is holding —
+    /// which is how a game ends up stopped with nothing said. Callers who want the failure raised
+    /// use <see cref="Save"/>.
+    /// </summary>
+    async Task TrySave()
+    {
+        try
+        {
+            await Save();
+            SaveError = null;
+        }
+        catch (Exception error) when (IsStorageFailure(error))
+        {
+            // Left saving on: the file may be free again by the next quest, and a game that gives
+            // up on saving after one bad moment loses far more than it protects.
+            SaveError = error;
+        }
+    }
+
+    /// <summary>
+    /// Whether an exception is the storage getting in the way rather than a defect. These two are
+    /// what a file that is missing, locked, on a full disk or barred by permissions throws; catching
+    /// wider than this would bury real bugs behind a "could not save" message.
+    /// </summary>
+    static bool IsStorageFailure(Exception error) =>
+        error is IOException or UnauthorizedAccessException;
 
     /// <summary>
     /// Returns the session to a freshly registered campaign with the player at the world's start.
@@ -114,7 +168,7 @@ public sealed class GameSession : IGameSession
     {
         if (_autoSave)
         {
-            PendingSave = Save();
+            PendingSave = TrySave();
         }
     }
 }
