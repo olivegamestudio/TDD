@@ -36,6 +36,25 @@ public interface IGameSession
     Task PendingSave { get; }
 
     /// <summary>
+    /// Gets the error from the last attempt to read or write the save game, or <c>null</c> when the
+    /// save is healthy. It is the only sign the player's progress is not being kept, so whatever
+    /// can tell them has something to read.
+    /// </summary>
+    /// <remarks>
+    /// A save that could not be <em>read</em> also stops the session saving, and
+    /// <see cref="IsSavingProgress"/> says so. A save that could not be <em>written</em> does not:
+    /// the next quest to change tries again, because the failure may have been momentary.
+    /// </remarks>
+    Exception? SaveError { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether quest progress is being written to the save game. It is
+    /// <c>false</c> when the game was begun over a save that could not be read, because a save the
+    /// player may still own must not be overwritten by the new game standing in for it.
+    /// </summary>
+    bool IsSavingProgress { get; }
+
+    /// <summary>
     /// Discards any game in progress and begins a fresh one: the player goes to the world's start
     /// position, the campaign's quests are registered, and the new game is saved.
     /// </summary>
@@ -43,9 +62,16 @@ public interface IGameSession
     Task StartNewGame();
 
     /// <summary>
-    /// Resumes the saved game, falling back to <see cref="StartNewGame"/> when there is no save or
-    /// the save cannot be read.
+    /// Resumes the saved game, falling back to a fresh one when there is no save or the save cannot
+    /// be read. It leaves the session ready to play whichever way it goes: a player who cannot be
+    /// given their save back is still owed a game, not a screen where nothing ever happens.
     /// </summary>
+    /// <remarks>
+    /// The two failures are not the same and are not treated the same. A save that is <em>damaged</em>
+    /// is gone, so a new game replaces it. A save that could not be <em>read</em> — locked by cloud
+    /// sync or antivirus, or unreadable through a permissions problem — may be perfectly intact, so
+    /// the new game is played but not saved, and <see cref="SaveError"/> says why.
+    /// </remarks>
     /// <returns>A task that completes once the session is ready.</returns>
     Task Continue();
 

@@ -135,4 +135,40 @@ public sealed class QuestTests
 
         Assert.Equal(QuestState.Completed, quest.State);
     }
+
+    [Theory]
+    [InlineData(QuestState.NotStarted)]
+    [InlineData(QuestState.Active)]
+    [InlineData(QuestState.Completed)]
+    public void Restore_AcceptsEveryStateAQuestHas(QuestState state)
+    {
+        Quest quest = CreateQuest();
+
+        quest.Restore(state);
+
+        Assert.Equal(state, quest.State);
+    }
+
+    [Fact]
+    public void Restore_RefusesAStateThatIsNotAState()
+    {
+        // a quest holding a state that does not exist can neither start nor complete, and nothing
+        // downstream would ever say so — the quest would simply be dead for the rest of the game
+        Quest quest = CreateQuest();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => quest.Restore((QuestState)99));
+    }
+
+    [Fact]
+    public void Restore_RefusingAStateLeavesTheQuestAsItWas()
+    {
+        Quest quest = CreateQuest();
+        quest.Restore(QuestState.Active);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => quest.Restore((QuestState)99));
+
+        Assert.Equal(QuestState.Active, quest.State);
+        quest.Complete();
+        Assert.True(quest.IsCompleted);
+    }
 }

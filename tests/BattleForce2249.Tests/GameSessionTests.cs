@@ -29,12 +29,14 @@ public sealed class GameSessionTests
 
     readonly InMemorySaveProgressService _saves = new();
 
-    GameSession CreateSession(params string[] questIds)
+    GameSession CreateSession(params string[] questIds) => CreateSession(_saves, questIds);
+
+    static GameSession CreateSession(ISaveProgressService saves, params string[] questIds)
     {
         string[] ids = questIds.Length == 0 ? ["quest-1"] : questIds;
 
         return new GameSession(
-            _saves,
+            saves,
             new TestCampaign([.. ids.Select(id => Quest(id))]),
             new TestWorld([.. ids.Select(id => new QuestMarkers(id, Start, End))]));
     }
@@ -252,5 +254,134 @@ public sealed class GameSessionTests
 
         Assert.Single(session.Quests.Quests);
         Assert.Single(session.Quests.Active);
+    }
+
+    [Fact]
+    public async Task Continue_StartsANewGame_WhenTheSaveHoldsAQuestStateThatIsNotAState()
+    {
+        // a hand-edited or corrupted save saying 99: the quest must be playable, not stuck
+        _saves.Content = """
+        { "PlayerX": 0, "PlayerY": 0, "Quests": [ { "QuestId": "quest-1", "State": 99 } ] }
+        """;
+        GameSession session = CreateSession();
+
+        await session.Continue();
+
+        Assert.True(session.IsReady);
+        Quest quest = Assert.Single(session.Quests.Quests);
+        Assert.Equal(QuestState.NotStarted, quest.State);
+
+        quest.Start();
+        Assert.True(quest.IsActive);
+        quest.Complete();
+        Assert.True(quest.IsCompleted);
+    }
+
+    // ---- a save that cannot be read ----
+
+    static FailingSaveProgressService LockedSave() =>
+        new(loadError: new IOException("The process cannot access the file."))
+        {
+            Content = SaveGameSerializer.Serialize(new SaveGame
+            {
+                PlayerY = 700,
+                Quests = [new QuestProgress("quest-1", QuestState.Active)],
+            }),
+        };
+
+    [Fact]
+    public async Task Continue_LeavesAPlayableGame_WhenTheSaveCannotBeRead()
+    {
+        // the save is locked, not damaged — the player is still owed a game rather than a screen
+        // where nothing ever happens again
+        GameSession session = CreateSession(LockedSave());
+
+        await session.Continue();
+
+        Assert.True(session.IsReady);
+        Assert.NotNull(session.Quests.Find("quest-1"));
+        Assert.Equal(Start, session.Player.Position);
+    }
+
+    [Fact]
+    public async Task Continue_ReportsWhyTheSaveCouldNotBeRead()
+    {
+        GameSession session = CreateSession(LockedSave());
+
+        await session.Continue();
+
+        Assert.IsType<IOException>(session.SaveError);
+    }
+
+    [Fact]
+    public async Task Continue_DoesNotWriteOverASaveItCouldNotRead()
+    {
+        // the save on disk may be perfectly intact; replacing it with the stand-in game would lose
+        // a game that was never actually lost
+        FailingSaveProgressService saves = LockedSave();
+        string? saveOnDisk = saves.Content;
+        GameSession session = CreateSession(saves);
+        await session.Continue();
+
+        session.Quests.Find("quest-1")!.Start();
+        await session.PendingSave;
+
+        Assert.False(session.IsSavingProgress);
+        Assert.Equal(0, saves.SaveCount);
+        Assert.Equal(saveOnDisk, saves.Content);
+    }
+
+    [Fact]
+    public async Task Continue_SavesAgain_OnceTheSaveCanBeRead()
+    {
+        GameSession session = CreateSession(LockedSave());
+        await session.Continue();
+        Assert.NotNull(session.SaveError);
+
+        GameSession recovered = CreateSession();
+        await recovered.Continue();
+
+        Assert.Null(recovered.SaveError);
+        Assert.True(recovered.IsSavingProgress);
+    }
+
+    // ---- a save that cannot be written ----
+
+    [Fact]
+    public async Task StartNewGame_LeavesAPlayableGame_WhenTheSaveCannotBeWritten()
+    {
+        FailingSaveProgressService saves = new(saveError: new UnauthorizedAccessException("Access to the path is denied."));
+        GameSession session = CreateSession(saves);
+
+        await session.StartNewGame();
+
+        Assert.True(session.IsReady);
+        Assert.IsType<UnauthorizedAccessException>(session.SaveError);
+    }
+
+    [Fact]
+    public async Task AFailedWrite_LeavesSavingOn_SoTheNextQuestTriesAgain()
+    {
+        // a write can fail for a moment; giving up on saving for the rest of the session would
+        // cost the player far more than the one write that failed
+        FailingSaveProgressService saves = new(saveError: new IOException("The disk is full."));
+        GameSession session = CreateSession(saves);
+        await session.StartNewGame();
+
+        session.Quests.Find("quest-1")!.Start();
+        await session.PendingSave;
+
+        Assert.True(session.IsSavingProgress);
+        Assert.IsType<IOException>(session.SaveError);
+    }
+
+    [Fact]
+    public async Task ADefectDuringASave_IsNotSwallowedAsAStorageProblem()
+    {
+        // catching every exception here would bury real bugs behind "could not save"
+        FailingSaveProgressService saves = new(saveError: new InvalidOperationException("a defect"));
+        GameSession session = CreateSession(saves);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(session.StartNewGame);
     }
 }

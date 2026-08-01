@@ -48,4 +48,19 @@ public sealed class SaveGameSerializerTests
         // a corrupt save must not crash the game; the caller falls back to a new game
         Assert.Null(SaveGameSerializer.Deserialize(content));
     }
+
+    [Theory]
+    // a name that is not a state has always been rejected; a number that is not one was not, and
+    // loaded as a quest that could neither be started nor completed for the rest of the game
+    [InlineData("\"Nonsense\"")]
+    [InlineData("99")]
+    [InlineData("0")]
+    public void Deserialize_ReturnsNull_ForAQuestStateThisBuildDidNotWrite(string state)
+    {
+        string content = $$"""
+        { "PlayerX": 0, "PlayerY": 0, "Quests": [ { "QuestId": "quest-1", "State": {{state}} } ] }
+        """;
+
+        Assert.Null(SaveGameSerializer.Deserialize(content));
+    }
 }

@@ -16,6 +16,10 @@
     </ItemGroup>
 
     <ItemGroup>
+      <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10" />
+    </ItemGroup>
+
+    <ItemGroup>
       <ProjectReference Include="..\BattleForce2249.Abstractions\BattleForce2249.Abstractions.csproj" />
       <ProjectReference Include="..\OliveGameStudio.Localisation\OliveGameStudio.Localisation.csproj" />
       <ProjectReference Include="..\OliveGameStudio.World\OliveGameStudio.World.csproj" />

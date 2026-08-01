@@ -13,8 +13,11 @@ public static class SaveGameSerializer
 {
     static readonly JsonSerializerOptions Options = new()
     {
-        // quest states by name, so reordering the enum cannot silently change a saved state
-        Converters = { new JsonStringEnumConverter() },
+        // Quest states by name, so reordering the enum cannot silently change a saved state — and
+        // by name only. Left to itself the converter also reads numbers, and reads them without
+        // checking they name a state at all, so a save saying 99 would load as a quest stuck in a
+        // state nothing can move it out of. A number is not a state this build wrote.
+        Converters = { new JsonStringEnumConverter(namingPolicy: null, allowIntegerValues: false) },
         WriteIndented = true,
     };
 
