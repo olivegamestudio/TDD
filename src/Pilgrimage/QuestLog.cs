@@ -45,7 +45,10 @@ public sealed class QuestLog
     /// <returns>The runtime quest created for the definition.</returns>
     /// <exception cref="ArgumentException">
     /// A quest with the same identifier is already registered. Two quests sharing an identifier
-    /// would overwrite each other in the save game.
+    /// would overwrite each other in the save game. Note that <see cref="Restore"/> deliberately
+    /// does <em>not</em> refuse a duplicate: it reads a file rather than a campaign, and two
+    /// entries under one identifier are one quest described twice rather than two quests. The
+    /// reasoning is on <see cref="Restore"/>.
     /// </exception>
     public Quest Register(QuestDefinition definition)
     {
@@ -95,16 +98,64 @@ public sealed class QuestLog
     /// Puts the registered quests back into their saved states, raising no events.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Saves and campaigns drift apart over a game's life, and both directions are tolerated: a
     /// quest the save knows about but this build no longer ships is ignored, and a quest added
     /// since the save was written simply starts from the beginning.
+    /// </para>
+    /// <para>
+    /// <b>A save naming one quest more than once restores it to the furthest of the states it
+    /// names.</b> A later entry is applied only when it carries the quest further on; one that
+    /// would hand progress back is dropped. So a file saying a quest is both completed and never
+    /// started restores it completed, whichever line comes first.
+    /// </para>
+    /// <para>
+    /// That rule is chosen over first-wins or last-wins because it is the only one whose answer
+    /// does not depend on the order the entries happen to be in. <see cref="Capture"/> emits one
+    /// entry per quest, so a duplicate is never something a game wrote — it means a file that was
+    /// hand-edited or merged, and the order two entries ended up in after a merge says nothing
+    /// about which is right. It is also the only rule that cannot lose progress the player really
+    /// made, which is what a save exists to hold.
+    /// </para>
+    /// <para>
+    /// This is not the same answer as <see cref="Register"/>, which refuses a duplicate outright,
+    /// and the difference is in what the two are reading. <see cref="Register"/> takes a campaign
+    /// the build is authoring: two quests under one identifier is a mistake in the build, caught
+    /// where it is made. This takes a file the build did not necessarily write: two entries under
+    /// one identifier is not two quests, it is one quest described twice, and there is a sensible
+    /// reading of that. Refusing here would cost the player everything saved beside it.
+    /// </para>
+    /// <para>
+    /// The rule applies within a single call. A later call is a different save being read, and it
+    /// is authoritative — restoring is not a promise that a log can never move backwards.
+    /// </para>
     /// </remarks>
     /// <param name="progress">The saved quest states.</param>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// An entry holds a state that is not one a quest has. Refused wherever it appears, including
+    /// in the second entry naming a quest — a value outside the lifecycle is not early progress,
+    /// so it is never dropped for standing behind something.
+    /// </exception>
     public void Restore(IEnumerable<QuestProgress> progress)
     {
+        HashSet<string> seen = [];
+
         foreach (QuestProgress saved in progress)
         {
-            Find(saved.QuestId)?.Restore(saved.State);
+            Quest? quest = Find(saved.QuestId);
+            if (quest is null)
+            {
+                continue;
+            }
+
+            // the first entry naming a quest is taken as it stands; a second only counts if it
+            // carries the quest further than the one already applied
+            if (!seen.Add(quest.Id) && saved.State.IsBehind(quest.State))
+            {
+                continue;
+            }
+
+            quest.Restore(saved.State);
         }
     }
 

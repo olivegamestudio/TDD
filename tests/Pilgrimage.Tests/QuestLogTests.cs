@@ -175,4 +175,126 @@ public sealed class QuestLogTests
 
         Assert.Equal(QuestState.NotStarted, log.Find("quest-added-since")!.State);
     }
+
+    // ---- a save that names the same quest twice ----
+
+    [Fact]
+    public void Restore_KeepsTheFurthestState_WhenALaterEntryWouldHandProgressBack()
+    {
+        // the case that decides the rule: the campaign is finished, and an entry standing behind
+        // it says otherwise. Applying entries in order would undo a completed campaign on the
+        // strength of whichever one the file happened to list last.
+        QuestLog log = new();
+        log.Register(Definition("quest-1"));
+
+        log.Restore([
+            new QuestProgress("quest-1", QuestState.Completed),
+            new QuestProgress("quest-1", QuestState.NotStarted),
+        ]);
+
+        Assert.Equal(QuestState.Completed, log.Find("quest-1")!.State);
+    }
+
+    [Fact]
+    public void Restore_TakesALaterEntryThatCarriesTheQuestFurther()
+    {
+        // the other direction, so the rule is "keep the furthest" rather than "keep the first"
+        QuestLog log = new();
+        log.Register(Definition("quest-1"));
+
+        log.Restore([
+            new QuestProgress("quest-1", QuestState.NotStarted),
+            new QuestProgress("quest-1", QuestState.Completed),
+        ]);
+
+        Assert.Equal(QuestState.Completed, log.Find("quest-1")!.State);
+    }
+
+    [Theory]
+    [InlineData(QuestState.NotStarted, QuestState.Active, QuestState.Completed)]
+    [InlineData(QuestState.Completed, QuestState.Active, QuestState.NotStarted)]
+    [InlineData(QuestState.Active, QuestState.Completed, QuestState.NotStarted)]
+    [InlineData(QuestState.Completed, QuestState.NotStarted, QuestState.Active)]
+    public void Restore_ReachesTheSameStateWhateverOrderTheEntriesAreIn(
+        QuestState first, QuestState second, QuestState third)
+    {
+        // the property the rule is chosen for. A duplicate means a hand-edited or merged file, and
+        // the order entries ended up in is an accident of whoever merged it — so the answer must
+        // not depend on it.
+        QuestLog log = new();
+        log.Register(Definition("quest-1"));
+
+        log.Restore([
+            new QuestProgress("quest-1", first),
+            new QuestProgress("quest-1", second),
+            new QuestProgress("quest-1", third),
+        ]);
+
+        Assert.Equal(QuestState.Completed, log.Find("quest-1")!.State);
+    }
+
+    [Fact]
+    public void Restore_ResolvesDuplicatesWithinOneCall_AndNotAcrossCalls()
+    {
+        // the rule is about one save disagreeing with itself, not about the log refusing to move
+        // backwards ever. A later Restore is a different save being read, and it is authoritative.
+        QuestLog log = new();
+        log.Register(Definition("quest-1"));
+        log.Restore([new QuestProgress("quest-1", QuestState.Completed)]);
+
+        log.Restore([new QuestProgress("quest-1", QuestState.NotStarted)]);
+
+        Assert.Equal(QuestState.NotStarted, log.Find("quest-1")!.State);
+    }
+
+    [Fact]
+    public void Restore_ResolvesDuplicatesPerQuest_NotAcrossTheWholeSave()
+    {
+        QuestLog log = new();
+        log.Register(Definition("quest-1"));
+        log.Register(Definition("quest-2"));
+
+        log.Restore([
+            new QuestProgress("quest-1", QuestState.Completed),
+            new QuestProgress("quest-2", QuestState.NotStarted),
+            new QuestProgress("quest-1", QuestState.NotStarted),
+        ]);
+
+        Assert.Equal(QuestState.Completed, log.Find("quest-1")!.State);
+        Assert.Equal(QuestState.NotStarted, log.Find("quest-2")!.State);
+    }
+
+    [Fact]
+    public void Restore_StillRefusesAStateThatIsNotAState_InADuplicateEntry()
+    {
+        // a state outside the lifecycle is refused wherever it appears. Treating it as merely
+        // "behind" would drop it silently in second place and throw in first, which is the kind of
+        // answer-by-position this rule exists to remove.
+        QuestLog log = new();
+        log.Register(Definition("quest-1"));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => log.Restore([
+            new QuestProgress("quest-1", QuestState.Completed),
+            new QuestProgress("quest-1", (QuestState)99),
+        ]));
+    }
+
+    [Fact]
+    public void Restore_RaisesNoEvents_ForADuplicatedQuest()
+    {
+        // restoring never replays the moments the player already lived, however many entries name
+        // the quest
+        QuestLog log = new();
+        log.Register(Definition("quest-1"));
+        int events = 0;
+        log.QuestStarted += (_, _) => events++;
+        log.QuestCompleted += (_, _) => events++;
+
+        log.Restore([
+            new QuestProgress("quest-1", QuestState.Active),
+            new QuestProgress("quest-1", QuestState.Completed),
+        ]);
+
+        Assert.Equal(0, events);
+    }
 }
