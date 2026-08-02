@@ -48,8 +48,9 @@ public interface IUIController
     /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// The button is not managed by this controller — including when a managed button shares its
-    /// name. This is also where a focus set by <see cref="FocusOn"/> to an unmanaged button
-    /// surfaces, since that call does not check.
+    /// name. When none is given the focused button is resolved the same way, though it can no
+    /// longer be a stranger: every route to focus checks membership, and an element once added is
+    /// never removed.
     /// </exception>
     void Press(Button? button = null);
 
@@ -130,10 +131,17 @@ public interface IUIController
     /// </summary>
     /// <param name="button">The <see cref="Button"/> instance to be focused.</param>
     /// <remarks>
-    /// Alone among the methods here, this one does not check that the button is managed. Focus can
-    /// therefore be left pointing at a button the controller does not hold, and the mistake is
-    /// reported by the next <see cref="Press"/> rather than by this call.
+    /// The button must be one this controller holds, so focus can never be left pointing at a
+    /// stranger. Only membership is checked: a managed button that is currently disabled may still
+    /// be focused, because disabled is a statement about pressing — which <see cref="Press"/>
+    /// declines on its own — and refusing the focus as well would be a wider rule than this one.
+    /// Implementations that refuse leave the existing focus where it was.
     /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// The button is not managed by this controller — including when a managed button shares its
+    /// name, since a same-named button belonging to another screen is a different button. The
+    /// refusal is raised where the aim is taken rather than by whatever later reads the focus.
+    /// </exception>
     void FocusOn(Button button);
 
     /// <summary>
