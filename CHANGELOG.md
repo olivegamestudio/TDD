@@ -117,10 +117,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   button *after* running the pressed action, by re-reading the focused element — so an action that
   moved focus, including the codebase's own idiom of disabling a button as it activates, handed the
   press to an unrelated button whose released action then fired on release. The same ordering meant
-  a pressed action could not `Cancel()` the press it started. ([#12](https://github.com/olivegamestudio/TDD/issues/12))
+  a pressed action could not `Cancel()` the press it started. `Held` now follows the pressed button
+  rather than the focused one, and the surrounding rule is pinned from both sides: enablement is
+  read at release, so disabling a held button withholds its commit without cancelling the press, and
+  re-enabling it before the player lets go restores
+  it. ([#12](https://github.com/olivegamestudio/TDD/issues/12), [#18](https://github.com/olivegamestudio/TDD/pull/18))
 - **A redirect cycle now fails loudly instead of freezing the game.**
   `LifecycleScreenDirector.NavigateTo` followed an `EnterResult.Redirect` chain with no bound, so
   two screens redirecting at each other — or one redirecting to itself — spun inside the call
   forever and the update loop never ticked again. It now throws `InvalidOperationException` naming
   the path the moment a screen would be entered twice in one navigation, exits the live screen and
-  leaves nothing current. ([#14](https://github.com/olivegamestudio/TDD/issues/14))
+  leaves nothing current. The bound is per navigation — going back to a screen visited earlier is
+  ordinary — and screens are compared by reference, so two instances of one type, or two records
+  equal by value, are two different screens rather than a
+  cycle. ([#14](https://github.com/olivegamestudio/TDD/issues/14), [#18](https://github.com/olivegamestudio/TDD/pull/18))

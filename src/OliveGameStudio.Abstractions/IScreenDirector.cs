@@ -34,5 +34,13 @@ public interface IScreenDirector
     /// The screen to navigate to. This screen will be set as the current active screen,
     /// replacing any previously active screen.
     /// </param>
+    /// <remarks>
+    /// An implementation that honours <see cref="EnterResult.Redirect"/> keeps entering screens
+    /// until one asks to stay, so a single call may pass through several screens before it settles.
+    /// A screen entered along that chain may not be entered twice within the one call: the redirect
+    /// targets come from game code, and a chain that comes back on itself would otherwise never
+    /// return, freezing the update loop. Navigating to a screen visited by an earlier call is
+    /// ordinary and unrestricted — the rule is one entry per screen per navigation.
+    /// </remarks>
     void NavigateTo(IScreen screen);
 }
