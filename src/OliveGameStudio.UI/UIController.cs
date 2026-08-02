@@ -120,9 +120,10 @@ public sealed class UIController : IUIController
     /// </para>
     /// </remarks>
     /// <exception cref="InvalidOperationException">
-    /// The button is not managed by this controller, or — when none is given — the focused button
-    /// is not. <see cref="FocusOn"/> does not validate, so focus aimed at an unmanaged button is
-    /// caught here rather than where it was set.
+    /// The button is not managed by this controller. When none is given the focused button is
+    /// resolved the same way, though it can no longer be a stranger: every route to focus checks
+    /// membership since <see cref="FocusOn"/> began to, and an element once added is never removed.
+    /// The check on that path is what keeps that true rather than a report of it failing.
     /// </exception>
     public void Press(Button? button = null)
     {
@@ -367,13 +368,23 @@ public sealed class UIController : IUIController
     /// </summary>
     /// <param name="button">The <see cref="Button"/> instance to be focused.</param>
     /// <remarks>
-    /// This is the one entry point that does not require the button to be managed, so focus may be
-    /// left pointing at a button this controller does not hold. The next <see cref="Press"/> throws
-    /// when it tries to resolve it; before elements became identities it silently found the managed
-    /// button of the same name and ran that one's action instead.
+    /// Membership is checked here and not only when the focus is used. This entry point used to be
+    /// the exception, which meant focus could rest on a button this controller does not hold and
+    /// the next <see cref="Press"/> threw on the caller's behalf, somewhere the mistake was no
+    /// longer visible. Only membership is checked: a managed button that is currently disabled may
+    /// still be focused. Disabled is a statement about pressing, which <see cref="Press"/> already
+    /// declines on its own; refusing the focus as well would take a decision this type has never
+    /// made — <see cref="Add"/> focuses the first button added without asking, and <see
+    /// cref="Disable"/> only re-homes focus away from a button when there is an enabled one to
+    /// take it.
     /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// The button is not managed by this controller. A same-named button belonging to another
+    /// screen is a stranger here, as it is everywhere else in this type.
+    /// </exception>
     public void FocusOn(Button button)
     {
+        Require(button);
         _focusedElement = button;
     }
 

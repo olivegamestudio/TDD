@@ -63,6 +63,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **`UIController.FocusOn` refuses a button it does not hold.** It was the last entry point taking a
+  button that did not check, so focus could be aimed at a stranger and the complaint arrived at the
+  next `Press` — an `InvalidOperationException` thrown from a call the author of the mistake was no
+  longer standing in, naming a button they had not passed. It now throws where the aim is taken, and
+  leaves the existing focus untouched when it refuses. Only membership is checked: a managed button
+  that is currently disabled may still be focused, since `Press` declines a disabled button on its
+  own and widening the guard would be a new decision rather than this
+  fix. ([#101](https://github.com/olivegamestudio/TDD/issues/101))
 - **One junk quest entry no longer discards the progress saved beside it, and no longer freezes the
   game.** A quest entry naming no quest — a `QuestId` that is absent, `null` or blank — is drift
   between a save and a campaign, exactly like an entry naming a quest this build has dropped, and
@@ -95,8 +103,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   one it holds, which is the case the rule exists for. The visible change for callers is that a
   button the controller does not hold is now an error rather than a misdirection: `OnPressed`,
   `OnReleased`, `Press`, `Enable`, `Disable`, `IsEnabled` and both ends of `Link` throw
-  `InvalidOperationException` instead of acting on the namesake. `FocusOn` is the exception — it
-  does not check, so focus aimed at an unmanaged button surfaces at the next `Press`.
+  `InvalidOperationException` instead of acting on the namesake. `FocusOn` was the exception until
+  [#101](https://github.com/olivegamestudio/TDD/issues/101) below.
   ([#13](https://github.com/olivegamestudio/TDD/issues/13), [#27](https://github.com/olivegamestudio/TDD/pull/27))
 - **A save naming one quest twice no longer undoes the progress it also records.** `QuestLog.Restore`
   applied entries in order, so the last one won by accident of iteration — a file holding `quest-1`

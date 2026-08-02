@@ -44,6 +44,54 @@ public sealed class UIControllerTests
     }
 
     [Fact]
+    public void FocusOn_AStrangerToThisController_IsRefused()
+    {
+        // Focus is a claim about a button this controller holds. Aiming it at one the
+        // controller has never seen used to be accepted and only reported at the next
+        // Press — a throw from somewhere the caller was not standing.
+        UIController controller = new();
+        Button managed = new("managed");
+        controller.Add(managed);
+
+        InvalidOperationException error = Assert.Throws<InvalidOperationException>(
+            () => controller.FocusOn(new Button("stranger")));
+
+        Assert.Contains("stranger", error.Message);
+    }
+
+    [Fact]
+    public void FocusOn_ARefusedButton_LeavesTheExistingFocusWhereItWas()
+    {
+        // The refusal has to be inert. A half-applied focus move would be worse than the
+        // deferred throw it replaces.
+        UIController controller = new();
+        Button managed = new("managed");
+        controller.Add(managed);
+
+        Assert.Throws<InvalidOperationException>(() => controller.FocusOn(new Button("stranger")));
+
+        Assert.Same(managed, controller.Focused);
+    }
+
+    [Fact]
+    public void FocusOn_AManagedButtonThatIsDisabled_IsStillAllowed()
+    {
+        // The guard checks membership, not state. Disabled means "cannot be pressed", not
+        // "cannot be focused" — Press already returns early on a disabled button — so the
+        // new refusal must not quietly widen into one this type has never made.
+        UIController controller = new();
+        Button start = new("start");
+        Button options = new("options");
+        controller.Add(start);
+        controller.Add(options);
+        controller.Disable(options);
+
+        controller.FocusOn(options);
+
+        Assert.Same(options, controller.Focused);
+    }
+
+    [Fact]
     public void UnFocus_ClearsFocused()
     {
         UIController controller = new();
