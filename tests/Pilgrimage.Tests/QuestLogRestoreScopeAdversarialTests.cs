@@ -122,29 +122,73 @@ public sealed class QuestLogRestoreScopeAdversarialTests
     // ---- the premise the skip rests on ----
 
     /// <summary>
-    /// The skip is justified in the doc comments by a premise — that nothing is registered under an
-    /// identifier naming no quest — which nothing enforces. <see cref="QuestLog.Register"/> accepts
-    /// a blank identifier today, and a quest registered under one is captured with its progress and
-    /// then restored to nothing, so a completed quest comes back unstarted.
+    /// The premise the skip rests on, now that <see cref="QuestLog.Register"/> enforces it (#106):
+    /// progress made on a registered quest survives a capture-and-restore round trip, whatever the
+    /// campaign chose to call it.
     /// </summary>
     /// <remarks>
-    /// Skipped rather than deleted: it fails today, for the reason above, and it asserts the
-    /// outcome — progress survives a round trip — rather than the mechanism, so whichever way the
-    /// premise is closed (refusing the identifier at registration, or honouring it at restore) will
-    /// satisfy it. Unskip it when that lands. See the issue linked from QA's pass on #44.
+    /// <para>
+    /// This was <c>Skip</c>-ped, and it registered a quest under a blank identifier to show the
+    /// premise failing: captured <see cref="QuestState.Completed"/>, restored to
+    /// <see cref="QuestState.NotStarted"/>, silently. That setup is now impossible — the blank
+    /// registration is refused at the door — so the test keeps its claim and drops the one
+    /// identifier that can no longer reach a log. What it asserts is unchanged and is still the
+    /// outcome rather than the mechanism: nothing a campaign can register is lost by saving it.
+    /// </para>
+    /// <para>
+    /// The identifiers are chosen to be awkward rather than tidy. An identifier that is only
+    /// <em>mostly</em> whitespace is the interesting case, because it is the nearest thing to the
+    /// one now refused and it must still round-trip.
+    /// </para>
     /// </remarks>
-    [Fact(Skip = "Premise unenforced: Register accepts an identifier Restore guarantees to skip. Raised separately by QA on #44.")]
-    public void Restore_BringsBackTheProgressOfEveryRegisteredQuest_WhateverItsIdentifier()
+    [Theory]
+    [InlineData("quest-1")]
+    [InlineData("quest 1")] // a space in it, not made of nothing but space
+    [InlineData("  x  ")]
+    [InlineData("0")]
+    [InlineData("クエスト")]
+    public void Restore_BringsBackTheProgressOfEveryRegisteredQuest_WhateverItsIdentifier(string id)
     {
         QuestLog saved = new();
-        Quest before = saved.Register(Quest(""));
+        Quest before = saved.Register(Quest(id));
         before.Start();
         before.Complete();
 
         QuestLog reloaded = new();
-        Quest after = reloaded.Register(Quest(""));
+        Quest after = reloaded.Register(Quest(id));
         reloaded.Restore(saved.Capture());
 
         Assert.Equal(QuestState.Completed, after.State);
+    }
+
+    /// <summary>
+    /// The two halves of the rule, checked against each other rather than each against itself: an
+    /// identifier <see cref="QuestLog.Restore"/> skips is one <see cref="QuestLog.Register"/>
+    /// refuses. That agreement is the whole of #106 — while it held only by assumption, a quest
+    /// could be registered under an identifier its own log guaranteed to throw away.
+    /// </summary>
+    /// <remarks>
+    /// Written as one test over both so the pair cannot drift apart. A later change that widened
+    /// the skip without widening the refusal — or the other way about — reopens the defect, and
+    /// this fails rather than the round trip quietly starting to lose a quest again.
+    /// </remarks>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("\t")]
+    [InlineData("\r\n")]
+    [InlineData("\u00a0")] // a non-breaking space, which is whitespace too
+    public void AnIdentifierRestoreSkips_IsOneRegisterRefuses(string? id)
+    {
+        QuestLog log = new();
+        Quest registered = log.Register(Quest("quest-1"));
+
+        // Restore skips it: the entry names no quest, so the log is left as it was...
+        log.Restore([new QuestProgress(id!, QuestState.Completed)]);
+        Assert.Equal(QuestState.NotStarted, registered.State);
+
+        // ...and because it would be skipped, no quest can be registered under it in the first place
+        Assert.Throws<ArgumentException>(() => log.Register(Quest(id!)));
     }
 }

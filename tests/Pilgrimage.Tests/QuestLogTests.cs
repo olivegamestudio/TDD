@@ -40,6 +40,69 @@ public sealed class QuestLogTests
         Assert.Throws<ArgumentException>(() => log.Register(Definition("quest-1")));
     }
 
+    /// <summary>
+    /// Every form of identifier that names nothing. A quest registered under one would be captured
+    /// with its progress and then restored to nothing, because <see cref="QuestLog.Restore"/> skips
+    /// exactly these — so the log refuses them at the door instead of accepting a quest it cannot
+    /// bring back.
+    /// </summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("   ")]
+    [InlineData("\t")]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    [InlineData("\u00a0")] // a non-breaking space is whitespace to IsNullOrWhiteSpace, so it is not a name either
+    public void Register_RefusesAnIdentifierThatNamesNoQuest(string? id)
+    {
+        QuestLog log = new();
+
+        ArgumentException refusal =
+            Assert.Throws<ArgumentException>(() => log.Register(Definition(id!)));
+
+        Assert.Equal("definition", refusal.ParamName);
+    }
+
+    /// <summary>
+    /// The refusal is inert: a log that turned a registration away is the log it was beforehand,
+    /// not one holding a half-registered quest.
+    /// </summary>
+    [Fact]
+    public void Register_RefusingAnIdentifierThatNamesNoQuest_LeavesTheLogAsItWas()
+    {
+        QuestLog log = new();
+        Quest kept = log.Register(Definition("quest-1"));
+
+        Assert.Throws<ArgumentException>(() => log.Register(Definition("  ")));
+
+        Assert.Single(log.Quests);
+        Assert.Same(kept, Assert.Single(log.Quests));
+    }
+
+    /// <summary>
+    /// The bound of the refusal. An identifier with whitespace <em>in</em> it, or around it, still
+    /// names something — only one made of nothing but whitespace does not — so the guard must not
+    /// widen into trimming or rejecting identifiers a campaign is entitled to choose.
+    /// </summary>
+    [Theory]
+    [InlineData("quest-1")]
+    [InlineData(" quest-1 ")]
+    [InlineData("quest 1")]
+    [InlineData("0")]
+    [InlineData("_")]
+    [InlineData("クエスト")]
+    public void Register_AcceptsAnyIdentifierThatNamesSomething(string id)
+    {
+        QuestLog log = new();
+
+        Quest quest = log.Register(Definition(id));
+
+        Assert.Equal(id, quest.Id);
+        Assert.Same(quest, log.Find(id));
+    }
+
     [Fact]
     public void RaisesQuestStarted_WithTheQuestThatStarted()
     {

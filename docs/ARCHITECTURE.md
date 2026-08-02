@@ -108,6 +108,16 @@ have to agree, because while they did not, one blank line in a file discarded th
 campaign saved beside it — and every refusal at this boundary is final, since a refused save is
 played over by the game that replaces it.
 
+**Dropping an unnamed entry is safe because nothing can be registered under one.** `QuestLog.Register`
+refuses an identifier that is `null`, empty or nothing but whitespace, so the entry both edges skip
+can never be the only record of a quest the player really finished. That was an assumption before
+#106 and is now a check at the single door every quest comes through: a campaign that named a quest
+with a blank string had it captured, dropped on the way back, and lost in silence. Only an
+identifier made of *nothing but* whitespace is refused — one with a space in it names something, and
+`Pilgrimage` has no opinion about identifiers it can store and find again. This matters more here
+than it would in the game, because `Pilgrimage` is a standalone library: the content is not ours,
+and a campaign built on it can name a quest whatever it likes.
+
 **A position is only progress beside the quest progress it was taken with.** Tolerating drift means
 a perfectly readable save can restore no progress at all — every entry naming a quest the campaign
 dropped, or naming no quest, or no entries. Its coordinates would then place the player inside a

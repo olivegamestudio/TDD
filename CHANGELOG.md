@@ -68,6 +68,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **`QuestLog.Register` refuses an identifier that names no quest.** Both edges that read a save skip
+  a quest entry whose identifier is `null`, empty or blank, on the stated grounds that nothing is
+  registered under one — but nothing enforced that, so a campaign could register a quest under a
+  blank identifier and have it captured with its progress and restored to nothing, silently. A
+  completed quest came back unstarted, and through the save file it cost the saved position too,
+  because a game restoring no progress declines the coordinates saved beside it. `Register` now
+  refuses that identifier where the duplicate check already lives, which turns the premise the two
+  reading edges assert into one they can rely on. Only an identifier made of *nothing but* whitespace
+  is refused: one with whitespace in it, or around it, names something and stays a campaign's to
+  choose. Unreachable in Battle Force 2249, which names its quests — it matters because `Pilgrimage`
+  is a standalone library whose content belongs to whoever builds on
+  it. ([#106](https://github.com/olivegamestudio/TDD/issues/106))
 - **`UIController.FocusOn` refuses a button it does not hold.** It was the last entry point taking a
   button that did not check, so focus could be aimed at a stranger and the complaint arrived at the
   next `Press` — an `InvalidOperationException` thrown from a call the author of the mistake was no
