@@ -9,6 +9,12 @@ namespace BattleForce2249;
 /// Reading is deliberately forgiving: a missing or damaged save is reported as "no save" rather
 /// than as an error, so a player with a corrupt file gets a new game instead of a crash.
 /// </summary>
+/// <remarks>
+/// What this type refuses is a judgement about what this build will take, not a measurement of
+/// what is recoverable, so <see cref="GameSession.Continue"/> sets a refused save aside before the
+/// new game writes. A boundary drawn here that turns out to be too strict costs the player a
+/// restart rather than their game.
+/// </remarks>
 public static class SaveGameSerializer
 {
     static readonly JsonSerializerOptions Options = new()

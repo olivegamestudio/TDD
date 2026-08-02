@@ -59,8 +59,10 @@ Engine, screen flow and the quest system are in. Quest 1 auto-starts on a new ga
 player forward through the collapsing debris field, and completes at the exit marker, with
 progress persisted across sessions and its title translated into seven languages.
 
-A save the game cannot read never stops it and is never written over: a damaged save is replaced,
-but one that was merely locked is played over and left alone, because it may be intact. See
+A save the game cannot read never stops it and is never lost: one that was merely locked is played
+over and left alone, because it may be intact, and one this build refuses is moved aside to
+`save.corrupt.json` before the new game writes — so a shape a later build could read is still
+there. If it cannot even be moved, nothing is written at all. See
 [the saved progress notes](docs/ARCHITECTURE.md#saved-progress).
 
 Not yet built:

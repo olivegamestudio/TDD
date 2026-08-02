@@ -36,21 +36,23 @@ public interface IGameSession
     Task PendingSave { get; }
 
     /// <summary>
-    /// Gets the error from the last attempt to read or write the save game, or <c>null</c> when the
-    /// save is healthy. It is the only sign the player's progress is not being kept, so whatever
-    /// can tell them has something to read.
+    /// Gets the error from the last attempt to read, write or set aside the save game, or
+    /// <c>null</c> when the save is healthy. It is the only sign the player's progress is not being
+    /// kept, so whatever can tell them has something to read.
     /// </summary>
     /// <remarks>
-    /// A save that could not be <em>read</em> also stops the session saving, and
-    /// <see cref="IsSavingProgress"/> says so. A save that could not be <em>written</em> does not:
-    /// the next quest to change tries again, because the failure may have been momentary.
+    /// A save that could not be <em>read</em>, or a refused one that could not be <em>set
+    /// aside</em>, also stops the session saving, and <see cref="IsSavingProgress"/> says so. A
+    /// save that could not be <em>written</em> does not: the next quest to change tries again,
+    /// because the failure may have been momentary.
     /// </remarks>
     Exception? SaveError { get; }
 
     /// <summary>
     /// Gets a value indicating whether quest progress is being written to the save game. It is
-    /// <c>false</c> when the game was begun over a save that could not be read, because a save the
-    /// player may still own must not be overwritten by the new game standing in for it.
+    /// <c>false</c> when the game was begun over a save that could not be read, or over a refused
+    /// save that could not be moved out of the way, because a save the player may still own must
+    /// not be overwritten by the new game standing in for it.
     /// </summary>
     bool IsSavingProgress { get; }
 
@@ -67,10 +69,18 @@ public interface IGameSession
     /// given their save back is still owed a game, not a screen where nothing ever happens.
     /// </summary>
     /// <remarks>
-    /// The two failures are not the same and are not treated the same. A save that is <em>damaged</em>
-    /// is gone, so a new game replaces it. A save that could not be <em>read</em> — locked by cloud
-    /// sync or antivirus, or unreadable through a permissions problem — may be perfectly intact, so
-    /// the new game is played but not saved, and <see cref="SaveError"/> says why.
+    /// <para>
+    /// The two failures are not the same and are not treated the same. A save that is
+    /// <em>damaged</em> cannot be resumed from, so a new game replaces it — but the refused content
+    /// is set aside first, because refusing it is this build's judgement and a later build may read
+    /// it perfectly well. A save that could not be <em>read</em> — locked by cloud sync or
+    /// antivirus, or unreadable through a permissions problem — may be perfectly intact, so the new
+    /// game is played but not saved, and <see cref="SaveError"/> says why.
+    /// </para>
+    /// <para>
+    /// The one case where they meet is a refused save that cannot be moved out of the way: nothing
+    /// is written there either, because overwriting it would destroy the very thing being kept.
+    /// </para>
     /// </remarks>
     /// <returns>A task that completes once the session is ready.</returns>
     Task Continue();
