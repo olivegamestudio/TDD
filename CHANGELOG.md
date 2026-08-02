@@ -50,6 +50,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A quest marker can no longer be stepped over by a long frame.** `QuestProximityWatcher`
+  measured the player once per frame, at whatever position the frame ended at, so a trigger fired
+  only if a frame happened to *land* inside it — a frame carrying the ship from outside one side of
+  a marker to outside the other flew straight through it. Markers are now measured against the
+  ground the player covered, through `Position.FirstApproachWithin`, so no frame is long enough to
+  miss one. The segment is closed at both ends, so nothing is widened sideways: heading towards a
+  marker without reaching it is still not arriving at it. `Player.TravelledFrom` supplies where the
+  journey began, and reads as a placement rather than a journey after `MoveTo`, so resuming a save
+  does not sweep the ground back to wherever the last game ended. A quest's two triggers are
+  ordered along the journey, so a frame flying its ground backwards begins the quest without also
+  finishing it. ([#8](https://github.com/olivegamestudio/TDD/issues/8))
 - **A save the game could not read no longer freezes it, and is no longer overwritten.**
   `Continue` documented a fallback to a new game when the save "cannot be read" but only recovered
   from damaged *content*; the read itself was unguarded, so an `IOException` from a file locked by

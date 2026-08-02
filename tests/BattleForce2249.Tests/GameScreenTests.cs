@@ -106,6 +106,48 @@ public sealed class GameScreenTests : HostTestBase
     }
 
     [Fact]
+    public void OneFrameThatFliesPastTheEndMarker_StillCompletesQuest1()
+    {
+        // the whole point, through the real composition: a frame long enough to carry the ship
+        // clean past the exit marker used to fire nothing, because it did not finish inside it
+        IHost host = StartTheGame();
+        host.Update(TimeSpan.FromSeconds(1 / 60.0));            // quest 1 starts on the marker
+
+        Session.Player.MoveBy(0, 2_000);                        // one frame, 2,000 units covered
+        host.Update(TimeSpan.FromSeconds(1 / 60.0));
+
+        QuestMarkers markers = Resolve<IWorld>().QuestMarkers
+            .Single(marker => marker.QuestId == BattleForceCampaign.Quest1Id);
+        Assert.True(
+            Session.Player.Position.DistanceTo(markers.End) > 50,
+            "the frame has to finish outside the trigger, or it proves nothing");
+        Quest quest = Assert.Single(Session.Quests.Completed);
+        Assert.Equal(BattleForceCampaign.Quest1Id, quest.Id);
+    }
+
+    [Fact]
+    public async Task ResumingASave_DoesNotSweepTheGroundBackToWhereTheLastGameEnded()
+    {
+        // A resumed player is placed, not flown. Measuring a journey from wherever they were
+        // before would run a line from the world's start position through every marker on the way,
+        // and fire quest 1 for a player who is a thousand units past it.
+        InMemorySaveProgressService saves = new()
+        {
+            Content = SaveGameSerializer.Serialize(new SaveGame { PlayerX = 0, PlayerY = 700 }),
+        };
+        GameSession session = new(saves, new BattleForceCampaign(), new BattleForceWorld());
+        GameScreen screen = new(session, new QuestProximityWatcher(new BattleForceWorld()), NullLogger<GameScreen>.Instance);
+
+        screen.Enter();
+        await screen.Started;
+        screen.Update(TimeSpan.FromMilliseconds(16));
+
+        Assert.Equal(new Position(0, 700), session.Player.Position);
+        Assert.Empty(session.Quests.Active);
+        Assert.Empty(session.Quests.Completed);
+    }
+
+    [Fact]
     public void DoesNotDriveQuests_BeforeTheGameHasStarted()
     {
         // frames can arrive while the save is still loading

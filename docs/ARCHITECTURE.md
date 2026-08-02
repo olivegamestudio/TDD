@@ -68,6 +68,35 @@ The game side supplies where things actually are:
 - `QuestProximityWatcher` — measures the player against the markers each frame and calls the
   quest API when a trigger fires. It keeps no memory of what it has already fired; the quest
   model absorbs repeat calls.
+
+### Quest triggers are swept, not sampled
+
+A trigger measured at the position a frame *ended* at fires only if the frame happens to land
+inside it, so a frame long enough to carry the ship from outside one side of a marker to outside
+the other flies straight through a trigger it passed within metres of. Pillar 1 in
+`docs/DESIGN.md` calls that a bug rather than something to size markers around, and it made
+trigger distances the only thing standing between a stalled frame and a quest that silently never
+starts.
+
+So markers are measured against the **ground the player covered**, not the point they stopped on.
+`Position.FirstApproachWithin(from, to, distance)` finds where along that journey the traveller
+first came within a distance, as a fraction from 0 to 1, or `null` if they never did. The segment
+is closed at both ends, so this never widens a trigger sideways: a marker beyond either end is
+measured to that end, and heading towards one without reaching it is not arriving at it.
+
+Two things follow from it:
+
+- **Nothing remembers where the player was.** The player does — `Player.TravelledFrom` is where
+  they moved from, and `MoveTo` sets it to the new position because a placement is not a journey.
+  Anything else would sweep a line the player never flew on the first frame after a save is
+  resumed, and fire every trigger along it. `MoveBy` is documented as the per-frame shape of
+  movement for the same reason: a frame that moves the player in several steps must combine them,
+  or only the last is ground anything can see.
+- **A quest's two triggers are ordered against each other along the journey.** A quest cannot be
+  completed at a point the player reached before it started, so one frame flying a quest's ground
+  *backwards* — past the exit marker and on to the start marker — begins the quest without also
+  finishing it. A quest already under way when the frame opened is unconstrained; it was started
+  before any of this ground was covered.
 - `GameSession` — the game in progress. Starts or resumes, and saves when a quest starts or
   completes rather than every frame.
 

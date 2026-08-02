@@ -8,6 +8,11 @@ namespace BattleForce2249;
 /// frame it measures the player against the quest markers and drives the quest API from what it
 /// finds — proximity is the presentation's job, not the quest model's.
 /// </summary>
+/// <remarks>
+/// It measures the ground the player covered rather than the point they finished the frame on, so
+/// no frame is long enough to step over a marker. Both ends of that journey come from the player,
+/// which is why nothing here remembers anything from frame to frame.
+/// </remarks>
 /// <param name="session">The game in progress.</param>
 /// <param name="questProximity">Applies the quests' proximity triggers against the world.</param>
 /// <param name="logger">Where a game that failed to begin is reported.</param>
@@ -62,7 +67,9 @@ public sealed class GameScreen(
             return;
         }
 
-        questProximity.Update(session.Quests, session.Player.Position);
+        // the ground covered since the last frame, not the point it ended on: a marker the player
+        // flew straight through in one frame is a marker they reached
+        questProximity.Update(session.Quests, session.Player.TravelledFrom, session.Player.Position);
     }
 
     /// <summary>
