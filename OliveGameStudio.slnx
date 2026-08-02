@@ -17,6 +17,7 @@
   <Project Path="src/OliveGameStudio/OliveGameStudio.csproj" />
   <Project Path="src/Pilgrimage/Pilgrimage.csproj" />
   <Project Path="src\BattleForce2249.Menu\BattleForce2249.Menu.csproj" />
+  <Project Path="tests/BattleForce2249.MonoGame.Tests/BattleForce2249.MonoGame.Tests.csproj" />
   <Project Path="tests/BattleForce2249.Tests/BattleForce2249.Tests.csproj" />
   <Project Path="tests/OliveGameStudio.FrameRate.Tests/OliveGameStudio.FrameRate.Tests.csproj" />
   <Project Path="tests/OliveGameStudio.Localisation.Tests/OliveGameStudio.Localisation.Tests.csproj" />

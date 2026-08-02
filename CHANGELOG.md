@@ -9,6 +9,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A keyboard and a gamepad at the controls.** The shipping game is flyable by a person rather
+  than only by a test: quest 1 can be completed on W/S/A/D or the arrow keys, or on a gamepad's
+  left stick. `ShipControls.FromKeys` translates held keys — opposite keys are summed, so they
+  cancel and the answer never depends on which was read first — and `ShipControls.FromStick`
+  applies a dead zone and stretches the remaining travel back over the full range, so a worn stick
+  does not fly the ship while a stick at its stop still asks for everything.
+  `FirstActiveShipInput` asks its devices in order and lets the first one asking for anything
+  answer for the frame, arbitrating per device rather than per axis and holding no state, so
+  putting one device down hands over on the next frame. `BattleForce2249.MonoGame` binds the
+  devices through `AddDesktopPilot()`, after `AddBattleForce` so it wins over the engine's
+  `NeutralShipInput`. ([#9](https://github.com/olivegamestudio/TDD/issues/9))
+
 - **The `Pilgrimage` quest system.** A standalone quest library with no project references:
   `QuestDefinition` and `QuestTrigger` for authored content, `Quest` for the
   `NotStarted → Active → Completed` lifecycle, `QuestLog` for the player's quests and their
@@ -68,6 +80,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **`ShipControls` takes an axis it cannot read as hands off.** The constructor clamped with
+  `Math.Clamp`, which does not hold for `NaN` — it returns it unchanged — so a driver reporting an
+  axis it could not read put a `NaN` into the heading, then the velocity, then the position, and
+  nothing after it recovered: the ship was still being drawn and flown and no longer had a place in
+  the world. Unreachable before now, because the only input device was `NeutralShipInput`; reachable
+  the moment a real pad was bound, so it is fixed with the binding. The same value would also have
+  won the arbitration and shut every device behind it out, since `NaN == 0` is
+  false. ([#9](https://github.com/olivegamestudio/TDD/issues/9))
 - **`QuestLog.Register` refuses an identifier that names no quest.** Both edges that read a save skip
   a quest entry whose identifier is `null`, empty or blank, on the stated grounds that nothing is
   registered under one — but nothing enforced that, so a campaign could register a quest under a

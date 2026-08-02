@@ -27,13 +27,13 @@ to know about ships, quests or credits is on the wrong side of this line.
 | `OliveGameStudio.UI`, `.UI.Abstractions` | Menu and button navigation. Not ship control. |
 | `OliveGameStudio.FrameRate` | Frame time filtering, so a paused or slowed game holds still while frames keep arriving. |
 | `OliveGameStudio.Progress` | `LocalSaveProgressService`, persisting save text to a file. |
-| `OliveGameStudio.World` | `Position`, `Player`. The spatial model. |
+| `OliveGameStudio.World` | `Position`, `Player`. The spatial model, plus the ship's physics and `IShipInput` — what an input means, never which device produced it. |
 | `OliveGameStudio.Localisation` | `ITextProvider`, `JsonTextProvider`, `MissingTextException`. |
 | `Pilgrimage` | The quest system. No project references at all, by design. |
 | `BattleForce2249` | Game host and DI registration. |
 | `BattleForce2249.Abstractions` | Screen interfaces and options. |
 | `BattleForce2249.Company`, `.Menu`, `.Game` | The three screens. |
-| `BattleForce2249.MonoGame` | The MonoGame entry point. |
+| `BattleForce2249.MonoGame` | The MonoGame entry point, and the real input devices bound to the engine's seams. |
 
 Tests live in `tests/` as `<project>.Tests`, xUnit, targeting `net10.0`.
 
@@ -343,10 +343,44 @@ button while nothing is focused adopts it. `MenuScreen` depends on the pair — 
 disabled until the save has been read, which leaves the screen with no focus at all, and enabling
 it is what puts focus back.
 
+## Ship input
+
+`IShipInput` is the seam gameplay input arrives through, and it follows the engine/game split the
+same way saved progress does: **the engine provides the service, the host provides the device.**
+`OliveGameStudio.World` owns what an input *means* — `ShipControls.FromKeys` for the digital case,
+`ShipControls.FromStick` for the analogue one, and `FirstActiveShipInput` for choosing between
+devices. `BattleForce2249.MonoGame` owns which keys and which stick.
+
+**Arbitration is per device, not per axis.** Devices are asked in order and the first one asking
+for anything answers for the whole frame. Summing two devices would turn two half-turns into a
+full one; arbitrating per axis is the same summing in a form the player cannot see. It holds no
+state, so putting one device down hands over on the very next frame. The gamepad is asked first —
+a resting pad is zeroed by its dead zone, so it costs the keyboard nothing.
+
+**An axis that cannot be read is hands off, guarded twice.** `Math.Sign` throws on `NaN` rather
+than returning 0, and an ordered comparison against `NaN` is false either way round, so a dead zone
+test does not catch one. `PastDeadZone` catches an unreadable axis; the `ShipControls` constructor
+catches a `NaN` arriving by any other route. The two cover different holes and neither is spare.
+`ShipControls.IsNeutral` compares exactly against zero and is only safe because of the second: a
+device reporting `NaN` would otherwise claim to be the one in use and shut every device behind it
+out.
+
+**The dead zone is the game's, not the platform's.** The host reads the pad with MonoGame's dead
+zone off and applies `GamePadShipInput.DeadZone` itself, so there is one stated number rather than
+whatever the driver decided.
+
 ## Known gaps
 
-- Nothing moves the ship. Quest 1 is completable by test, not by playing — movement and physics
-  are issue #3.
+- `Keyboard.GetState` and `GamePad.GetState` are static calls into MonoGame with no seam in front
+  of them, so nothing invokes `Read()` on a real device. What is untested is the few lines naming
+  the keys and the stick axes; everything they feed is engine code and is covered.
+  `tests/BattleForce2249.MonoGame.Tests` pins the registration in both orderings and pins the
+  shipped dead zone, which no other project can see.
+- Nobody has *felt* the handling. `BattleForceShip`'s tuning has only been checked against quest
+  1's distances, and as of the input binding a person can actually fly it. Worth a play session
+  before the numbers are treated as settled.
+- There are no on-screen key prompts; nothing tells the player which keys fly the ship. That is
+  `ENGINE` work and needs localised text.
 - Nothing displays a quest title. There is no HUD or quest log; that is a separate `ENGINE`
   issue. `IGameSession.SaveError` is unread for the same reason — there is nowhere to say it.
 - Nothing selects a language. Translations are reachable only through the machine's own culture.
