@@ -53,6 +53,11 @@ public static class BattleForceServiceCollectionExtensions
         services
             .AddOliveGameStudio()
 
+            // the ship the game is flown in: the engine owns the physics, the game owns the
+            // numbers that decide how it handles
+            .AddSingleton(DisgracedShip.Handling)
+            .AddSingleton<ShipMovement>()
+
             // the quest content, the world its markers stand in, and the watcher that measures
             // the player against them
             .AddSingleton<ICampaign, BattleForceCampaign>()
@@ -63,6 +68,12 @@ public static class BattleForceServiceCollectionExtensions
             .AddSingleton<ICompanyScreen, CompanyScreen>()
             .AddSingleton<IMenuScreen, MenuScreen>()
             .AddSingleton<IGameScreen, GameScreen>()
+            .AddSingleton<IShipView, ShipView>()
+
+            // Registered as itself rather than behind an interface. Nothing outside the drawing
+            // sets anything on it — it reads the camera and nothing else — so an interface would
+            // be a name for the container's benefit and no one else's.
+            .AddSingleton<StarField>()
             .AddSingleton<IHost, BattleForceHost>();
 
         return services;

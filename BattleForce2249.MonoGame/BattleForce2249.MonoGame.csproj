@@ -32,6 +32,7 @@
     <ItemGroup>
       <ProjectReference Include="..\src\BattleForce2249\BattleForce2249.csproj" />
       <ProjectReference Include="..\src\OliveGameStudio.Abstractions\OliveGameStudio.Abstractions.csproj" />
+      <ProjectReference Include="..\src\OliveGameStudio.MonoGame\OliveGameStudio.MonoGame.csproj" />
       <ProjectReference Include="..\src\OliveGameStudio.UI.Abstractions\OliveGameStudio.UI.Abstractions.csproj" />
       <ProjectReference Include="..\src\OliveGameStudio.UI\OliveGameStudio.UI.csproj" />
       <ProjectReference Include="..\src\OliveGameStudio\OliveGameStudio.csproj" />

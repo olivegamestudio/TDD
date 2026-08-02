@@ -1,20 +1,30 @@
-using Microsoft.Extensions.Logging;
+using System.Numerics;
 using OliveGameStudio;
 
 namespace BattleForce2249;
 
 /// <summary>
-/// The screen the game is played on. Entering it begins or resumes the game session, and every
-/// frame it measures the player against the quest markers and drives the quest API from what it
-/// finds — proximity is the presentation's job, not the quest model's.
+/// The screen the game is played on. Entering it begins or resumes the game session; every frame
+/// it flies the ship, measures the player against the quest markers and drives the quest API from
+/// what it finds — proximity is the presentation's job, not the quest model's — and then hands the
+/// result to the drawing side as a pose. Drawing follows the ship rather than leading it.
 /// </summary>
 /// <param name="session">The game in progress.</param>
+/// <param name="ship">The ship's physics, which carries the player around the world.</param>
+/// <param name="pilot">Where the pilot's intent comes from this frame.</param>
 /// <param name="questProximity">Applies the quests' proximity triggers against the world.</param>
-/// <param name="logger">Where a game that failed to begin is reported.</param>
+/// <param name="camera">The camera the world is drawn through.</param>
+/// <param name="view">The ship on screen, which draws whatever pose it was last given.</param>
+/// <param name="stars">The stars the ship flies through.</param>
 public sealed class GameScreen(
     IGameSession session,
+    ShipMovement ship,
+    IShipInput pilot,
     QuestProximityWatcher questProximity,
-    ILogger<GameScreen> logger) : IGameScreen, IActivatable
+    ICamera camera,
+    IShipView view,
+    StarField stars)
+    : IGameScreen, IActivatable, IRenderable
 {
     /// <summary>
     /// Gets the task that begins the game, so a caller can await the save being read. Loading
@@ -28,30 +38,12 @@ public sealed class GameScreen(
     /// <returns>Always <see cref="EnterResult.Stay"/>; this screen is where gameplay happens.</returns>
     public EnterResult Enter()
     {
-        Started = Start();
-        return EnterResult.Stay;
-    }
+        // a fresh flight every time the screen is entered: the save carries where the player is,
+        // never how fast they were going, so nothing should be inherited from a previous session
+        ship.Reset();
 
-    /// <summary>
-    /// Begins the game and makes sure a failure is heard.
-    /// </summary>
-    /// <remarks>
-    /// Nothing in the game holds <see cref="Started"/>, so a failure here reaches no one on its own:
-    /// the session never becomes ready, every frame turns straight back, and the player sits in
-    /// front of a game that has quietly stopped. The session already recovers from a save it cannot
-    /// read, so anything landing here is a defect — and it gets logged as one rather than swallowed.
-    /// </remarks>
-    async Task Start()
-    {
-        try
-        {
-            await session.Continue();
-        }
-        catch (Exception error)
-        {
-            logger.LogError(error, "The game could not be started, so the game screen will do nothing.");
-            throw;
-        }
+        Started = session.Continue();
+        return EnterResult.Stay;
     }
 
     /// <inheritdoc />
@@ -59,10 +51,21 @@ public sealed class GameScreen(
     {
         if (!session.IsReady)
         {
+            // frames arrive while the save is still being read; there is no position to draw yet,
+            // so the view keeps the pose it has rather than being shown a half loaded game
             return;
         }
 
+        // the ship flies first, so the quests are measured against where the player got to this
+        // frame rather than where they were at the end of the last one
+        ship.Update(session.Player, pilot.Read(), frameTime);
+
         questProximity.Update(session.Quests, session.Player.Position);
+
+        // and last, what the frame produced is handed to the drawing side. The pose is the whole
+        // of what the two stages agree about: the physics has no idea a screen exists, and the
+        // view has no idea physics does.
+        view.Pose = PoseOf(session.Player.Position, ship.Heading);
     }
 
     /// <summary>
@@ -71,4 +74,38 @@ public sealed class GameScreen(
     public void Exit()
     {
     }
+
+    /// <inheritdoc />
+    public void Render(IRenderer renderer)
+    {
+        // The camera follows the ship rather than standing still. At the speeds this ship flies,
+        // a fixed viewport is left behind within seconds of the player touching the throttle,
+        // and a ship that has flown off the edge of the screen is indistinguishable from one
+        // that was never drawn. The world moves; the ship holds the middle.
+        camera.Target = view.Pose.Position;
+
+        // Before the ship, so the ship is over the stars rather than behind one. It is also what
+        // makes the ship look like it is going anywhere: the camera holds the ship still in the
+        // middle of the viewport, so the only thing that can move is what is behind it.
+        stars.Render(renderer);
+
+        view.Render(renderer);
+    }
+
+    /// <summary>
+    /// Converts what the physics produced into the pose the drawing side draws from.
+    /// </summary>
+    /// <remarks>
+    /// The heading passes through untouched, and that is a decision rather than an omission. Both
+    /// sides measure the same angle the same way — zero is straight forward along the positive
+    /// world Y axis, and the angle increases to starboard — so a correction here would turn the
+    /// ship the wrong way. Nothing in either type can enforce that agreement, which is why it is
+    /// written down here and asserted in <c>GameScreenTests</c> rather than left to be noticed.
+    ///
+    /// The narrowing to <see cref="float"/> is the world model keeping its precision while the
+    /// drawing side takes what a graphics device can use. At the sizes a viewport spans, the
+    /// difference is far below a pixel.
+    /// </remarks>
+    static ShipPose PoseOf(Position position, double heading) =>
+        new(new Vector2((float)position.X, (float)position.Y), (float)heading);
 }

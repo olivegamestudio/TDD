@@ -19,6 +19,12 @@ public sealed class ScreenDirector(ILogger<ScreenDirector> logger) : IScreenDire
     }
 
     /// <inheritdoc />
+    public void Draw(IRenderer renderer)
+    {
+        (Current as IRenderable)?.Render(renderer);
+    }
+
+    /// <inheritdoc />
     /// <remarks>
     /// This director does not enter the screen, so it never reads an <see cref="EnterResult"/> and
     /// a screen asking to redirect is simply not heard. The one-entry-per-navigation rule the

@@ -27,6 +27,14 @@ public interface IScreenDirector
     void Update(TimeSpan frameTime);
 
     /// <summary>
+    /// Draws the current screen, if there is one and it has anything to draw. A screen draws by
+    /// implementing <see cref="IRenderable"/> alongside <see cref="IScreen"/>; one that does not
+    /// is skipped, so a screen with no visuals yet costs nothing and needs no empty method.
+    /// </summary>
+    /// <param name="renderer">The frame's renderer.</param>
+    void Draw(IRenderer renderer);
+
+    /// <summary>
     /// Navigates to the specified screen by setting it as the new active screen.
     /// This method updates the current state of the screen director to reflect the provided screen.
     /// </summary>
