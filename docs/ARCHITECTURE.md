@@ -208,6 +208,60 @@ the log is a defect; the point is that it is a defect somebody can see. A failur
 leaves the session never ready, every frame turning straight back, and the player in front of a
 game that has quietly stopped.
 
+### A redirect chain ends, one way or the other
+
+`IActivatable.Enter` returns either `EnterResult.Stay` or `EnterResult.RedirectTo(other)`, and
+`LifecycleScreenDirector` keeps entering until a screen stays — so one `NavigateTo` can pass
+through several screens before it settles. (`ScreenDirector` does not follow redirects at all;
+none of this applies to it.)
+
+**A screen may not be entered twice during one navigation.** Redirect targets come from game code
+and each screen's `Enter` is written in isolation, so a cycle is authored by accident rather than
+on purpose: a title screen redirecting to the menu when a save exists, a menu redirecting back when
+the save turns out to be unreadable. Neither screen is wrong on its own; the cycle exists only in
+the pair. Followed without a bound, that call never returns — the update loop stops ticking and the
+game hangs on a black screen with no exception and no log, which is the worst shape a failure can
+take. `NavigateTo` instead throws `InvalidOperationException` naming the path in entry order
+(`A -> B -> A`) the moment a screen would be entered a second time.
+
+The bound is per navigation, not for the life of the director: navigating back to a screen visited
+by an earlier call is ordinary and unrestricted, and a redirect back to the screen the navigation
+*came from* is not a cycle either, because that screen was exited rather than entered on this pass.
+A chain that would have settled on the second entry is rejected along with the ones that would not —
+deliberately, since at the moment of the repeat the two cannot be told apart, and whether it settles
+depends on state the screens mutate inside `Enter`.
+
+Screens are compared by reference. Two instances of one screen type are two different screens, and
+a screen written as a record does not collide with an equal-valued sibling — value equality would
+report a cycle that is not there.
+
+When the cycle is detected the navigation is abandoned rather than half-applied: the screen entered
+last is exited, and `Current` is left `null`. That keeps every `Enter` paired with an `Exit`, and
+`Current == null` is a state `Update` already handles, so nothing goes on ticking a screen that had
+asked to be redirected away from. The director is still usable afterwards — the next `NavigateTo`
+starts clean.
+
+## Menu input
+
+`OliveGameStudio.UI` drives buttons, not the ship. A button press is two events with a gap between
+them: `Press` arms the hold, `Release` commits it, and `Cancel` abandons it.
+
+**The press belongs to the button that was pressed.** `Held` follows that button and not the focused
+one, because a pressed action is free to move focus while the player is still holding the key —
+`FocusOn` directly, or `Disable`, which re-homes focus as a side effect. Disabling a button as it
+activates, so it cannot fire twice, is an idiom the menu already uses, so this is the common case
+rather than an exotic one. `IUIController` is registered as a singleton and every screen's buttons
+share one node list, so a press that drifted off its button could commit one belonging to a screen
+that is not even current.
+
+`Press` also arms the hold *before* running the pressed action, so an action that calls `Cancel`
+abandons the press it was invoked by; arming afterwards would overwrite that decision.
+
+**Enablement is read at release, not at press.** Disabling a held button therefore suppresses its
+commit without cancelling the press, and re-enabling it before the player lets go restores it.
+`Disable` governs whether a button may act; `Cancel` abandons a press. Conflating them would leave
+no way to say the first without also saying the second.
+
 ## Known gaps
 
 - Nothing moves the ship. Quest 1 is completable by test, not by playing — movement and physics

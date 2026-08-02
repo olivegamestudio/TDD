@@ -53,6 +53,11 @@ public interface IUIController
     /// Disables the specified button, preventing it from receiving input or triggering actions.
     /// </summary>
     /// <param name="button">The button to be disabled.</param>
+    /// <remarks>
+    /// Disabling the focused button re-homes focus to the first enabled button, or clears it if
+    /// there is none. A press already in flight is unaffected — it stays with the button it started
+    /// on and is only withheld from committing while that button is disabled.
+    /// </remarks>
     void Disable(Button button);
 
     /// <summary>

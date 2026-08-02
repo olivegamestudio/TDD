@@ -71,6 +71,13 @@ the order the entries are in, and a duplicate can only come from a file that was
 merged, where the order says nothing. See
 [the saved progress notes](docs/ARCHITECTURE.md#saved-progress).
 
+Two ways the engine could fail quietly are closed. A menu press stays with the button it started
+on, so a button that disables itself as it activates — the menu's own idiom — no longer hands the
+press to whichever button focus landed on, and the wrong action no longer runs on release. And a
+screen navigation that redirects round in a circle now throws, naming the path it took, instead of
+spinning inside the call while the update loop stops ticking and the window goes black. See
+[the screen flow and menu input notes](docs/ARCHITECTURE.md#screen-flow).
+
 Not yet built:
 
 - **Ship movement and physics** (#3) — nothing moves the ship in the running game, so Quest 1 is

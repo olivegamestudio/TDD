@@ -170,6 +170,12 @@ public sealed class UIController : IUIController
     /// This method resets the state of the pressing operation in the UI controller, ensuring that
     /// the action linked to the currently held button is not executed. Typically used to handle scenarios
     /// where an input operation is interrupted or deliberately aborted.
+    /// <para>
+    /// A pressed action may cancel the very press that invoked it: <see cref="Press"/> arms the hold
+    /// before running the action, so the decision made inside it stands and the button does not commit
+    /// on release. This is the way to abandon a press — <see cref="Disable"/> only withholds the
+    /// commit, and the press it belongs to survives being re-enabled.
+    /// </para>
     /// </remarks>
     public void Cancel() => _pressing = null;
 
@@ -210,6 +216,14 @@ public sealed class UIController : IUIController
     /// Disables the specified button, preventing it from receiving input or triggering actions.
     /// </summary>
     /// <param name="button">The button to be disabled.</param>
+    /// <remarks>
+    /// Disabling the focused button moves focus: it is re-homed to the first enabled button, or
+    /// cleared if there is none. That side effect is worth knowing about because disabling a button
+    /// as it activates — so it cannot fire twice — is an idiom this codebase uses. It does not
+    /// disturb a press in flight: <see cref="Held"/> follows the button that was pressed, not focus,
+    /// so the press stays where it started and is merely withheld from committing while the button
+    /// is disabled.
+    /// </remarks>
     public void Disable(Button button) => SetEnabled(button, false);
 
     /// <summary>
