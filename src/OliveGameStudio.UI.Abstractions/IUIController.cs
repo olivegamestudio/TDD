@@ -23,6 +23,10 @@ public interface IUIController
     /// Simulates a button press event, optionally focusing on the specified button before triggering its associated action.
     /// </summary>
     /// <param name="button">The <see cref="Button"/> to focus and press. If null, the press is executed on the currently focused button, if any.</param>
+    /// <remarks>
+    /// The press is held by the button that was pressed. A pressed action that moves focus — directly,
+    /// or by disabling its own button — does not hand the press to whatever focus lands on.
+    /// </remarks>
     void Press(Button? button = null);
 
     /// <summary>
@@ -31,6 +35,8 @@ public interface IUIController
     /// <remarks>
     /// This method stops the ongoing press action by resetting the pressed button to null and,
     /// if the associated node is enabled, triggers its corresponding action. If no button is currently being pressed, the method performs no operation.
+    /// Enablement is read at release, so disabling a held button suppresses its commit and re-enabling
+    /// it before release restores it.
     /// </remarks>
     void Release();
 
