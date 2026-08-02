@@ -277,6 +277,107 @@ public sealed class GameSessionTests
         Assert.True(quest.IsCompleted);
     }
 
+    // ---- a save that restores no campaign progress ----
+
+    /// <summary>
+    /// Saves the game accepts that say nothing about any quest the campaign ships. Every one of
+    /// them is readable, so none is damaged, and every one carries a position — and it is the
+    /// position that is the problem, because there is no progress beside it to make sense of it.
+    /// </summary>
+    public static TheoryData<string> SavesHoldingNoCampaignProgress() =>
+    [
+        // an entry naming no quest at all, and no word about quest-1: QA's shape on #44
+        """{ "PlayerX": 0, "PlayerY": 700, "Quests": [ { "QuestId": "  ", "State": "Active" } ] }""",
+        // the same file with an id that names a quest this build has dropped rather than nothing
+        """{ "PlayerX": 0, "PlayerY": 700, "Quests": [ { "QuestId": "quest-99", "State": "Active" } ] }""",
+        // no quest entries at all
+        """{ "PlayerX": 0, "PlayerY": 700, "Quests": [] }""",
+        // quest-1 named, and named as a campaign nobody has begun
+        """{ "PlayerX": 0, "PlayerY": 700, "Quests": [ { "QuestId": "quest-1", "State": "NotStarted" } ] }""",
+    ];
+
+    [Theory]
+    [MemberData(nameof(SavesHoldingNoCampaignProgress))]
+    public async Task Continue_PutsThePlayerAtTheWorldStart_WhenTheSaveHoldsNoCampaignProgress(string content)
+    {
+        // A saved position is where the player got to while playing the campaign, so it means
+        // something only beside the progress it was taken with. These files restore no progress at
+        // all, and setting the player down at their coordinates leaves them 700 units past a start
+        // trigger 25 units wide, with nothing active and nothing to fly towards.
+        _saves.Content = content;
+        GameSession session = CreateSession();
+
+        await session.Continue();
+
+        Assert.True(session.IsReady);
+        Assert.Equal(Start, session.Player.Position);
+    }
+
+    [Theory]
+    [MemberData(nameof(SavesHoldingNoCampaignProgress))]
+    public async Task Continue_LeavesQuest1Completable_WhenTheSaveHoldsNoCampaignProgress(string content)
+    {
+        // Ready is not playable. Fly it — forwards only, the one direction the game teaches — and
+        // prove the campaign really is there rather than merely registered.
+        _saves.Content = content;
+        GameSession session = CreateSession();
+        QuestProximityWatcher watcher = new(new TestWorld(new QuestMarkers("quest-1", Start, End)));
+
+        await session.Continue();
+
+        for (int frame = 0; frame < 500 && !session.Quests.Find("quest-1")!.IsCompleted; frame++)
+        {
+            watcher.Update(session.Quests, session.Player.Position);
+            session.Player.MoveBy(0, 10);
+        }
+
+        Assert.True(
+            session.Quests.Find("quest-1")!.IsCompleted,
+            $"the quest could not be flown from {session.Player.Position.X},{session.Player.Position.Y} for: {content}");
+    }
+
+    [Theory]
+    [InlineData("Active")]
+    [InlineData("Completed")]
+    public async Task Continue_KeepsTheSavedPosition_WhenTheCampaignHasBegun(string state)
+    {
+        // The other side of the rule, and the side that must not move: a save holding real progress
+        // is resumed where it was left, junk entry beside it or not. This is #44's own file, and
+        // ignoring its position would send a player who had flown 700 units back to the beginning.
+        _saves.Content = $$"""
+        {
+          "PlayerX": 0, "PlayerY": 700,
+          "Quests": [
+            { "QuestId": "quest-1", "State": "{{state}}" },
+            { "QuestId": "  ",      "State": "Active"    }
+          ]
+        }
+        """;
+        GameSession session = CreateSession();
+
+        await session.Continue();
+
+        Assert.Equal(new Position(0, 700), session.Player.Position);
+        Assert.Equal(Enum.Parse<QuestState>(state), Assert.Single(session.Quests.Quests).State);
+    }
+
+    [Fact]
+    public async Task Continue_DoesNotWriteOverASaveItDeclinedThePositionOf()
+    {
+        // Declining the position is not refusing the file, and the difference is the whole reason
+        // this is not simply a new game: a refused save is set aside and replaced, while this one
+        // is left exactly where it was found until the player makes progress worth writing.
+        _saves.Content = """{ "PlayerX": 0, "PlayerY": 700, "Quests": [ { "QuestId": "  ", "State": "Active" } ] }""";
+        string onDisk = _saves.Content;
+        GameSession session = CreateSession();
+
+        await session.Continue();
+
+        Assert.Equal(0, _saves.SaveCount);
+        Assert.Null(_saves.SetAsideContent);
+        Assert.Equal(onDisk, _saves.Content);
+    }
+
     // ---- a save the game refuses ----
 
     /// <summary>

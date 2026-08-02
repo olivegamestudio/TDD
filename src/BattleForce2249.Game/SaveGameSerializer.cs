@@ -10,10 +10,21 @@ namespace BattleForce2249;
 /// than as an error, so a player with a corrupt file gets a new game instead of a crash.
 /// </summary>
 /// <remarks>
+/// <para>
 /// What this type refuses is a judgement about what this build will take, not a measurement of
 /// what is recoverable, so <see cref="GameSession.Continue"/> sets a refused save aside before the
 /// new game writes. A boundary drawn here that turns out to be too strict costs the player a
 /// restart rather than their game.
+/// </para>
+/// <para>
+/// <b>A quest entry that names no registered quest is drift, not damage.</b> It costs the entry
+/// and nothing else: the file is read, and <see cref="QuestLog.Restore"/> skips the entry, exactly
+/// as it skips one naming a quest this build no longer ships. A blank identifier and a dropped one
+/// mean the same thing to everything downstream — there is no quest to apply them to — so refusing
+/// the file over one would discard the progress saved beside it to protect against an entry that
+/// does nothing. What refusal is for is a file this build cannot read: a state outside a quest's
+/// lifecycle, or JSON that will not parse.
+/// </para>
 /// </remarks>
 public static class SaveGameSerializer
 {

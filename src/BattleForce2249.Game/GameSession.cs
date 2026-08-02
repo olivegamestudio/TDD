@@ -94,12 +94,53 @@ public sealed class GameSession : IGameSession
         }
 
         Reset();
-        Player.MoveTo(new Position(save.PlayerX, save.PlayerY));
         Quests.Restore(save.Quests);
+
+        // Reset has already put the player at the world's start, which is where a campaign nobody
+        // has begun belongs. Moving them is what resuming a game in progress means.
+        if (HasBegun())
+        {
+            Player.MoveTo(new Position(save.PlayerX, save.PlayerY));
+        }
 
         _autoSave = true;
         IsReady = true;
     }
+
+    /// <summary>
+    /// Whether the campaign restored from the save has actually been played: at least one
+    /// registered quest came back started or completed.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// It decides whether the saved position is used, because a position is only progress beside
+    /// the quest progress it was taken with. A save can be perfectly readable and still say nothing
+    /// about any quest this build ships — every entry naming a quest the campaign has since
+    /// dropped, or naming no quest at all, or simply no entries. Both directions of that drift are
+    /// tolerated on purpose (see <see cref="QuestLog.Restore"/>), so reading such a file leaves the
+    /// quest log exactly as a new game's while the player is set down wherever the coordinates say.
+    /// Quest 1 begins within 25 units of a marker a new game spawns the player on, so a player put
+    /// 700 units out has no quest active, nothing to fly towards, and gets further from the only
+    /// trigger that could help with every frame of flying forward — the one direction the game
+    /// teaches. The game is not frozen, but the only way out of it is backwards, through the debris
+    /// field quest 1 is about escaping, with nothing on screen to say so.
+    /// </para>
+    /// <para>
+    /// The file is still accepted rather than refused, and that is the cheaper mistake. A refused
+    /// save is set aside and replaced, so refusing costs the player the file as well as the
+    /// position; declining only the position leaves the file on disk untouched until real progress
+    /// is written over it.
+    /// </para>
+    /// <para>
+    /// What the line costs is a save taken after the player has travelled but before any quest has
+    /// begun: resuming it sends them back to the start. No such save can be written today —
+    /// progress is captured when a quest changes state, and quest 1 begins on the starting marker
+    /// — but a campaign whose first quest does not auto-start where the player spawns would make
+    /// one, and this needs revisiting with it.
+    /// </para>
+    /// </remarks>
+    /// <returns><c>true</c> when the save restored progress against a quest the campaign ships.</returns>
+    bool HasBegun() => Quests.Quests.Any(quest => quest.State is not QuestState.NotStarted);
 
     /// <summary>
     /// Starts a new game in place of a save this build refused, keeping the refused content first.

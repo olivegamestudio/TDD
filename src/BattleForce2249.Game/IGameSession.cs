@@ -81,6 +81,13 @@ public interface IGameSession
     /// The one case where they meet is a refused save that cannot be moved out of the way: nothing
     /// is written there either, because overwriting it would destroy the very thing being kept.
     /// </para>
+    /// <para>
+    /// A save that <em>is</em> resumed is resumed at its coordinates only when it restored progress
+    /// against a quest this build ships. A readable save can restore none — drift is tolerated in
+    /// both directions — and a position without the progress it was taken beside puts the player
+    /// outside a campaign nobody has begun, too far from its first trigger to reach it by playing
+    /// forward. The file is kept either way; only the position is declined.
+    /// </para>
     /// </remarks>
     /// <returns>A task that completes once the session is ready.</returns>
     Task Continue();
