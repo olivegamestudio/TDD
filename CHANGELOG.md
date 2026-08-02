@@ -63,6 +63,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Comparing a save whose quest list is null no longer throws.** `SaveGame.Quests` is declared
+  non-nullable, but nothing enforced it, so a snapshot built with `Quests = null!` — or read from a
+  file saying `"Quests": null` before `SaveGameSerializer` patched it up — reached `Equals` and
+  `GetHashCode`, where `SequenceEqual` and `.Count` threw on it. The list is now normalised where it
+  is set rather than where it is read: `Quests` takes a null as no quests, so the declaration holds
+  for every reader instead of each one defending itself, and a save with no quests is written as an
+  empty array rather than as null. The serializer's own null patch went with it, being the same rule
+  stated twice. ([#99](https://github.com/olivegamestudio/TDD/issues/99))
 - **Two buttons with the same name are two buttons.** `Element` and its kinds are now classes
   rather than records, so `==` is identity. `Button` was a record, which made `==` value equality
   on the name, and `UIController` resolves every button through `==` — so with the controller
