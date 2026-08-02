@@ -34,9 +34,12 @@ public interface IGameSession
     /// tests, or a shutdown path — can await it.
     /// </summary>
     /// <remarks>
-    /// Awaiting it waits out every save queued ahead of it as well, because saves are written one
-    /// at a time and in the order they were asked for. There is no state of affairs in which this
-    /// has completed and an earlier save has not.
+    /// Awaiting it waits out everything the session had already been asked to do to the file as
+    /// well — earlier saves, and the read or the set-aside that begins a game — because they are
+    /// performed one at a time and in the order they were asked for. There is no state of affairs
+    /// in which this has completed and something asked for before it has not. A save that was
+    /// asked for is always eventually written: nothing abandons one, not even the end of the game
+    /// that asked for it.
     /// </remarks>
     Task PendingSave { get; }
 
@@ -76,6 +79,13 @@ public interface IGameSession
     /// is gone, so a new game replaces it. A save that could not be <em>read</em> — locked by cloud
     /// sync or antivirus, or unreadable through a permissions problem — may be perfectly intact, so
     /// the new game is played but not saved, and <see cref="SaveError"/> says why.
+    /// </remarks>
+    /// <remarks>
+    /// The game in progress ends before the file is read, and the read waits for anything that
+    /// game left outstanding. One session serves every entry into gameplay, so a write it was
+    /// asked for by the game before is still to come; reading past it would resume from a snapshot
+    /// the file is about to stop holding, and the next quest to change would then write that older
+    /// game back out over the player's real progress, with nothing raised to say so.
     /// </remarks>
     /// <returns>A task that completes once the session is ready.</returns>
     Task Continue();

@@ -60,6 +60,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   land, and `PendingSave` waits out the whole queue rather than only the most recent request. A
   write that fails is still reported to its own caller and still does not stop the next one from
   running. ([#63](https://github.com/olivegamestudio/TDD/issues/63))
+- **A save queued by one game can no longer land behind the game after it.** `IGameSession` is a
+  singleton, so one session and one queue serve every entry into gameplay and outlive any one game
+  played through them — and #63's queue orders the writes within a game without knowing that the
+  game one of them belonged to is over. Reading the save past a leftover write resumed from a
+  snapshot the file was about to stop holding, and the next quest to change wrote that older game
+  back out over the player's real progress; moving a refused save aside past one let that write
+  recreate a save behind the move, so the file set aside was no longer the only copy and the new
+  game's first save was no longer the first thing written. Every operation the session performs on
+  the file — reads and set-asides as well as writes — now goes through the one queue in the order
+  it was asked for, and a game ends before the file is touched rather than once the read has
+  answered, so a frame arriving mid-read cannot queue one last write of the game being left. A
+  leftover write is waited out and never abandoned: it is progress the player earned. Not reachable
+  in the shipping game, which enters the game screen once per run.
+  ([#85](https://github.com/olivegamestudio/TDD/issues/85))
 - **A save the game could not read no longer freezes it, and is no longer overwritten.**
   `Continue` documented a fallback to a new game when the save "cannot be read" but only recovered
   from damaged *content*; the read itself was unguarded, so an `IOException` from a file locked by

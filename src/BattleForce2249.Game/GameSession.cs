@@ -23,6 +23,14 @@ namespace BattleForce2249;
 /// tell them apart. What a service must do when it <em>is</em> written to twice at once — which
 /// this no longer does, but another caller still might — is the service's own contract.
 /// </para>
+/// <para>
+/// The queue holds every operation the session performs on the file, not only the writes. One
+/// session is registered for the whole game, so it outlives any one game played through it, and a
+/// write asked for by a game that is over is still a write: reading the file past it would resume
+/// from a snapshot the file is about to stop holding, and moving the file aside past it would let
+/// that write recreate a save behind the move. Neither corrupts anything and neither raises
+/// anything, which is what makes them worth ordering rather than watching for.
+/// </para>
 /// </remarks>
 public sealed class GameSession : IGameSession
 {
@@ -31,17 +39,19 @@ public sealed class GameSession : IGameSession
     readonly IWorld _world;
 
     /// <summary>
-    /// Guards <see cref="_lastWrite"/>. Quest events arrive on the frame loop and a shutdown flush
-    /// need not, so the one place the queue is read and replaced is not left to luck.
+    /// Guards <see cref="_lastFileOperation"/>. Quest events arrive on the frame loop and a
+    /// shutdown flush need not, so the one place the queue is read and replaced is not left to
+    /// luck.
     /// </summary>
-    readonly Lock _saveOrder = new();
+    readonly Lock _fileOrder = new();
 
     /// <summary>
-    /// The write at the back of the queue: every new save waits for it before starting, and then
-    /// becomes it. Ordering the writes is the session's job because only the session knows which
-    /// of two snapshots is the newer — the storage sees two payloads and no way to tell.
+    /// The operation at the back of the queue: every new one waits for it before starting, and
+    /// then becomes it. Ordering them is the session's job because only the session knows which of
+    /// two snapshots is the newer, and which game each of them belonged to — the storage sees a
+    /// series of payloads and no way to tell any of that.
     /// </summary>
-    Task _lastWrite = Task.CompletedTask;
+    Task _lastFileOperation = Task.CompletedTask;
 
     /// <summary>
     /// Whether a quest changing state should write a save. It is turned off while a game is being
@@ -103,10 +113,16 @@ public sealed class GameSession : IGameSession
     {
         SaveError = null;
 
+        // The game in progress ends here, before the file is touched, rather than once the read
+        // has answered. Reset turns autosave off, so a frame arriving while the read is in flight
+        // cannot put one last write of the game being left behind the read of the game arriving —
+        // which is the leftover write the queue would then be ordering against.
+        Reset();
+
         string? content;
         try
         {
-            content = await _saveProgressService.Load();
+            content = await Queue(_saveProgressService.Load);
         }
         catch (Exception error) when (IsStorageFailure(error))
         {
@@ -115,7 +131,6 @@ public sealed class GameSession : IGameSession
             // locked for a moment loses a game that was never actually lost.
             SaveError = error;
 
-            Reset();
             IsReady = true;
             return;
         }
@@ -127,7 +142,6 @@ public sealed class GameSession : IGameSession
             return;
         }
 
-        Reset();
         Player.MoveTo(new Position(save.PlayerX, save.PlayerY));
         Quests.Restore(save.Quests);
 
@@ -164,13 +178,19 @@ public sealed class GameSession : IGameSession
         {
             try
             {
-                await _saveProgressService.SetAside();
+                // Queued like a write, because it is the same file. A write already asked for and
+                // not yet run would otherwise land after the move and recreate a save behind it,
+                // leaving the file set aside no longer the only copy. Queueing costs nothing here:
+                // the failure is still this operation's own and still arrives to be caught, since
+                // only the operation in front of it has its failure swallowed.
+                await Queue(_saveProgressService.SetAside);
             }
             catch (Exception error) when (IsStorageFailure(error))
             {
                 SaveError = error;
 
-                Reset();
+                // Already reset by Continue, which is this method's only caller and ends the game
+                // in progress before it reads the file.
                 IsReady = true;
                 return;
             }
@@ -187,39 +207,76 @@ public sealed class GameSession : IGameSession
         // queue would just be several writes of whatever the game happened to reach.
         string content = SaveGameSerializer.Serialize(Capture());
 
-        lock (_saveOrder)
+        return Queue(() => _saveProgressService.Save(content));
+    }
+
+    /// <summary>
+    /// Puts <paramref name="operation"/> at the back of the queue, so it starts once everything
+    /// already asked for has finished and everything asked for after it waits in turn.
+    /// </summary>
+    /// <remarks>
+    /// Every read, write and move the session makes goes through here, because they all act on one
+    /// file and the order they were asked for in is the only order any of them can be right in.
+    /// </remarks>
+    /// <param name="operation">The work to run when its turn comes.</param>
+    /// <returns>A task that completes when this operation has, not when its turn arrives.</returns>
+    Task Queue(Func<Task> operation) =>
+        Queue<object?>(async () =>
         {
-            Task write = WriteAfter(_lastWrite, content);
-            _lastWrite = write;
-            return write;
+            await operation();
+            return null;
+        });
+
+    /// <inheritdoc cref="Queue(Func{Task})" />
+    /// <typeparam name="T">What the operation produces.</typeparam>
+    Task<T> Queue<T>(Func<Task<T>> operation)
+    {
+        // What the next operation will wait for. It is put at the back of the queue before this
+        // one is allowed to start, so that a save asked for *by* an operation already running —
+        // a shutdown flush arriving while the save is being read — queues behind it rather than
+        // beside it. Claiming the slot afterwards would hand that caller the queue as it stood
+        // before this operation joined it.
+        TaskCompletionSource finished = new();
+
+        lock (_fileOrder)
+        {
+            Task previous = _lastFileOperation;
+            _lastFileOperation = finished.Task;
+
+            return RunAfter(previous, operation, finished);
         }
     }
 
     /// <summary>
-    /// Writes <paramref name="content"/> once <paramref name="previous"/> has finished, which is
-    /// what keeps two writes of the same save off the same storage at once.
+    /// Runs <paramref name="operation"/> once <paramref name="previous"/> has finished, which is
+    /// what keeps two operations off the same file at once, and then releases whatever is queued
+    /// behind it.
     /// </summary>
     /// <remarks>
-    /// The failure of the write in front is deliberately not observed here. It belongs to whoever
-    /// asked for that write and has already been reported to them — <see cref="TrySave"/> records
-    /// it on <see cref="SaveError"/>, and <see cref="Save"/> raises it — so re-raising it would
-    /// hand one caller a problem it never had, and swallowing the whole queue behind one bad
-    /// moment would undo the decision to keep saving after a failure.
+    /// What the next operation waits on always completes successfully, however this one ends. A
+    /// failure belongs to whoever asked for it and has already been reported to them —
+    /// <see cref="TrySave"/> records it on <see cref="SaveError"/>, and <see cref="Save"/> raises
+    /// it — so passing it down the queue would hand one caller a problem it never had, and
+    /// abandoning the queue behind one bad moment would undo the decision to keep saving after a
+    /// failure. A write that could not be made is also no reason not to set a refused save aside.
     /// </remarks>
-    /// <param name="previous">The write this one waits for.</param>
-    /// <param name="content">The snapshot to write.</param>
-    async Task WriteAfter(Task previous, string content)
+    /// <typeparam name="T">What the operation produces.</typeparam>
+    /// <param name="previous">The operation this one waits for.</param>
+    /// <param name="operation">The work to run once it has.</param>
+    /// <param name="finished">Released when this operation ends, however it ends.</param>
+    static async Task<T> RunAfter<T>(
+        Task previous, Func<Task<T>> operation, TaskCompletionSource finished)
     {
         try
         {
             await previous;
-        }
-        catch
-        {
-            // not ours to report
-        }
 
-        await _saveProgressService.Save(content);
+            return await operation();
+        }
+        finally
+        {
+            finished.SetResult();
+        }
     }
 
     /// <summary>
@@ -252,8 +309,16 @@ public sealed class GameSession : IGameSession
         error is IOException or UnauthorizedAccessException;
 
     /// <summary>
-    /// Returns the session to a freshly registered campaign with the player at the world's start.
+    /// Ends the game in progress: the session returns to a freshly registered campaign with the
+    /// player at the world's start, and stops writing.
     /// </summary>
+    /// <remarks>
+    /// This is the line where one game ends and the next begins, so it is where writing stops. A
+    /// write already asked for is not abandoned — it is progress the player earned, and the queue
+    /// carries it through to the file — but no further write is queued on behalf of a game that is
+    /// over. Whatever begins the next game waits its turn behind what is left, which is why
+    /// <see cref="Continue"/> resets before it reads rather than after.
+    /// </remarks>
     void Reset()
     {
         _autoSave = false;

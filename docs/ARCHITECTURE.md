@@ -169,6 +169,27 @@ after a failure.
 What an `ISaveProgressService` must guarantee when it *is* written to twice at once, by some other
 caller, is the service's own contract and is not settled here.
 
+**The queue carries reads and set-asides too, and it spans the boundary between two games.**
+`IGameSession` is a singleton, so one session and one queue serve every entry into gameplay and
+outlive any one game played through them. A write asked for by a game that is over is still a
+write, and only two things can be overtaken by one: a read, and a move. Reading past a leftover
+write resumes from a snapshot the file is about to stop holding, and the next quest to change then
+writes that older game back out over the player's real progress. Moving the file aside past one
+lets it recreate a save behind the move, so the file set aside is no longer the only copy and the
+new game's first save is no longer the first thing written — which is exactly the guarantee the
+set-aside exists to make. Neither corrupts anything and neither raises anything.
+
+So every operation the session performs on the file goes through the one queue, in the order it
+was asked for. A leftover write is **waited out, never abandoned**: it is progress the player
+earned, and dropping it would satisfy the ordering just as cheaply while quietly costing them the
+last quest they finished. `Reset` is where a game ends, so it is where writing stops — `Continue`
+resets *before* it reads, so that a frame arriving while the read is in flight cannot put one last
+write of the game being left behind the read of the game arriving.
+
+`StartNewGame` needs no such wait. Its own first save is queued behind whatever is outstanding, so
+the file still ends up holding the new game; only a read or a move can be overtaken, and `Continue`
+is where both of those happen.
+
 ## Localised text
 
 A language is a file named after its culture — `Text/en.json`, `Text/pt-BR.json` — holding a flat
