@@ -91,6 +91,32 @@ A save the campaign has drifted from is tolerated in both directions: a quest th
 this build no longer ships is ignored, and a quest added since the save was written starts from
 the beginning.
 
+### Two writes at once cannot tear the file
+
+`ISaveProgressService.Save` says what happens when two writes overlap, because the obvious way to
+write a file gives none of it — overlapping writes silently interleave, silently succeed, or throw,
+depending on the platform. The promise is that the save ends up holding the whole of exactly one of
+them, that neither call fails on account of the other, and that a read overlapping a write sees one
+whole save or the other. This matters more than it sounds: a torn save is not a damaged file the
+player can be warned about, because the game refuses what it cannot read and replaces it — so
+tearing costs a campaign outright.
+
+What is deliberately **not** promised is *which* of two overlapping writes survives. Only the caller
+knows which of two snapshots is the newer one, so ordering is the caller's half and integrity is the
+implementation's. They are separate problems and neither fixes the other.
+
+`LocalSaveProgressService` keeps its half twice over, because the two cover different callers:
+
+- **Operations on the file take it in turns**, through one asynchronous gate. Two writes are never
+  running together and a read is never running during a write. `HasProgress` stays outside it: it
+  asks one question with no half-written state to observe, and queueing it behind a write would
+  only make the menu slower.
+- **A save is written to a file of its own and moved into place.** A move is one step, so the save
+  is replaced whole or not at all. This is what holds when the gate cannot — a second process,
+  another service on the same path, or the game being killed mid-write. The temporary file is named
+  per write so two of them cannot fill the same one, and is beside the save so the move stays on the
+  volume.
+
 ### A save that cannot be read is not a save that is gone
 
 These are two different failures and `GameSession` does not treat them the same. The distinction

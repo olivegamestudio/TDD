@@ -58,6 +58,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Two saves written at once can no longer tear the file, and the contract now says they cannot.**
+  `ISaveProgressService.Save` promised only to replace "anything previously saved", which implies a
+  last writer without ever defining one, so the answer to two overlapping writes was nobody knows —
+  and `LocalSaveProgressService` wrote through `File.WriteAllTextAsync`, which truncates and
+  rewrites with no serialisation between callers. Measured at 200 KB, concurrent pairs left files
+  holding bytes from both writes and raised nothing; on Windows the second write instead fails
+  `FileShare` and throws, which the game reports to the player as storage trouble. The contract now
+  states that overlapping writes leave the whole of exactly one payload, that neither call fails
+  because of the other, and that a read overlapping a write sees one whole save or the other — and
+  states that *which* write survives is the caller's problem, because only the caller knows which
+  snapshot is newer. `LocalSaveProgressService` keeps it in two independent ways: operations on the
+  file take it in turns through an asynchronous gate, and a save is written to a file of its own and
+  moved into place, so it is replaced whole or not at all even by a second process or a game killed
+  halfway through. ([#69](https://github.com/olivegamestudio/TDD/issues/69))
 - **A save the game could not read no longer freezes it, and is no longer overwritten.**
   `Continue` documented a fallback to a new game when the save "cannot be read" but only recovered
   from damaged *content*; the read itself was unguarded, so an `IOException` from a file locked by
