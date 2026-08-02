@@ -7,6 +7,12 @@ namespace OliveGameStudio;
 /// <remarks>
 /// Handles addition of elements, focus management, button actions,
 /// enabling or disabling elements, and directional navigation between buttons.
+/// <para>
+/// Every lookup resolves a <see cref="Button"/> by identity, never by name. The controller is
+/// registered as a singleton, so all of a game's screens share one node list, and two screens are
+/// free to label a button the same obvious thing without either author knowing the other did.
+/// <see cref="Element"/> is what makes that safe; nothing here should compare names.
+/// </para>
 /// </remarks>
 public sealed class UIController : IUIController
 {
@@ -245,6 +251,10 @@ public sealed class UIController : IUIController
     /// <param name="button">The button for which the corresponding node is required.</param>
     /// <returns>The node associated with the specified button.</returns>
     /// <exception cref="InvalidOperationException">Thrown if the specified button is not managed by the controller.</exception>
+    /// <remarks>
+    /// Matches the button itself, not its name. A button that merely shares a name with a managed
+    /// one is a stranger, and is reported as one.
+    /// </remarks>
     Node Require(Button button) =>
         _nodes.FirstOrDefault(n => n.Button == button)
         ?? throw new InvalidOperationException($"Button '{button.Name}' is not managed by this controller.");
@@ -281,15 +291,26 @@ public sealed class UIController : IUIController
     /// This allows the element to participate in UI interactions such as receiving focus or being pressed.
     /// </summary>
     /// <param name="element">The UI element to be added to the controller.</param>
+    /// <exception cref="InvalidOperationException">
+    /// The button is already managed by this controller. A second node for it would be
+    /// unreachable by construction — every lookup finds the first — so the double add fails
+    /// loudly rather than leaving a button that silently stops responding.
+    /// </exception>
     public void Add(Element element)
     {
+        if (element is Button existing && _nodes.Any(n => n.Button == existing))
+        {
+            throw new InvalidOperationException(
+                $"Button '{existing.Name}' is already managed by this controller.");
+        }
+
         _elements.Add(element);
 
         if (element is not Button button)
         {
             return;
         }
-        
+
         _nodes.Add(new Node(button));
 
         if (_focusedElement is null)
