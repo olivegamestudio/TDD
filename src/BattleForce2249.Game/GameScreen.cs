@@ -56,11 +56,17 @@ public sealed class GameScreen(
             return;
         }
 
+        // where the frame began, taken before the ship flies. The quests are measured against the
+        // journey between this and where the ship ends up, not against the end of it: at 200 units
+        // a second a long frame steps clean over a 50 unit trigger, and a marker that fires only
+        // when a frame happens to land inside it is the trap pillar 1 names.
+        Position began = session.Player.Position;
+
         // the ship flies first, so the quests are measured against where the player got to this
         // frame rather than where they were at the end of the last one
         ship.Update(session.Player, pilot.Read(), frameTime);
 
-        questProximity.Update(session.Quests, session.Player.Position);
+        questProximity.Update(session.Quests, began, session.Player.Position);
 
         // and last, what the frame produced is handed to the drawing side. The pose is the whole
         // of what the two stages agree about: the physics has no idea a screen exists, and the

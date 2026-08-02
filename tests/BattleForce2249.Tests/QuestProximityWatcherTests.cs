@@ -196,4 +196,139 @@ public sealed class QuestProximityWatcherTests
 
         watcher.Update(new QuestLog(), StartMarker);       // must not throw
     }
+
+    // ---- sweeping the frame, rather than sampling the end of it ----
+
+    [Fact]
+    public void CompletesTheQuest_WhenOneFrameSteppedStraightOverTheEndMarker()
+    {
+        // the case pillar 1 calls a bug: neither end of this frame is within the 50 unit end
+        // trigger, and the ship flew through the middle of it
+        QuestProximityWatcher watcher = CreateWatcher();
+        Quest1.Start();
+
+        watcher.Update(_quests, new Position(0, 900), new Position(0, 1100));
+
+        Assert.Equal(QuestState.Completed, Quest1.State);
+    }
+
+    [Fact]
+    public void StartsTheQuest_WhenOneFrameSteppedStraightOverTheStartMarker()
+    {
+        QuestProximityWatcher watcher = CreateWatcher();
+
+        watcher.Update(_quests, new Position(0, -200), new Position(0, 200));
+
+        Assert.Equal(QuestState.Active, Quest1.State);
+    }
+
+    [Fact]
+    public void SweepsAtAnyFrameLength()
+    {
+        // the trigger must not depend on how long the frame was. A frame carrying the ship the
+        // whole 1000 units in one step passes both markers, so it both starts and finishes.
+        QuestProximityWatcher watcher = CreateWatcher();
+
+        watcher.Update(_quests, new Position(0, -100), new Position(0, 1100));
+
+        Assert.Equal(QuestState.Completed, Quest1.State);
+    }
+
+    [Fact]
+    public void DoesNotFire_WhenTheFrameOnlyPassedWideOfTheMarker()
+    {
+        // the sweep measures a line, not a corridor: a ship that crossed the marker's latitude
+        // 400 units off to one side never came near it
+        QuestProximityWatcher watcher = CreateWatcher();
+
+        watcher.Update(_quests, new Position(400, -200), new Position(400, 200));
+
+        Assert.Equal(QuestState.NotStarted, Quest1.State);
+    }
+
+    [Fact]
+    public void DoesNotFire_WhenTheFrameStoppedShortOfTheMarker()
+    {
+        QuestProximityWatcher watcher = CreateWatcher();
+        Quest1.Start();
+
+        watcher.Update(_quests, new Position(0, 100), new Position(0, 940));
+
+        Assert.Equal(QuestState.Active, Quest1.State);
+    }
+
+    [Fact]
+    public void SweepsTheFrameTheShipActuallyFlew_NotTheGroundBehindIt()
+    {
+        // only this frame's journey is measured, not everything flown since the game began: a
+        // frame between 400 and 600 never came near the marker back at the origin
+        QuestProximityWatcher watcher = CreateWatcher();
+        watcher.Update(_quests, new Position(0, 400), new Position(0, 600));
+
+        Assert.Equal(QuestState.NotStarted, Quest1.State);
+    }
+
+    [Fact]
+    public void RaisesStartedOnce_WhenSuccessiveFramesKeepSweepingTheMarker()
+    {
+        QuestProximityWatcher watcher = CreateWatcher();
+        int started = 0;
+        _quests.QuestStarted += (_, _) => started++;
+
+        for (int frame = 0; frame < 10; frame++)
+        {
+            watcher.Update(_quests, new Position(0, -50), new Position(0, 50));
+        }
+
+        Assert.Equal(1, started);
+    }
+
+    [Fact]
+    public void CompletesAQuestStartedByTheSameFrame()
+    {
+        // one frame long enough to sweep both markers is a frame that flew through the whole
+        // quest. Start is applied before end, exactly as it is for a frame that lands on one.
+        QuestProximityWatcher watcher = CreateWatcher();
+
+        watcher.Update(_quests, StartMarker, EndMarker);
+
+        Assert.Equal(QuestState.Completed, Quest1.State);
+    }
+
+    [Fact]
+    public void FiresOnTheSweep_EvenWhenTheFrameWasFlownBackwards()
+    {
+        // a proximity trigger is a disc round a marker and has no sense of direction — the
+        // existing point measure completes a quest approached from beyond the exit, and the
+        // sweep does not quietly acquire an opinion the point measure never had
+        QuestProximityWatcher watcher = CreateWatcher();
+        Quest1.Start();
+
+        watcher.Update(_quests, new Position(0, 1100), new Position(0, 900));
+
+        Assert.Equal(QuestState.Completed, Quest1.State);
+    }
+
+    [Fact]
+    public void MeasuresAJourneyThatWentNowhere_AsThePointItStoodAt()
+    {
+        // the three argument call with both ends the same is the two argument call
+        QuestProximityWatcher watcher = CreateWatcher();
+
+        watcher.Update(_quests, StartMarker, StartMarker);
+
+        Assert.Equal(QuestState.Active, Quest1.State);
+    }
+
+    [Fact]
+    public void FiresNothing_WhenTheFrameCannotBeMeasured()
+    {
+        // a journey to nowhere fires nothing rather than firing everything: the distance is not a
+        // number, and every comparison against it is false
+        QuestProximityWatcher watcher = CreateWatcher();
+
+        watcher.Update(_quests, StartMarker, new Position(double.NaN, double.NaN));
+
+        Assert.Equal(QuestState.NotStarted, Quest1.State);
+    }
 }
