@@ -78,6 +78,18 @@ tolerance hid it; a stalled frame, a faster ship or a tighter trigger authored f
 each brought it back. `Position.DistanceToSegment` does the measuring, clamped to the ends so a
 sweep brings a marker nearer but never widens a trigger sideways.
 
+**The sweep states no bound on how long a journey may be.** It never forms the journey's length,
+because a length is a square and a double squares to infinity somewhere above 1.34e154 — and a
+sweep that overflows does not report an error, it reports the ground it covered as a single point
+at the start, which is exactly the point sampling the sweep replaced. The fraction along a journey
+is a ratio of two quantities that both grow with the square of it, so it is measured at half size
+and in units of the journey's own longer axis; the answer is the same and nothing formed along the
+way leaves a double's range. Two finite ends and a finite marker therefore always give a fraction
+between 0 and 1, never `NaN`, which the ordering rule above depends on: an ordered comparison
+against `NaN` is false whichever way round it is written, so a `NaN` fraction would report that
+neither marker came first and quietly finish nothing. How far out a position is allowed to be is a
+separate rule kept at the save boundary, and the geometry does not lean on it.
+
 The sweep keeps the order the ground was covered in. `Position.FractionAlongSegment` says how far
 along a journey each marker was reached, and a quest that *starts* on a given frame only completes
 on that same frame if its end marker was reached no earlier than its start marker. One frame flown

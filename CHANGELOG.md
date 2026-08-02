@@ -61,6 +61,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   previous position across frames. A quest that starts and finishes on the same frame must have
   had its markers reached in order, so a field flown backwards in one frame starts the quest and
   leaves it in progress rather than completing something the player had not begun. ([#8](https://github.com/olivegamestudio/TDD/issues/8))
+- **A journey too long to square is swept rather than silently sampled.** `Position` measured a
+  point against a journey by squaring the journey's length, and a double squares to infinity
+  somewhere above 1.34e154 — so a longer journey reported an infinite length, a fraction of zero
+  and a closest approach at the start. The sweep quietly went back to answering the question point
+  sampling answered, missing every marker in the middle of the journey without throwing, reporting
+  a wrong distance or saying it had stopped working; the fraction could also come back `NaN`, and
+  an ordered comparison against `NaN` is false both ways round, so the ordering rule would report
+  that neither marker came first and finish nothing at all. The length is now never formed: the
+  journey is measured at half size and in units of its own longer axis, which leaves the fraction
+  unchanged and keeps every quantity inside a double, and the closest point is taken as a blend of
+  the two ends so that a journey spanning the whole of a double's range still has one. Two finite
+  ends and a finite marker always give a fraction between 0 and 1. This holds at any magnitude and
+  does not lean on any bound on how far out a position may be. ([#76](https://github.com/olivegamestudio/TDD/issues/76))
 - **A save the game could not read no longer freezes it, and is no longer overwritten.**
   `Continue` documented a fallback to a new game when the save "cannot be read" but only recovered
   from damaged *content*; the read itself was unguarded, so an `IOException` from a file locked by

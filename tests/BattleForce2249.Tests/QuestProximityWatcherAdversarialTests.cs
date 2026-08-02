@@ -10,9 +10,10 @@ namespace BattleForce2249.Tests;
 /// </summary>
 /// <remarks>
 /// Written against the shipped behaviour rather than the implementation, so they stay meaningful
-/// if the geometry is rewritten. Nothing here asserts which triggers an unmeasurable journey
-/// fires — that is <see href="https://github.com/olivegamestudio/TDD/issues/76">#76</see>, and a
-/// test pinning today's answer would have to be deleted when it lands.
+/// if the geometry is rewritten. A journey too long to square is now swept like any other
+/// (<see href="https://github.com/olivegamestudio/TDD/issues/76">#76</see>), so what it fires is
+/// asserted here rather than left open; a journey with an end that is not a place still fires
+/// nothing, which is a different case and remains pinned as such.
 /// </remarks>
 public sealed class QuestProximityWatcherAdversarialTests
 {
@@ -211,12 +212,26 @@ public sealed class QuestProximityWatcherAdversarialTests
     [Fact]
     public void AJourneyLongEnoughToOverflowItsOwnLength_IsHandledWithoutThrowing()
     {
-        // Squaring the length of a journey this long overflows a double. Which triggers it fires is
-        // #76's question, deliberately not asserted here; that it does not take the frame down with
-        // an exception is this issue's.
+        // Squaring the length of a journey this long overflows a double. That it does not take the
+        // frame down with an exception is this issue's; what it fires is #76's, below.
         QuestProximityWatcher watcher = Watcher(new Position(0, 0), new Position(0, 1000));
 
         watcher.Update(_quests, new Position(0, -1e200), new Position(0, 1e200));
+    }
+
+    [Fact]
+    public void AMarkerHalfwayAlongAJourneyThatOverflowsItsOwnLength_IsStillSwept()
+    {
+        // #76. The marker is in the middle of the ground the frame covered, which is the whole
+        // point of sweeping rather than sampling. Measuring by squaring the journey's length gave
+        // an infinite length and a closest approach at the start, so this marker — 1e200 units from
+        // where the frame began — was reported far outside its 25-unit trigger and fired nothing.
+        // The sweep said it had covered the ground and then answered as though it had not.
+        QuestProximityWatcher watcher = Watcher(new Position(0, 1e200), new Position(0, 2e200));
+
+        watcher.Update(_quests, new Position(0, 0), new Position(0, 2e200));
+
+        Assert.Equal(QuestState.Completed, StateOf());
     }
 
     // ---- repetition and independence ----

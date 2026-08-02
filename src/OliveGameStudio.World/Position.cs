@@ -35,6 +35,13 @@ public readonly record struct Position(double X, double Y)
     /// nearer endpoint but never brings a sideways one into range. Non-finite coordinates answer
     /// <see cref="double.NaN"/>, which compares false against any distance a caller tests.
     /// </para>
+    /// <para>
+    /// The journey's length is never formed, so there is no length for a long journey to overflow.
+    /// The closest point is taken as a weighted blend of the two ends rather than as the start plus
+    /// a share of the difference between them: a blend of two finite ends is finite whatever lies
+    /// between them, whereas the difference alone is not, and a journey spanning the width of a
+    /// <see langword="double"/> would otherwise put the closest point at infinity.
+    /// </para>
     /// </remarks>
     /// <param name="from">Where the journey began.</param>
     /// <param name="to">Where it ended.</param>
@@ -42,10 +49,11 @@ public readonly record struct Position(double X, double Y)
     public double DistanceToSegment(Position from, Position to)
     {
         double along = FractionAlongSegment(from, to);
+        double back = 1 - along;
 
         return DistanceTo(new Position(
-            from.X + (along * (to.X - from.X)),
-            from.Y + (along * (to.Y - from.Y))));
+            (back * from.X) + (along * to.X),
+            (back * from.Y) + (along * to.Y)));
     }
 
     /// <summary>
@@ -62,22 +70,58 @@ public readonly record struct Position(double X, double Y)
     /// the line. A journey that went nowhere answers 0 — it began and ended in the same place, and
     /// everything was reached at once.
     /// </para>
+    /// <para>
+    /// A fraction is a ratio of two quantities that both grow with the square of the journey, so
+    /// the journey may be measured at any convenient size without changing the answer. It is
+    /// measured here at half size and then in units of its own longer axis, which is what keeps
+    /// every quantity formed along the way inside a <see langword="double"/>. Squaring the length
+    /// directly overflowed above roughly 1.34e154 and then divided infinity by infinity, so a
+    /// journey longer than that answered <see cref="double.NaN"/> or collapsed to 0 — and a
+    /// collapsed fraction is a sweep silently reporting the ground it covered as a single point at
+    /// the start. This holds at any magnitude, so it does not depend on how far out a position is
+    /// allowed to be; that is a separate rule, kept at the save boundary rather than here.
+    /// </para>
+    /// <para>
+    /// For three finite positions the answer is always a fraction and never
+    /// <see cref="double.NaN"/>, which matters more than it looks: an ordered comparison against
+    /// NaN is false whichever way round it is written, so a caller ordering two markers by when a
+    /// journey reached them would be told neither came first and would quietly do nothing.
+    /// </para>
     /// </remarks>
     /// <param name="from">Where the journey began.</param>
     /// <param name="to">Where it ended.</param>
     /// <returns>A fraction between 0 and 1, or <see cref="double.NaN"/> for a non-finite journey.</returns>
     public double FractionAlongSegment(Position from, Position to)
     {
-        double dx = to.X - from.X;
-        double dy = to.Y - from.Y;
-        double lengthSquared = (dx * dx) + (dy * dy);
+        // Halved before subtracting, so that two ends at opposite extremes of a double's range
+        // still have a difference that is a number. Halving is exact; subtracting first is not.
+        double halfFromX = from.X * 0.5;
+        double halfFromY = from.Y * 0.5;
+        double dx = (to.X * 0.5) - halfFromX;
+        double dy = (to.Y * 0.5) - halfFromY;
 
-        if (lengthSquared is 0)
+        // The journey's longer axis. Dividing by it leaves one of the two components at exactly
+        // one and the other no larger, so the squares below land between 1 and 2 whatever the
+        // journey's length — there is no length here for a long journey to overflow.
+        double longerAxis = Math.Max(Math.Abs(dx), Math.Abs(dy));
+
+        if (longerAxis is 0)
         {
+            // began and ended in the same place
             return 0;
         }
 
-        return Math.Clamp((((X - from.X) * dx) + ((Y - from.Y) * dy)) / lengthSquared, 0, 1);
+        double alongX = dx / longerAxis;
+        double alongY = dy / longerAxis;
+
+        // Neither product can overflow, because neither component exceeds one in magnitude, so
+        // this is a sum of two finite terms: it may reach infinity, but it cannot reach NaN.
+        double reach = (((X * 0.5) - halfFromX) * alongX) + (((Y * 0.5) - halfFromY) * alongY);
+
+        // Divided by the axis separately rather than folded into a single denominator, so that an
+        // enormous reach and an enormous journey are never divided by one another. Whatever the
+        // magnitudes, the sign survives, and the sign is what decides which end the clamp lands on.
+        return Math.Clamp(reach / longerAxis / ((alongX * alongX) + (alongY * alongY)), 0, 1);
     }
 
     /// <summary>
