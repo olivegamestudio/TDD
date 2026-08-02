@@ -68,6 +68,14 @@ public sealed class DisplayOptions
     /// nobody owns — but it means raising this is a decision to re-check the content against, not
     /// a free safety margin. The star layers the game ships cover a little over 22,000 pixels.
     /// </para>
+    /// <para>
+    /// <b>Far enough from <see cref="NarrowestSupportedViewportInPixels"/> and the pair admits
+    /// nothing.</b> The two are not only ordered, they are spaced: this one raises a floor and that
+    /// one lowers a ceiling, so a wide enough gap between them leaves no content that satisfies
+    /// both. That is refused where a layer is put to them and the failure names this pair, because
+    /// the layer is a bystander — but it is worth knowing before declaring a very wide screen
+    /// alongside a very narrow one, since each is individually reasonable.
+    /// </para>
     /// </remarks>
     public float WidestSupportedViewportInPixels { get; set; } =
         DefaultWidestSupportedViewportInPixels;

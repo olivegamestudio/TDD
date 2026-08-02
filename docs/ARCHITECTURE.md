@@ -252,6 +252,14 @@ range of tile sizes a layer may be sown at. Declaring a narrowest screen wider t
 refused at binding and at construction — it is not a tight bound but a contradiction, and the two
 bounds would cross and refuse everything with advice pointing in both directions at once.
 
+The pair can also be too far apart. Each end may be perfectly reasonable on its own and still leave
+no tile size satisfying both, because one raises a floor while the other lowers a ceiling. That is
+caught where a layer is put to the bounds, and it names the **declaration** rather than the layer:
+the two crossings are told apart by the floor under a star of no size, the least a declared screen
+can ask of a tile, and if even that clears the ceiling then no layer of any kind fits and the layer
+in hand is a bystander. Reporting it as a star to shrink would be #40's defect in miniature —
+advice that reads as actionable, points at the wrong field, and cannot work.
+
 Layer validation checks that each number **is a number** before it checks any range, and `Render`
 asks the same of the zoom and the viewport. Every range check is an ordered comparison and an
 ordered comparison against `NaN` is false, so a `NaN` satisfies a guard by saying nothing about it

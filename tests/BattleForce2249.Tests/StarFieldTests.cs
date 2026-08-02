@@ -618,6 +618,90 @@ public sealed class StarFieldTests
         Assert.Contains(nameof(StarLayer.SizeInPixels), error.Message, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// The declaration that admits nothing. Wide enough that the floor under a star of no size at
+    /// all already sits above the ceiling, so no layer can be sown between the two — and both ends
+    /// are individually valid, so nothing before this point refuses it.
+    /// </summary>
+    static IOptions<DisplayOptions> DeclaringScreensNoLayerFitsBetween =>
+        Declaring(widestInPixels: 100_000f, narrowestInPixels: 720f);
+
+    [Fact]
+    public void Layers_RefusesAnOrdinaryStar_WhenItIsTheDeclarationThatCrossesTheBounds_NamingTheDeclaration()
+    {
+        // The same crossing as above, reached from the other side: an ordinary 3 pixel star against
+        // a declaration so wide that the floor clears the ceiling on its own. "Lower SizeInPixels"
+        // is advice into a wall here — the star is already tiny and lowering it to nothing still
+        // leaves the bounds crossed, because the floor is set by the declared screen rather than by
+        // the star. #64 asks that the crossing keep naming the right thing when both ends move, and
+        // when the declaration is what crossed them, the declaration is the right thing.
+        StarField field = new(new Camera2D(), DeclaringScreensNoLayerFitsBetween);
+
+        Assert.True(
+            field.SmallestUsableTileSize(0f) > field.LargestUsableTileSize,
+            "This declaration still leaves room for a layer, so the test is not testing anything.");
+
+        ArgumentException error = Assert.Throws<ArgumentException>(() =>
+        {
+            _ = new StarField(new Camera2D(), DeclaringScreensNoLayerFitsBetween)
+            {
+                Layers = [new StarLayer(1f, 200f, 1, 3f)],
+            };
+        });
+
+        Assert.Contains(
+            nameof(DisplayOptions.WidestSupportedViewportInPixels),
+            error.Message,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            nameof(DisplayOptions.NarrowestSupportedViewportInPixels),
+            error.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Layers_DoesNotBlameTheStar_ForACrossingNoStarSizeCouldFix()
+    {
+        // the half of the above that matters to whoever reads the message: being sent to lower a
+        // field that cannot fix it is worse than being told nothing, because it reads as actionable
+        ArgumentException error = Assert.Throws<ArgumentException>(() =>
+        {
+            _ = new StarField(new Camera2D(), DeclaringScreensNoLayerFitsBetween)
+            {
+                Layers = [new StarLayer(1f, 200f, 1, 3f)],
+            };
+        });
+
+        Assert.DoesNotContain(
+            $"Lower {nameof(StarLayer.SizeInPixels)}",
+            error.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Layers_StillBlamesTheStar_WhenTheDeclarationLeavesRoomAndTheStarDoesNot()
+    {
+        // the boundary between the two messages: the shipping declaration admits plenty of layers,
+        // so a star that crosses the bounds against it really is the thing to lower. This is the
+        // case the existing crossing test covers, asserted here as the *other* side of the choice
+        // so that widening the declaration branch cannot quietly swallow it.
+        StarField shipping = ShippingField(new Camera2D());
+
+        Assert.True(
+            shipping.SmallestUsableTileSize(0f) <= shipping.LargestUsableTileSize,
+            "The shipping declaration admits no layer at all, which is a different defect.");
+
+        ArgumentException error = Assert.Throws<ArgumentException>(() =>
+        {
+            _ = FieldOf(new Camera2D(), new StarLayer(1f, 200f, 1, 50_000f));
+        });
+
+        Assert.Contains(
+            $"Lower {nameof(StarLayer.SizeInPixels)}",
+            error.Message,
+            StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(0f, 0f)]
     [InlineData(179.5f, -359.5f)]

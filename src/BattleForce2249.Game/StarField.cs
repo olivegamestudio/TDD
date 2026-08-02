@@ -298,13 +298,25 @@ public sealed class StarField : IRenderable
     /// <see cref="StarLayer.SizeInPixels"/> makes <see cref="SmallestUsableTileSize"/> infinite
     /// too, so left to the floor check it would be reported as a tile size to raise.
     /// </para>
+    /// <para>
+    /// <b>Where the two bounds cross, what is named depends on what crossed them.</b> A star large
+    /// enough to push the floor past the ceiling is the star's fault and says so. But the floor
+    /// also rises with <see cref="DisplayOptions.WidestSupportedViewportInPixels"/> and the ceiling
+    /// falls with <see cref="DisplayOptions.NarrowestSupportedViewportInPixels"/>, so a wide enough
+    /// declaration crosses them on its own, with any layer at all. The two are told apart by the
+    /// floor under a star of no size — the least this declared screen can ask of a tile — and when
+    /// even that clears the ceiling the declaration is named instead. Sending the reader to lower a
+    /// three pixel star cannot move a floor set by a hundred thousand pixel screen, and advice that
+    /// reads as actionable and is not costs more than none.
+    /// </para>
     /// </remarks>
     /// <exception cref="ArgumentException">
     /// A layer has a parallax, a tile size or a star size that is not a finite number; a parallax
     /// outside <c>(0, 1]</c>; a tile size that is not positive, is too small to fill the screen
     /// within <see cref="MaxTilesPerAxis"/> tiles, or is larger than
-    /// <see cref="LargestUsableTileSize"/>; fewer than one star per tile; or a star size that is
-    /// not positive or is so large that no tile size satisfies both bounds.
+    /// <see cref="LargestUsableTileSize"/>; fewer than one star per tile; a star size that is
+    /// not positive or is so large that no tile size satisfies both bounds; or a declared pair of
+    /// screens so far apart that no layer of any size fits between the bounds they set.
     /// </exception>
     public IReadOnlyList<StarLayer> Layers
     {
@@ -354,9 +366,29 @@ public sealed class StarField : IRenderable
                 // and there is no point deriving it from a size that has just been refused.
                 float smallest = SmallestUsableTileSize(layer.SizeInPixels);
 
-                // A star wide enough to push the floor above the ceiling leaves no tile size that
-                // would work, so the tile size is not the thing to change, and saying it is would
-                // send the reader into a wall.
+                // Where the floor clears the ceiling there is no tile size that would work, so the
+                // tile size is not the thing to change and saying it is would send the reader into
+                // a wall. Which of the other two it *is* depends on what did the crossing, and the
+                // answer is whether the declaration leaves any room at all: the floor under a star
+                // of no size is the least this declared screen can ask of a tile, so if even that
+                // is past the ceiling, no layer of any kind fits between the two and the star is a
+                // bystander. Blaming it there is the same defect at one remove — advice that reads
+                // as actionable and is not, since lowering a 3 pixel star cannot move a floor set
+                // by a 100,000 pixel screen.
+                if (SmallestUsableTileSize(0f) > LargestUsableTileSize)
+                {
+                    throw new ArgumentException(
+                        $"{DisplayOptions.SectionName} declares screens no star layer fits "
+                        + $"between: filling {WidestSupportedViewportInPixels} pixels needs tiles "
+                        + $"of at least {SmallestUsableTileSize(0f)} even for a star of no size, "
+                        + $"which is past the {LargestUsableTileSize} a tile can be and still be "
+                        + $"spanned by {NarrowestSupportedViewportInPixels} pixels. Lower "
+                        + $"{nameof(DisplayOptions.WidestSupportedViewportInPixels)} or raise "
+                        + $"{nameof(DisplayOptions.NarrowestSupportedViewportInPixels)}; no "
+                        + "SizeInPixels or TileSizeInWorldUnits would help.",
+                        nameof(value));
+                }
+
                 if (smallest > LargestUsableTileSize)
                 {
                     throw new ArgumentException(
