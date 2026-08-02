@@ -91,6 +91,27 @@ A save the campaign has drifted from is tolerated in both directions: a quest th
 this build no longer ships is ignored, and a quest added since the save was written starts from
 the beginning.
 
+**A save that names one quest twice restores it to the furthest of the states it names.** A later
+entry is applied only if it carries the quest further on; one that would hand progress back is
+dropped, so a file saying a quest is both completed and never started comes back completed
+whichever line is first. `QuestState`'s members are declared in the order a quest passes through
+them and `QuestStateExtensions.IsBehind` reads that order, so it is a stated rule rather than a
+consequence of which entry `Restore` happened to apply last.
+
+That rule is chosen over first-wins or last-wins because it is the only one whose answer does not
+depend on the order the entries are in. `QuestLog.Capture` emits one entry per registered quest, so
+no build writes a duplicate — a duplicate means a hand-edited or merged file, and the order two
+entries ended up in after a merge says nothing about which is right. It is also the only reading
+that cannot lose progress the player really made, which is what pillar 4 in `docs/DESIGN.md` asks
+of anything holding the record.
+
+`QuestLog.Register` refuses a duplicate identifier outright and that is not the same answer, on
+purpose. `Register` reads a campaign the build is authoring, where two quests under one identifier
+is a mistake caught where it is made; `Restore` reads a file the build did not necessarily write,
+where two entries under one identifier are one quest described twice. Refusing there would cost the
+player everything saved beside it. The rule holds within a single `Restore`; a later call is a
+different save being read, and it is authoritative.
+
 ### A save that cannot be read is not a save that is gone
 
 These are two different failures and `GameSession` does not treat them the same. The distinction

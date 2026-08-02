@@ -50,6 +50,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A save naming one quest twice no longer undoes the progress it also records.** `QuestLog.Restore`
+  applied entries in order, so the last one won by accident of iteration — a file holding `quest-1`
+  as both `Completed` and `NotStarted` handed the player back a campaign they had finished. It now
+  restores the **furthest** of the states an entry names: a later entry counts only if it carries
+  the quest further on. That is the only reading whose answer does not depend on the order of the
+  entries, which matters because `Capture` writes one entry per quest — a duplicate means a
+  hand-edited or merged file, where the order says nothing about which entry is right. Stated on
+  `QuestState`, whose declaration order is now load bearing, and readable through the new
+  `QuestStateExtensions.IsBehind`. A state outside the lifecycle is still refused wherever it
+  appears. ([#72](https://github.com/olivegamestudio/TDD/issues/72))
 - **A save the game could not read no longer freezes it, and is no longer overwritten.**
   `Continue` documented a fallback to a new game when the save "cannot be read" but only recovered
   from damaged *content*; the read itself was unguarded, so an `IOException` from a file locked by

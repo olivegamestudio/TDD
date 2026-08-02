@@ -205,10 +205,12 @@ public class SaveRecoveryAdversarialTests
     }
 
     [Fact]
-    public async Task ASaveHoldingTheSameQuestTwice_TakesTheLastStateRatherThanThrowing()
+    public async Task ASaveHoldingTheSameQuestTwice_TakesTheFurthestStateRatherThanThrowing()
     {
         // A hand-edited or merged save can name a quest twice. It must not throw on the load path,
-        // because throwing there is the freeze this whole change exists to remove.
+        // because throwing there is the freeze this whole change exists to remove — and it must
+        // come back at the furthest of the states it names, rather than at whichever one the file
+        // happens to list last.
         FailingSaveProgressService saves = new()
         {
             Content = """
@@ -227,6 +229,33 @@ public class SaveRecoveryAdversarialTests
 
         Assert.True(session.IsReady);
         Assert.True(session.Quests.Find("quest-1")!.IsCompleted);
+    }
+
+    [Fact]
+    public async Task ASaveHoldingTheSameQuestTwice_DoesNotUndoACompletedCampaign()
+    {
+        // The reported save, and the half the case above cannot discriminate: it lists the two
+        // entries the other way round, so applying them in order hands the player back a campaign
+        // they had finished. Nothing in the file changed except the order of two lines.
+        FailingSaveProgressService saves = new()
+        {
+            Content = """
+            {
+              "PlayerX": 0, "PlayerY": 700,
+              "Quests": [
+                { "QuestId": "quest-1", "State": "Completed" },
+                { "QuestId": "quest-1", "State": "NotStarted" }
+              ]
+            }
+            """,
+        };
+        GameSession session = CreateSession(saves);
+
+        await session.Continue();
+
+        Assert.True(session.IsReady);
+        Assert.Equal(QuestState.Completed, session.Quests.Find("quest-1")!.State);
+        Assert.Equal(new Position(0, 700), session.Player.Position);
     }
 
     [Fact]
