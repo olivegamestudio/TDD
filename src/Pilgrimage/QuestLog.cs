@@ -110,6 +110,16 @@ public sealed class QuestLog
     /// since the save was written simply starts from the beginning.
     /// </para>
     /// <para>
+    /// <b>An entry naming no quest is drift of the same kind and is skipped.</b> An identifier that
+    /// is <c>null</c>, empty or blank names a quest exactly as poorly as one that is merely
+    /// unknown: nothing is registered under it, so there is nothing to apply it to, and refusing
+    /// the batch over it would throw away the progress standing beside it — which is the part that
+    /// was real. An entry that is <c>null</c> is not drift; no <see cref="Capture"/> wrote it, so
+    /// the batch is refused instead. A game reading its own save file draws that same line one step
+    /// earlier, and two edges answering differently about one entry is how a save that needed a
+    /// single line skipping came to be discarded whole.
+    /// </para>
+    /// <para>
     /// <b>A save naming one quest more than once restores it to the furthest of the states it
     /// names.</b> A later entry is applied only when it carries the quest further on; one that
     /// would hand progress back is dropped. So a file saying a quest is both completed and never
@@ -137,6 +147,10 @@ public sealed class QuestLog
     /// </para>
     /// </remarks>
     /// <param name="progress">The saved quest states.</param>
+    /// <exception cref="ArgumentException">
+    /// An entry is <c>null</c>. Checked across the whole batch before any of it is applied, so a
+    /// caller that catches this still has the log it started with rather than half a save.
+    /// </exception>
     /// <exception cref="ArgumentOutOfRangeException">
     /// An entry holds a state that is not one a quest has. Refused wherever it appears, including
     /// in the second entry naming a quest — a value outside the lifecycle is not early progress,
@@ -144,10 +158,30 @@ public sealed class QuestLog
     /// </exception>
     public void Restore(IEnumerable<QuestProgress> progress)
     {
+        // Materialised because the batch is read twice: once to refuse it whole, once to apply it.
+        List<QuestProgress> entries = [.. progress];
+
+        foreach (QuestProgress saved in entries)
+        {
+            if (saved is null)
+            {
+                throw new ArgumentException(
+                    "The saved progress holds an entry that is not there.", nameof(progress));
+            }
+        }
+
         HashSet<string> seen = [];
 
-        foreach (QuestProgress saved in progress)
+        foreach (QuestProgress saved in entries)
         {
+            // Asked in full rather than left to Find, which takes an identifier a dictionary has to
+            // be able to hash: nothing in a running game looks up a quest it cannot name, but a
+            // save is not a running game and can hold an entry that names nothing.
+            if (string.IsNullOrWhiteSpace(saved.QuestId))
+            {
+                continue;
+            }
+
             Quest? quest = Find(saved.QuestId);
             if (quest is null)
             {

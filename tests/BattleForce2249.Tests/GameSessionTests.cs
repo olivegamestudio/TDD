@@ -277,6 +277,70 @@ public sealed class GameSessionTests
         Assert.True(quest.IsCompleted);
     }
 
+    // ---- a junk quest entry beside real progress ----
+
+    [Fact]
+    public async Task Continue_KeepsTheProgressSavedBesideAnEntryNamingNoQuest()
+    {
+        // #44's report, pinned verbatim. The blank id names nothing the campaign registered, so
+        // there is nothing to apply it to; the completed quest and the 700 units beside it are
+        // what the file is actually worth. Refusing the file over the blank line took both, and
+        // took them for good — a refused save is set aside and played over.
+        _saves.Content = """
+        { "PlayerX": 0, "PlayerY": 700,
+          "Quests": [ { "QuestId": "quest-1", "State": "Completed" },
+                      { "QuestId": "  ",      "State": "Active"    } ] }
+        """;
+        GameSession session = CreateSession();
+
+        await session.Continue();
+
+        Assert.True(session.IsReady);
+        Assert.Equal(700, session.Player.Position.Y);
+        Assert.True(session.Quests.Find("quest-1")!.IsCompleted);
+        Assert.Null(_saves.SetAsideContent);            // the file was read, not judged damaged
+        Assert.Equal(0, _saves.SaveCount);
+    }
+
+    [Fact]
+    public async Task Continue_StartsANewGame_WhenTheSaveHoldsAQuestEntryThatIsNotThere()
+    {
+        // The other half of the same decision, and the one that used to soft-lock: a null entry
+        // reached QuestLog.Restore and threw onto a task nothing awaits, so the session never
+        // became ready and the game screen waited on it forever. A null entry is not drift — no
+        // build wrote it — so the file is refused and a new game starts over it.
+        _saves.Content = """
+        { "PlayerX": 0, "PlayerY": 700,
+          "Quests": [ { "QuestId": "quest-1", "State": "Completed" }, null ] }
+        """;
+        GameSession session = CreateSession();
+
+        await session.Continue();
+
+        Assert.True(session.IsReady);
+        Assert.Equal(Start, session.Player.Position);
+        Assert.Equal(QuestState.NotStarted, session.Quests.Find("quest-1")!.State);
+    }
+
+    [Fact]
+    public async Task Continue_StartsANewGame_WhenTheSaveHoldsAQuestEntryWithNoIdAtAll()
+    {
+        // `{ "State": "Active" }` deserialises to a QuestProgress whose QuestId is null, which came
+        // out of the dictionary lookup as ArgumentNullException('key') — the same soft-lock by a
+        // different route. Dropped at the serializer now, so the file loads.
+        _saves.Content = """
+        { "PlayerX": 0, "PlayerY": 700,
+          "Quests": [ { "QuestId": "quest-1", "State": "Completed" }, { "State": "Active" } ] }
+        """;
+        GameSession session = CreateSession();
+
+        await session.Continue();
+
+        Assert.True(session.IsReady);
+        Assert.Equal(700, session.Player.Position.Y);
+        Assert.True(session.Quests.Find("quest-1")!.IsCompleted);
+    }
+
     // ---- a save the game refuses ----
 
     /// <summary>
