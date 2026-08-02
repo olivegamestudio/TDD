@@ -98,6 +98,33 @@ A save the campaign has drifted from is tolerated in both directions: a quest th
 this build no longer ships is ignored, and a quest added since the save was written starts from
 the beginning.
 
+**Refusal is per file; drift is per entry.** The two look alike and are not the same. A quest entry
+that *names no quest* — a `QuestId` that is absent, `null` or blank — names nothing this build
+ships, so there is nothing to apply it to: it is dropped and the rest of the file is read. A quest
+entry that *is not there* — a `null` in the list — is not drift; no build wrote one, so the file is
+refused whole and set aside. Both edges give that answer: `SaveGameSerializer` drops the unnamed
+entry and refuses the null one, and `QuestLog.Restore` skips the first and refuses the second. They
+have to agree, because while they did not, one blank line in a file discarded the completed
+campaign saved beside it — and every refusal at this boundary is final, since a refused save is
+played over by the game that replaces it.
+
+**A position is only progress beside the quest progress it was taken with.** Tolerating drift means
+a perfectly readable save can restore no progress at all — every entry naming a quest the campaign
+dropped, or naming no quest, or no entries. Its coordinates would then place the player inside a
+campaign nobody has begun, and quest 1's start trigger is 25 units wide around the marker a new
+game spawns on: a player set down 700 units out has nothing active, nothing to fly towards, and
+gets further from the only trigger that could help with every frame of flying forward — the one
+direction the game teaches. So `GameSession.Continue` uses the saved position only when at least
+one registered quest came back started or completed; otherwise the player begins where a new game
+begins.
+
+The file itself is still read rather than refused, and deliberately: a refused save is set aside
+and replaced by the game written over it, so refusing costs the player the file as well as the
+position, while declining only the position leaves it on disk until real progress is written. What
+the line costs is a save taken after the player has travelled but before any quest has begun. None
+can be written while the first quest starts where the player spawns, and a campaign that changes
+that has to revisit this.
+
 **A save that names one quest twice restores it to the furthest of the states it names.** A later
 entry is applied only if it carries the quest further on; one that would hand progress back is
 dropped, so a file saying a quest is both completed and never started comes back completed

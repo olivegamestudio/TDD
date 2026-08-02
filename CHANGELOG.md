@@ -63,6 +63,28 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **One junk quest entry no longer discards the progress saved beside it, and no longer freezes the
+  game.** A quest entry naming no quest — a `QuestId` that is absent, `null` or blank — is drift
+  between a save and a campaign, exactly like an entry naming a quest this build has dropped, and
+  the two edges that read one now agree on it: `SaveGameSerializer` drops the entry and reads the
+  rest of the file, and `QuestLog.Restore` skips it. A `null` id used to come out of the dictionary
+  as `ArgumentNullException` and a `null` *entry* as a `NullReferenceException`, neither of which is
+  a storage failure — so they escaped `GameSession.Continue` onto a task nothing awaits, leaving the
+  game screen waiting on a session that never became ready: no error, no new game, and the save
+  neither read nor set aside. An entry that is not there is still refused, now as a stated
+  contract and across the whole batch before any of it is applied, so a caught refusal leaves the
+  log it started with rather than half a save. ([#44](https://github.com/olivegamestudio/TDD/issues/44))
+- **A save holding no campaign progress no longer strands the player where it says.** Drift is
+  tolerated on purpose, so a readable save whose every quest entry names nothing this build ships
+  — a dropped quest, no quest at all, or no entries — restored an empty quest log while still
+  putting the player at its coordinates. Quest 1 begins within 25 units of the marker a new game
+  spawns on, so a player set down 700 units out had nothing active, nothing to fly towards, and
+  got further from the only trigger that could help with every frame of flying forward; the only
+  way out was backwards, through the debris field quest 1 is about escaping. `GameSession.Continue`
+  now uses the saved position only when at least one registered quest came back started or
+  completed. The file is still read rather than refused, because a refused save is set aside and
+  written over while a declined position leaves it on
+  disk. ([#44](https://github.com/olivegamestudio/TDD/issues/44))
 - **Two buttons with the same name are two buttons.** `Element` and its kinds are now classes
   rather than records, so `==` is identity. `Button` was a record, which made `==` value equality
   on the name, and `UIController` resolves every button through `==` — so with the controller
