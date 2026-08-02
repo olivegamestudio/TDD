@@ -48,14 +48,46 @@ public sealed class LocalSaveProgressService : ISaveProgressService
     public Task<bool> HasProgress() => Task.FromResult(File.Exists(FilePath));
 
     /// <inheritdoc />
+    /// <remarks>
+    /// <para>
+    /// One open, rather than asking whether the file is there and then reading it. Those were two
+    /// questions with a gap between them, and <see cref="SetAside"/> moves the save out from
+    /// exactly that gap — so a read that had passed the existence check found nothing to open and
+    /// threw instead of answering. Opening once asks the question and gets the answer in the same
+    /// breath.
+    /// </para>
+    /// <para>
+    /// A save that has gone by the time it is read is reported as no save, because that is what it
+    /// is: the file really is not there, and the alternative is telling the game its storage is
+    /// broken over a read that was only unlucky in its timing. That is not the same as being
+    /// unable to read the save — anything else in the way of the read still raises, so a game that
+    /// distinguishes the two still can.
+    /// </para>
+    /// <para>
+    /// The share mode admits a concurrent move as well as a concurrent read, so a set-aside is not
+    /// blocked by a read already in progress on platforms that enforce sharing.
+    /// </para>
+    /// </remarks>
     public async Task<string?> Load()
     {
-        if (!File.Exists(FilePath))
+        try
         {
+            await using FileStream file = new(
+                FilePath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete,
+                bufferSize: 4096,
+                useAsync: true);
+            using StreamReader reader = new(file);
+            return await reader.ReadToEndAsync();
+        }
+        catch (Exception exception) when (
+            exception is FileNotFoundException or DirectoryNotFoundException)
+        {
+            // there is no save, which is an answer rather than a failure
             return null;
         }
-
-        return await File.ReadAllTextAsync(FilePath);
     }
 
     /// <inheritdoc />
@@ -72,9 +104,17 @@ public sealed class LocalSaveProgressService : ISaveProgressService
 
     /// <inheritdoc />
     /// <remarks>
+    /// <para>
     /// One generation: a second set-aside replaces the first. An unbounded pile of them is its own
     /// kind of mess in a folder the player may go looking through, and the most recent refusal is
     /// the one a later build would be asked to read.
+    /// </para>
+    /// <para>
+    /// This is the only operation that makes the save path stop existing, which is why
+    /// <see cref="Load"/> is written to survive it: a read overlapping a set-aside is answered as
+    /// "no save" rather than failing. Nothing orders the two against each other, so a game that
+    /// needs a set-aside to be the last word on a file has to arrange that itself.
+    /// </para>
     /// </remarks>
     public Task SetAside()
     {

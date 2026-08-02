@@ -63,6 +63,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Loading a save no longer fails outright when the save is set aside underneath it.**
+  `LocalSaveProgressService.Load` asked whether the file existed and then read it, and `SetAside`
+  moves the save out from between those two steps — so a read that had passed the existence check
+  found nothing to open and threw `FileNotFoundException` instead of answering, which the game
+  reports as storage trouble and holds the player's saving back over. It now opens the file once,
+  and a save that has gone by the time it is read is reported as no save, because that is what is
+  true. Anything else in the way of the read still raises, so "cannot be read" and "is not there"
+  stay distinguishable. The share mode also admits a concurrent move, so a set-aside is not blocked
+  by a read already underway on platforms that enforce sharing.
+  ([#86](https://github.com/olivegamestudio/TDD/issues/86))
 - **A save naming one quest twice no longer undoes the progress it also records.** `QuestLog.Restore`
   applied entries in order, so the last one won by accident of iteration — a file holding `quest-1`
   as both `Completed` and `NotStarted` handed the player back a campaign they had finished. It now

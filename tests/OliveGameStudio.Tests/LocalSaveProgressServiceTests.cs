@@ -35,6 +35,52 @@ public sealed class LocalSaveProgressServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Load_ReportsNoSave_WhenTheSaveIsGoneByTheTimeItIsRead()
+    {
+        // The case this pins is a save that answers "yes, I am here" and is then not there to
+        // open — which is what SetAside makes of a save halfway through a Load, and what a
+        // dangling symlink is at every moment. Staging it as a symlink is what makes it a check
+        // rather than a coin toss: the real race reproduces about once in four hundred rounds,
+        // which is a flaky test, not cover.
+        Directory.CreateDirectory(_directory);
+        if (!TryStageAFileThatIsNotThere())
+        {
+            // Some platforms only let a privileged process create one. The rule holds there too;
+            // it just cannot be staged here.
+            return;
+        }
+
+        Assert.True(File.Exists(SaveFile));
+
+        Assert.Null(await CreateService().Load());
+    }
+
+    [Fact]
+    public async Task Load_ReportsNoSave_WhenAnotherServiceSetTheSaveAsideFirst()
+    {
+        // The report's shape in the order that can be staged: two services sharing no gate, one
+        // moving the save away and the other asked for it afterwards. The save really has gone,
+        // so "there is no save" is the true answer and not a failure to report.
+        LocalSaveProgressService reader = CreateService();
+        await reader.Save("the game that was there a moment ago");
+
+        await CreateService().SetAside();
+
+        Assert.Null(await reader.Load());
+    }
+
+    [Fact]
+    public async Task Load_DoesNotReportNoSave_WhenSomethingIsInTheWayOfReadingIt()
+    {
+        // "There is no save" is reserved for the save not being there. Anything else is storage
+        // getting in the way, and the game holds saving back over it rather than starting a new
+        // game on top of something that may well be intact.
+        Directory.CreateDirectory(SaveFile);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => CreateService().Load());
+    }
+
+    [Fact]
     public async Task RoundTripsTheSavedContent()
     {
         LocalSaveProgressService service = CreateService();
@@ -144,6 +190,24 @@ public sealed class LocalSaveProgressServiceTests : IDisposable
         LocalSaveProgressService service = new();
 
         Assert.EndsWith(Path.Combine("OliveGameStudio", "save.json"), service.FilePath);
+    }
+
+    /// <summary>
+    /// Puts something at the save path that exists as far as an existence check is concerned and
+    /// is not there to open — a symlink to a file that was never written.
+    /// </summary>
+    /// <returns><c>false</c> when the platform will not let this process create one.</returns>
+    bool TryStageAFileThatIsNotThere()
+    {
+        try
+        {
+            File.CreateSymbolicLink(SaveFile, Path.Combine(_directory, "moved-away.json"));
+            return true;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     public void Dispose()

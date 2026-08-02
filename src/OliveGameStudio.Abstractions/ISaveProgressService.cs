@@ -17,6 +17,13 @@ public interface ISaveProgressService
     /// <summary>
     /// Reads the saved progress.
     /// </summary>
+    /// <remarks>
+    /// A save that goes while it is being read — set aside by something else, or removed from
+    /// under the read — is reported as no save rather than as a failure, because that is the true
+    /// answer: there is nothing there. Reporting it as storage trouble would have a game hold its
+    /// saving back over a read that was only unlucky in its timing. Being unable to read a save
+    /// that <em>is</em> there is a different thing and still raises.
+    /// </remarks>
     /// <returns>A task producing the saved content, or <c>null</c> when there is no save.</returns>
     Task<string?> Load();
 

@@ -133,6 +133,19 @@ intact, and starting a new game on top of it is its own kind of data loss — th
 | damaged, and it cannot be set aside | a playable game that **does not write over the save** |
 | **unreadable** — locked, or barred by permissions | a playable game that **does not write over the save**, which may be intact |
 
+**A save that goes while it is being read is the first row, not the last.** `SetAside` is the one
+operation that makes the save path stop existing, and it can do so under a read already underway.
+`LocalSaveProgressService.Load` therefore opens the file once rather than asking whether it exists
+and then reading it — two questions with a gap between them, and the gap was where the save went.
+A read that finds nothing to open answers "no save", because that is what is true: the file really
+has gone. Reporting it as storage trouble would hold the player's saving back over a read that was
+only unlucky in its timing. Nothing else is absorbed — a save that is there and cannot be read
+still raises, so the two rows stay distinguishable.
+
+`Load` and `SetAside` are not ordered against each other, and nothing in the engine orders them.
+The engine's promise is only that neither can make the other fail; a game that needs a set-aside
+to be the last word on a file arranges that itself.
+
 #### A refused save is set aside, not written over
 
 "Damaged" is a judgement, not a measurement. `SaveGameSerializer` decides what this build will
