@@ -26,9 +26,23 @@ public readonly record struct ShipControls
     /// </remarks>
     public ShipControls(double thrust, double turn)
     {
-        Thrust = Math.Clamp(thrust, -1, 1);
-        Turn = Math.Clamp(turn, -1, 1);
+        Thrust = Axis(thrust);
+        Turn = Axis(turn);
     }
+
+    /// <summary>
+    /// Brings one axis into the range the ship is rated for, taking an axis that could not be read
+    /// as hands off.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Math.Clamp(double, double, double)"/> does not hold for <c>NaN</c> — it returns
+    /// it unchanged — and a device that cannot read an axis reports exactly that. One unreadable
+    /// frame would put a <c>NaN</c> in the heading, then the velocity, then the position, and
+    /// nothing after it recovers: the ship is still being drawn and flown, and no longer has a
+    /// place in the world. Zeroing it here costs one frame of input and is the only point every
+    /// device passes through.
+    /// </remarks>
+    static double Axis(double value) => double.IsNaN(value) ? 0 : Math.Clamp(value, -1, 1);
 
     /// <summary>
     /// Hands off the controls. What an unbound input device reports, and what a frame with no
@@ -45,4 +59,98 @@ public readonly record struct ShipControls
     /// Gets which way the ship is being turned, from -1 hard to port to 1 hard to starboard.
     /// </summary>
     public double Turn { get; }
+
+    /// <summary>
+    /// Gets whether nobody is flying: neither axis is asking for anything.
+    /// </summary>
+    /// <remarks>
+    /// An exact comparison against zero, which is safe because <see cref="Axis"/> normalises every
+    /// axis at construction — there is no path, constructor or <c>default</c>, that puts a
+    /// <c>NaN</c> in either property, and <c>NaN == 0</c> is false. That guarantee is what holds
+    /// this up: were it removed, a device reporting an axis it could not read would claim to be
+    /// the one being used and shut every device behind it out.
+    /// </remarks>
+    public bool IsNeutral => Thrust == 0 && Turn == 0;
+
+    /// <summary>
+    /// Reads the controls from four keys — the digital case, where a key is either held or it is
+    /// not and there is no travel in between.
+    /// </summary>
+    /// <param name="ahead">Whether the ahead key is held.</param>
+    /// <param name="astern">Whether the astern key is held.</param>
+    /// <param name="port">Whether the turn-to-port key is held.</param>
+    /// <param name="starboard">Whether the turn-to-starboard key is held.</param>
+    /// <returns>The controls those keys are asking for.</returns>
+    /// <remarks>
+    /// Opposite keys are summed rather than tested in order, so a player holding both gets a
+    /// straight cancel — and, more to the point, the answer does not depend on which of the two
+    /// the code happened to look at first. A hand flat on all four keys therefore reads as hands
+    /// off, and reports itself that way, so it does not win the arbitration against a device
+    /// somebody is actually using.
+    /// </remarks>
+    public static ShipControls FromKeys(bool ahead, bool astern, bool port, bool starboard) =>
+        new((ahead ? 1 : 0) - (astern ? 1 : 0),
+            (starboard ? 1 : 0) - (port ? 1 : 0));
+
+    /// <summary>
+    /// Reads the controls from an analogue stick, absorbing the drift of a stick nobody is
+    /// touching.
+    /// </summary>
+    /// <param name="thrust">The stick's thrust axis, nominally -1 to 1.</param>
+    /// <param name="turn">The stick's helm axis, nominally -1 to 1.</param>
+    /// <param name="deadZone">
+    /// How far the stick must travel before it counts as being pushed, from 0 to 1.
+    /// </param>
+    /// <returns>The controls the stick is asking for.</returns>
+    /// <remarks>
+    /// The dead zone is taken off the bottom of the travel and the rest is stretched back over the
+    /// full range, rather than simply subtracted. Subtracting would cost the player the top of the
+    /// range — they could push the stick to its stop and never quite ask for full thrust, which is
+    /// the kind of bug that is felt long before it is found. Stretching also means crossing the
+    /// edge asks for a little rather than jumping straight to a fifth of the engine.
+    /// </remarks>
+    public static ShipControls FromStick(double thrust, double turn, double deadZone) =>
+        new(PastDeadZone(thrust, deadZone), PastDeadZone(turn, deadZone));
+
+    /// <summary>
+    /// How far one axis is past its dead zone, as a fraction of the travel that is left.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The unreadable cases are taken first and deliberately. <see cref="Math.Sign(double)"/>
+    /// <em>throws</em> on <c>NaN</c> rather than returning 0, and an ordered comparison against
+    /// <c>NaN</c> is false either way round — so the dead zone test below does not catch one, and
+    /// without this line a driver reporting an axis it could not read takes the game down on the
+    /// frame path. The host reads its pad with the dead zone off, so raw driver floats arrive here
+    /// with nothing in between.
+    /// </para>
+    /// <para>
+    /// A negative dead zone is floored rather than refused. Left alone it inverts the feature into
+    /// a sensitivity boost — at -0.5 a stick 1% off centre would ask for a third of the engine,
+    /// which is precisely the drift the dead zone exists to absorb. Refusing it would be the other
+    /// defensible answer, but this runs once a frame per axis, and a miscalibrated device should
+    /// not be able to stop the game.
+    /// </para>
+    /// </remarks>
+    static double PastDeadZone(double value, double deadZone)
+    {
+        if (double.IsNaN(value) || double.IsNaN(deadZone))
+        {
+            return 0;
+        }
+
+        deadZone = Math.Max(deadZone, 0);
+
+        double travel = 1 - deadZone;
+        double magnitude = Math.Abs(value);
+
+        // travel is gone once the dead zone reaches the stop, and a stick that can never be
+        // pushed far enough to count is one nobody can fly with — hands off rather than a divide
+        if (travel <= 0 || magnitude <= deadZone)
+        {
+            return 0;
+        }
+
+        return Math.Sign(value) * (magnitude - deadZone) / travel;
+    }
 }

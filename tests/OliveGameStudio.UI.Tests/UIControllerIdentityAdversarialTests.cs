@@ -109,11 +109,12 @@ public sealed class UIControllerIdentityAdversarialTests
     }
 
     [Fact]
-    public void FocusingAStrangerThatSharesAName_DoesNotPressTheManagedButton()
+    public void FocusingAStrangerThatSharesAName_IsRefused_AndTheManagedButtonKeepsFocus()
     {
-        // FocusOn does not validate, so focus can be aimed at a button the controller does
-        // not hold. Pressing it must not quietly find the managed button of the same name
-        // and fire that instead — which is exactly what a name match did.
+        // A name match once made this stranger indistinguishable from the managed button, so
+        // pressing it fired the managed one's action. Identity closed that; #101 moved the
+        // report to where the mistake is made. Focus never moves, so the press that follows
+        // is the ordinary one on the managed button rather than a throw from a stale aim.
         UIController controller = new();
         Button managed = new("BACK");
         controller.Add(managed);
@@ -121,10 +122,14 @@ public sealed class UIControllerIdentityAdversarialTests
         bool fired = false;
         controller.OnPressed(managed, () => fired = true);
 
-        controller.FocusOn(new Button("BACK"));
+        Assert.Throws<InvalidOperationException>(() => controller.FocusOn(new Button("BACK")));
 
-        Assert.Throws<InvalidOperationException>(() => controller.Press());
+        Assert.Same(managed, controller.Focused);
         Assert.False(fired);
+
+        controller.Press();
+
+        Assert.True(fired);
     }
 
     // ---- siblings, with the sibling registered first ------------------------

@@ -9,6 +9,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A keyboard and a gamepad at the controls.** The shipping game is flyable by a person rather
+  than only by a test: quest 1 can be completed on W/S/A/D or the arrow keys, or on a gamepad's
+  left stick. `ShipControls.FromKeys` translates held keys — opposite keys are summed, so they
+  cancel and the answer never depends on which was read first — and `ShipControls.FromStick`
+  applies a dead zone and stretches the remaining travel back over the full range, so a worn stick
+  does not fly the ship while a stick at its stop still asks for everything.
+  `FirstActiveShipInput` asks its devices in order and lets the first one asking for anything
+  answer for the frame, arbitrating per device rather than per axis and holding no state, so
+  putting one device down hands over on the next frame. `BattleForce2249.MonoGame` binds the
+  devices through `AddDesktopPilot()`, after `AddBattleForce` so it wins over the engine's
+  `NeutralShipInput`. ([#9](https://github.com/olivegamestudio/TDD/issues/9))
+
 - **The `Pilgrimage` quest system.** A standalone quest library with no project references:
   `QuestDefinition` and `QuestTrigger` for authored content, `Quest` for the
   `NotStarted → Active → Completed` lifecycle, `QuestLog` for the player's quests and their
@@ -57,6 +69,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   than silently degrading to sampling one end above 1.3e154. ([#8](https://github.com/olivegamestudio/TDD/issues/8))
 - **Project documentation** — this changelog, a README, and the design canon, architecture notes
   and workflow under `docs/`.
+- **Continuous integration** — `.github/workflows/build.yml` builds and tests the whole solution,
+  MonoGame host included, on every push to `main` and every pull request. Until it landed, nothing
+  in this repository had ever been compiled by anything but the author of the change: pull requests
+  carried no checks at all, and several were stacked on one another unbuilt. A failing test now
+  fails the pull request. ([#34](https://github.com/olivegamestudio/TDD/issues/34))
 
 ### Changed
 
@@ -78,6 +95,56 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **`ShipControls` takes an axis it cannot read as hands off.** The constructor clamped with
+  `Math.Clamp`, which does not hold for `NaN` — it returns it unchanged — so a driver reporting an
+  axis it could not read put a `NaN` into the heading, then the velocity, then the position, and
+  nothing after it recovered: the ship was still being drawn and flown and no longer had a place in
+  the world. Unreachable before now, because the only input device was `NeutralShipInput`; reachable
+  the moment a real pad was bound, so it is fixed with the binding. The same value would also have
+  won the arbitration and shut every device behind it out, since `NaN == 0` is
+  false. ([#9](https://github.com/olivegamestudio/TDD/issues/9))
+- **`QuestLog.Register` refuses an identifier that names no quest.** Both edges that read a save skip
+  a quest entry whose identifier is `null`, empty or blank, on the stated grounds that nothing is
+  registered under one — but nothing enforced that, so a campaign could register a quest under a
+  blank identifier and have it captured with its progress and restored to nothing, silently. A
+  completed quest came back unstarted, and through the save file it cost the saved position too,
+  because a game restoring no progress declines the coordinates saved beside it. `Register` now
+  refuses that identifier where the duplicate check already lives, which turns the premise the two
+  reading edges assert into one they can rely on. Only an identifier made of *nothing but* whitespace
+  is refused: one with whitespace in it, or around it, names something and stays a campaign's to
+  choose. Unreachable in Battle Force 2249, which names its quests — it matters because `Pilgrimage`
+  is a standalone library whose content belongs to whoever builds on
+  it. ([#106](https://github.com/olivegamestudio/TDD/issues/106))
+- **`UIController.FocusOn` refuses a button it does not hold.** It was the last entry point taking a
+  button that did not check, so focus could be aimed at a stranger and the complaint arrived at the
+  next `Press` — an `InvalidOperationException` thrown from a call the author of the mistake was no
+  longer standing in, naming a button they had not passed. It now throws where the aim is taken, and
+  leaves the existing focus untouched when it refuses. Only membership is checked: a managed button
+  that is currently disabled may still be focused, since `Press` declines a disabled button on its
+  own and widening the guard would be a new decision rather than this
+  fix. ([#101](https://github.com/olivegamestudio/TDD/issues/101))
+- **One junk quest entry no longer discards the progress saved beside it, and no longer freezes the
+  game.** A quest entry naming no quest — a `QuestId` that is absent, `null` or blank — is drift
+  between a save and a campaign, exactly like an entry naming a quest this build has dropped, and
+  the two edges that read one now agree on it: `SaveGameSerializer` drops the entry and reads the
+  rest of the file, and `QuestLog.Restore` skips it. A `null` id used to come out of the dictionary
+  as `ArgumentNullException` and a `null` *entry* as a `NullReferenceException`, neither of which is
+  a storage failure — so they escaped `GameSession.Continue` onto a task nothing awaits, leaving the
+  game screen waiting on a session that never became ready: no error, no new game, and the save
+  neither read nor set aside. An entry that is not there is still refused, now as a stated
+  contract and across the whole batch before any of it is applied, so a caught refusal leaves the
+  log it started with rather than half a save. ([#44](https://github.com/olivegamestudio/TDD/issues/44))
+- **A save holding no campaign progress no longer strands the player where it says.** Drift is
+  tolerated on purpose, so a readable save whose every quest entry names nothing this build ships
+  — a dropped quest, no quest at all, or no entries — restored an empty quest log while still
+  putting the player at its coordinates. Quest 1 begins within 25 units of the marker a new game
+  spawns on, so a player set down 700 units out had nothing active, nothing to fly towards, and
+  got further from the only trigger that could help with every frame of flying forward; the only
+  way out was backwards, through the debris field quest 1 is about escaping. `GameSession.Continue`
+  now uses the saved position only when at least one registered quest came back started or
+  completed. The file is still read rather than refused, because a refused save is set aside and
+  written over while a declined position leaves it on
+  disk. ([#44](https://github.com/olivegamestudio/TDD/issues/44))
 - **Two buttons with the same name are two buttons.** `Element` and its kinds are now classes
   rather than records, so `==` is identity. `Button` was a record, which made `==` value equality
   on the name, and `UIController` resolves every button through `==` — so with the controller
@@ -88,8 +155,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   one it holds, which is the case the rule exists for. The visible change for callers is that a
   button the controller does not hold is now an error rather than a misdirection: `OnPressed`,
   `OnReleased`, `Press`, `Enable`, `Disable`, `IsEnabled` and both ends of `Link` throw
-  `InvalidOperationException` instead of acting on the namesake. `FocusOn` is the exception — it
-  does not check, so focus aimed at an unmanaged button surfaces at the next `Press`.
+  `InvalidOperationException` instead of acting on the namesake. `FocusOn` was the exception until
+  [#101](https://github.com/olivegamestudio/TDD/issues/101) below.
   ([#13](https://github.com/olivegamestudio/TDD/issues/13), [#27](https://github.com/olivegamestudio/TDD/pull/27))
 - **A save naming one quest twice no longer undoes the progress it also records.** `QuestLog.Restore`
   applied entries in order, so the last one won by accident of iteration — a file holding `quest-1`

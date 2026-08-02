@@ -40,6 +40,69 @@ public sealed class QuestLogTests
         Assert.Throws<ArgumentException>(() => log.Register(Definition("quest-1")));
     }
 
+    /// <summary>
+    /// Every form of identifier that names nothing. A quest registered under one would be captured
+    /// with its progress and then restored to nothing, because <see cref="QuestLog.Restore"/> skips
+    /// exactly these — so the log refuses them at the door instead of accepting a quest it cannot
+    /// bring back.
+    /// </summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("   ")]
+    [InlineData("\t")]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    [InlineData("\u00a0")] // a non-breaking space is whitespace to IsNullOrWhiteSpace, so it is not a name either
+    public void Register_RefusesAnIdentifierThatNamesNoQuest(string? id)
+    {
+        QuestLog log = new();
+
+        ArgumentException refusal =
+            Assert.Throws<ArgumentException>(() => log.Register(Definition(id!)));
+
+        Assert.Equal("definition", refusal.ParamName);
+    }
+
+    /// <summary>
+    /// The refusal is inert: a log that turned a registration away is the log it was beforehand,
+    /// not one holding a half-registered quest.
+    /// </summary>
+    [Fact]
+    public void Register_RefusingAnIdentifierThatNamesNoQuest_LeavesTheLogAsItWas()
+    {
+        QuestLog log = new();
+        Quest kept = log.Register(Definition("quest-1"));
+
+        Assert.Throws<ArgumentException>(() => log.Register(Definition("  ")));
+
+        Assert.Single(log.Quests);
+        Assert.Same(kept, Assert.Single(log.Quests));
+    }
+
+    /// <summary>
+    /// The bound of the refusal. An identifier with whitespace <em>in</em> it, or around it, still
+    /// names something — only one made of nothing but whitespace does not — so the guard must not
+    /// widen into trimming or rejecting identifiers a campaign is entitled to choose.
+    /// </summary>
+    [Theory]
+    [InlineData("quest-1")]
+    [InlineData(" quest-1 ")]
+    [InlineData("quest 1")]
+    [InlineData("0")]
+    [InlineData("_")]
+    [InlineData("クエスト")]
+    public void Register_AcceptsAnyIdentifierThatNamesSomething(string id)
+    {
+        QuestLog log = new();
+
+        Quest quest = log.Register(Definition(id));
+
+        Assert.Equal(id, quest.Id);
+        Assert.Same(quest, log.Find(id));
+    }
+
     [Fact]
     public void RaisesQuestStarted_WithTheQuestThatStarted()
     {
@@ -174,6 +237,50 @@ public sealed class QuestLogTests
         log.Restore([new QuestProgress("quest-1", QuestState.Completed)]);
 
         Assert.Equal(QuestState.NotStarted, log.Find("quest-added-since")!.State);
+    }
+
+    // ---- an entry that names no quest, and an entry that is not there ----
+    // Two shapes that look alike and are not the same. An entry naming no quest is drift of the
+    // kind above — it matches nothing registered, so there is nothing to apply it to and it is
+    // skipped. An entry that is *not there* is not drift: no build wrote it, and the batch is
+    // refused. A game reading its own save file draws the same line one file earlier.
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Restore_SkipsAnEntryNamingNoQuest_AndKeepsTheProgressBesideIt(string? questId)
+    {
+        // An identifier that is absent names a quest exactly as poorly as one that is merely
+        // unknown, and refusing the batch over it would throw away the progress standing beside
+        // it — which is the part that was real. A null id used to come out of the dictionary as
+        // ArgumentNullException, which is neither a skip nor a refusal, just a crash.
+        QuestLog log = new();
+        log.Register(Definition("quest-1"));
+
+        log.Restore([
+            new QuestProgress(questId!, QuestState.Active),
+            new QuestProgress("quest-1", QuestState.Completed),
+        ]);
+
+        Assert.Equal(QuestState.Completed, log.Find("quest-1")!.State);
+    }
+
+    [Fact]
+    public void Restore_RefusesAnEntryThatIsNotThere_AndAppliesNothingBesideIt()
+    {
+        // The refusal has to be all-or-nothing, or a caller that catches it is left holding half a
+        // save: quest-1 restored, the rest of the batch abandoned mid-way. It reached callers as a
+        // NullReferenceException before, which is a crash rather than a contract.
+        QuestLog log = new();
+        log.Register(Definition("quest-1"));
+
+        Assert.Throws<ArgumentException>("progress", () => log.Restore([
+            new QuestProgress("quest-1", QuestState.Completed),
+            null!,
+        ]));
+
+        Assert.Equal(QuestState.NotStarted, log.Find("quest-1")!.State);
     }
 
     // ---- a save that names the same quest twice ----

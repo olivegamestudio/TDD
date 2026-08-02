@@ -27,13 +27,13 @@ to know about ships, quests or credits is on the wrong side of this line.
 | `OliveGameStudio.UI`, `.UI.Abstractions` | Menu and button navigation. Not ship control. |
 | `OliveGameStudio.FrameRate` | Frame time filtering, so a paused or slowed game holds still while frames keep arriving. |
 | `OliveGameStudio.Progress` | `LocalSaveProgressService`, persisting save text to a file. |
-| `OliveGameStudio.World` | `Position`, `Player`. The spatial model. |
+| `OliveGameStudio.World` | `Position`, `Player`. The spatial model, plus the ship's physics and `IShipInput` — what an input means, never which device produced it. |
 | `OliveGameStudio.Localisation` | `ITextProvider`, `JsonTextProvider`, `MissingTextException`. |
 | `Pilgrimage` | The quest system. No project references at all, by design. |
 | `BattleForce2249` | Game host and DI registration. |
 | `BattleForce2249.Abstractions` | Screen interfaces and options. |
 | `BattleForce2249.Company`, `.Menu`, `.Game` | The three screens. |
-| `BattleForce2249.MonoGame` | The MonoGame entry point. |
+| `BattleForce2249.MonoGame` | The MonoGame entry point, and the real input devices bound to the engine's seams. |
 
 Tests live in `tests/` as `<project>.Tests`, xUnit, targeting `net10.0`.
 
@@ -107,6 +107,43 @@ what older saves can be read back into.
 A save the campaign has drifted from is tolerated in both directions: a quest the save knows but
 this build no longer ships is ignored, and a quest added since the save was written starts from
 the beginning.
+
+**Refusal is per file; drift is per entry.** The two look alike and are not the same. A quest entry
+that *names no quest* — a `QuestId` that is absent, `null` or blank — names nothing this build
+ships, so there is nothing to apply it to: it is dropped and the rest of the file is read. A quest
+entry that *is not there* — a `null` in the list — is not drift; no build wrote one, so the file is
+refused whole and set aside. Both edges give that answer: `SaveGameSerializer` drops the unnamed
+entry and refuses the null one, and `QuestLog.Restore` skips the first and refuses the second. They
+have to agree, because while they did not, one blank line in a file discarded the completed
+campaign saved beside it — and every refusal at this boundary is final, since a refused save is
+played over by the game that replaces it.
+
+**Dropping an unnamed entry is safe because nothing can be registered under one.** `QuestLog.Register`
+refuses an identifier that is `null`, empty or nothing but whitespace, so the entry both edges skip
+can never be the only record of a quest the player really finished. That was an assumption before
+#106 and is now a check at the single door every quest comes through: a campaign that named a quest
+with a blank string had it captured, dropped on the way back, and lost in silence. Only an
+identifier made of *nothing but* whitespace is refused — one with a space in it names something, and
+`Pilgrimage` has no opinion about identifiers it can store and find again. This matters more here
+than it would in the game, because `Pilgrimage` is a standalone library: the content is not ours,
+and a campaign built on it can name a quest whatever it likes.
+
+**A position is only progress beside the quest progress it was taken with.** Tolerating drift means
+a perfectly readable save can restore no progress at all — every entry naming a quest the campaign
+dropped, or naming no quest, or no entries. Its coordinates would then place the player inside a
+campaign nobody has begun, and quest 1's start trigger is 25 units wide around the marker a new
+game spawns on: a player set down 700 units out has nothing active, nothing to fly towards, and
+gets further from the only trigger that could help with every frame of flying forward — the one
+direction the game teaches. So `GameSession.Continue` uses the saved position only when at least
+one registered quest came back started or completed; otherwise the player begins where a new game
+begins.
+
+The file itself is still read rather than refused, and deliberately: a refused save is set aside
+and replaced by the game written over it, so refusing costs the player the file as well as the
+position, while declining only the position leaves it on disk until real progress is written. What
+the line costs is a save taken after the player has travelled but before any quest has begun. None
+can be written while the first quest starts where the player spawns, and a campaign that changes
+that has to revisit this.
 
 **A save that names one quest twice restores it to the furthest of the states it names.** A later
 entry is applied only if it carries the quest further on; one that would hand progress back is
@@ -235,11 +272,13 @@ this controller holds, and *not held* includes a button whose name matches a man
 separately and does not.) That is the trade the fix makes: a screen that wires up a button it never
 added used to quietly operate somebody else's, and now says so on the first call.
 
-`FocusOn` is the one that does not check. Focus may be pointed at a button the controller does not
-hold, and the failure surfaces at the next `Press`, which throws when it tries to resolve it. Before
-the elements became identities that call found the managed namesake instead and fired *its* action,
-so this is loud where it was silent — but it is still later than the mistake, and it is recorded in
-the gaps below rather than claimed as closed.
+`FocusOn` checks too, and used to be the exception. Focus could be pointed at a button the
+controller does not hold, and the failure surfaced at the next `Press`, which threw when it tried to
+resolve it — loud, since before the elements became identities that call found the managed namesake
+and fired *its* action, but reported somewhere the mistake was no longer in view. It now refuses the
+stranger where the aim is taken, and leaves the existing focus alone when it does. Membership is all
+it checks: a managed button that is disabled may still be focused, because disabled is a statement
+about pressing, which `Press` declines on its own.
 
 ## Screen flow
 
@@ -314,18 +353,52 @@ button while nothing is focused adopts it. `MenuScreen` depends on the pair — 
 disabled until the save has been read, which leaves the screen with no focus at all, and enabling
 it is what puts focus back.
 
+## Ship input
+
+`IShipInput` is the seam gameplay input arrives through, and it follows the engine/game split the
+same way saved progress does: **the engine provides the service, the host provides the device.**
+`OliveGameStudio.World` owns what an input *means* — `ShipControls.FromKeys` for the digital case,
+`ShipControls.FromStick` for the analogue one, and `FirstActiveShipInput` for choosing between
+devices. `BattleForce2249.MonoGame` owns which keys and which stick.
+
+**Arbitration is per device, not per axis.** Devices are asked in order and the first one asking
+for anything answers for the whole frame. Summing two devices would turn two half-turns into a
+full one; arbitrating per axis is the same summing in a form the player cannot see. It holds no
+state, so putting one device down hands over on the very next frame. The gamepad is asked first —
+a resting pad is zeroed by its dead zone, so it costs the keyboard nothing.
+
+**An axis that cannot be read is hands off, guarded twice.** `Math.Sign` throws on `NaN` rather
+than returning 0, and an ordered comparison against `NaN` is false either way round, so a dead zone
+test does not catch one. `PastDeadZone` catches an unreadable axis; the `ShipControls` constructor
+catches a `NaN` arriving by any other route. The two cover different holes and neither is spare.
+`ShipControls.IsNeutral` compares exactly against zero and is only safe because of the second: a
+device reporting `NaN` would otherwise claim to be the one in use and shut every device behind it
+out.
+
+**The dead zone is the game's, not the platform's.** The host reads the pad with MonoGame's dead
+zone off and applies `GamePadShipInput.DeadZone` itself, so there is one stated number rather than
+whatever the driver decided.
+
 ## Known gaps
 
-- Nothing moves the ship. Quest 1 is completable by test, not by playing — movement and physics
-  are issue #3.
+- `Keyboard.GetState` and `GamePad.GetState` are static calls into MonoGame with no seam in front
+  of them, so nothing invokes `Read()` on a real device. What is untested is the few lines naming
+  the keys and the stick axes; everything they feed is engine code and is covered.
+  `tests/BattleForce2249.MonoGame.Tests` pins the registration in both orderings and pins the
+  shipped dead zone, which no other project can see.
+- Nobody has *felt* the handling. `BattleForceShip`'s tuning has only been checked against quest
+  1's distances, and as of the input binding a person can actually fly it. Worth a play session
+  before the numbers are treated as settled.
+- There are no on-screen key prompts; nothing tells the player which keys fly the ship. That is
+  `ENGINE` work and needs localised text.
 - Nothing displays a quest title. There is no HUD or quest log; that is a separate `ENGINE`
   issue. `IGameSession.SaveError` is unread for the same reason — there is nowhere to say it.
 - Nothing selects a language. Translations are reachable only through the machine's own culture.
 - There is no persistent record (experience, credits, quest history) separate from the saved
   position. See pillar 4 in `docs/DESIGN.md`.
-- `UIController.FocusOn` accepts a button the controller does not hold, so a mistake there is
-  reported by the next `Press` rather than by the call that made it. Related: the re-home in
-  `SetEnabled` picks the first enabled button anywhere in the controller, and the controller is
-  shared by every screen, so disabling a screen's focused button can land focus on a button
-  belonging to a screen that is not current. Both are about which buttons a controller should be
-  answering for at all, which is a scoping question the singleton has not been asked yet.
+- The re-home in `SetEnabled` picks the first enabled button anywhere in the controller, and the
+  controller is shared by every screen, so disabling a screen's focused button can land focus on a
+  button belonging to a screen that is not current. `FocusOn` refusing strangers (#101) closed the
+  half of this that was about buttons the controller does not hold; what is left is which of the
+  buttons it *does* hold it should be answering for, a scoping question the singleton has not been
+  asked yet.

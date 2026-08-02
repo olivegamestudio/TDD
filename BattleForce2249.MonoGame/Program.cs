@@ -35,6 +35,11 @@ services.AddBattleForce(configuration);
 // implementation; configuration tunes it.
 // services.AddSingleton<IFrameTimeController, ScaledFrameTimeController>();
 
+// The keyboard and the gamepad, for the same reason and in the same place: the engine ships
+// nobody at the controls, and the input device is the platform host's to own. Without this line
+// the game launches, starts quest 1, and the ship sits on the start marker for ever.
+services.AddDesktopPilot();
+
 using ServiceProvider provider = services.BuildServiceProvider();
 
 using BattleForceGame game = new(provider.GetRequiredService<IHost>());

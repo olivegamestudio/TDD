@@ -1,0 +1,16 @@
+{
+  // Path B: give the cloud agent (and any devcontainer-based environment) the .NET 10 SDK so it
+  // can build and run the tests itself, instead of writing blind and waiting on CI.
+  //
+  // This is only honoured if the environment actually builds from a devcontainer AND has network
+  // during provisioning (the image + restore are fetched then). If your Claude Code cloud
+  // environment uses a different mechanism (a setup script, a prebuilt base image), point that
+  // mechanism at the same SDK version instead — the file to read is this one.
+  "name": "BattleForce2249 — .NET 10 build environment",
+  "image": "mcr.microsoft.com/dotnet/sdk:10.0",
+
+  // Warm the package cache while network is still available, so a locked-down run can build offline.
+  "postCreateCommand": "dotnet restore OliveGameStudio.slnx",
+
+  "remoteUser": "root"
+}

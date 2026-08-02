@@ -42,6 +42,22 @@ public static class SaveGameSerializer
     /// The snapshot, or <c>null</c> when <paramref name="content"/> is missing, blank, or not a
     /// save this build can read.
     /// </returns>
+    /// <remarks>
+    /// <para>
+    /// <b>Refusal is per file; drift is per entry.</b> The two shapes look alike and are not the
+    /// same. A quest entry that <em>names no quest</em> — a <see cref="QuestProgress.QuestId"/>
+    /// that is absent, <c>null</c> or blank — names nothing this build ships, which is exactly how
+    /// <see cref="QuestLog.Restore"/> reads it: there is nothing to apply it to, so the entry is
+    /// dropped and the rest of the file is read. A quest entry that <em>is not there</em> is not
+    /// drift; no build wrote a <c>null</c> into the list, so the file is refused whole.
+    /// </para>
+    /// <para>
+    /// Both edges give that same answer, and the agreement is the point. While they disagreed, one
+    /// blank line in a file discarded the completed campaign saved beside it — and discarded it for
+    /// good, because a refused save is set aside and played over. Every refusal here is final, so
+    /// the narrowing is deliberate rather than a convenience.
+    /// </para>
+    /// </remarks>
     public static SaveGame? Deserialize(string? content)
     {
         if (string.IsNullOrWhiteSpace(content))
@@ -52,13 +68,44 @@ public static class SaveGameSerializer
         try
         {
             SaveGame? save = JsonSerializer.Deserialize<SaveGame>(content, Options);
+            if (save is null)
+            {
+                return null;
+            }
 
             // a save written as JSON null, or with a null quest list, is still readable
-            return save is null ? null : save with { Quests = save.Quests ?? [] };
+            save = save with { Quests = save.Quests ?? [] };
+
+            if (save.Quests.Any(quest => quest is null))
+            {
+                return null;
+            }
+
+            // Dropped here rather than carried on: an entry naming no quest matches nothing the
+            // campaign registered, so nothing downstream could act on it, and the rest of the load
+            // never has to hold an entry it must remember to ignore.
+            return save with { Quests = [.. save.Quests.Where(NamesAQuest)] };
         }
         catch (JsonException)
         {
             return null;
         }
     }
+
+    /// <summary>
+    /// Whether a quest entry names a quest at all. A missing, <c>null</c> or blank identifier is
+    /// not a name: no quest can be registered under one — <see cref="QuestLog.Register"/> refuses
+    /// it — and no save this build wrote holds one.
+    /// </summary>
+    /// <remarks>
+    /// The first half of that used to be an assumption. Nothing stopped a campaign registering a
+    /// quest under a blank identifier, and one that did would have its progress captured and then
+    /// dropped here, so the entry this method skips as meaningless was the only record of a quest
+    /// the player had really finished. <see cref="QuestLog.Register"/> now closes that door, which
+    /// is why this can state it. Both edges test the identifier the same way, and that agreement is
+    /// pinned by tests rather than left to the two of them to keep separately.
+    /// </remarks>
+    /// <param name="quest">The parsed quest entry.</param>
+    /// <returns><c>true</c> when the entry names something.</returns>
+    static bool NamesAQuest(QuestProgress quest) => !string.IsNullOrWhiteSpace(quest.QuestId);
 }
