@@ -44,6 +44,21 @@ public sealed class QuestLog
     /// <param name="definition">The quest to register.</param>
     /// <returns>The runtime quest created for the definition.</returns>
     /// <exception cref="ArgumentException">
+    /// <para>
+    /// The identifier names no quest — it is <c>null</c>, empty or nothing but whitespace. This is
+    /// the door that makes <see cref="Restore"/>'s skip safe. <see cref="Restore"/> passes over an
+    /// entry whose identifier names nothing, on the stated grounds that nothing is registered under
+    /// one; refusing here is what makes that a fact rather than an assumption. Without it a
+    /// campaign could register a quest, play it, save it through <see cref="Capture"/> and have
+    /// <see cref="Restore"/> throw the progress away, reporting nothing at any step.
+    /// </para>
+    /// <para>
+    /// Only an identifier made of nothing but whitespace is refused. One with whitespace in it, or
+    /// around it, names something and is a campaign's to choose — the library does not trim,
+    /// case-fold or otherwise have opinions about identifiers it can store and find again.
+    /// </para>
+    /// </exception>
+    /// <exception cref="ArgumentException">
     /// A quest with the same identifier is already registered. Two quests sharing an identifier
     /// would overwrite each other in the save game. Note that <see cref="Restore"/> deliberately
     /// does <em>not</em> refuse a duplicate: it reads a file rather than a campaign, and two
@@ -52,6 +67,15 @@ public sealed class QuestLog
     /// </exception>
     public Quest Register(QuestDefinition definition)
     {
+        // Asked before the duplicate check because it is the more basic complaint: an identifier
+        // that names nothing is not a candidate for being a second anything.
+        if (string.IsNullOrWhiteSpace(definition.Id))
+        {
+            throw new ArgumentException(
+                "A quest must be registered under an identifier that names something. An identifier that is null, empty or only whitespace is one Restore skips, so a quest registered under it would be saved and then silently lost.",
+                nameof(definition));
+        }
+
         if (_quests.ContainsKey(definition.Id))
         {
             throw new ArgumentException($"A quest with the id '{definition.Id}' is already registered.", nameof(definition));
@@ -112,9 +136,10 @@ public sealed class QuestLog
     /// <para>
     /// <b>An entry naming no quest is drift of the same kind and is skipped.</b> An identifier that
     /// is <c>null</c>, empty or blank names a quest exactly as poorly as one that is merely
-    /// unknown: nothing is registered under it, so there is nothing to apply it to, and refusing
-    /// the batch over it would throw away the progress standing beside it — which is the part that
-    /// was real. An entry that is <c>null</c> is not drift; no <see cref="Capture"/> wrote it, so
+    /// unknown: nothing is registered under it — <see cref="Register"/> refuses exactly these, which
+    /// is what makes that a fact rather than a hope — so there is nothing to apply it to, and
+    /// refusing the batch over it would throw away the progress standing beside it, which is the
+    /// part that was real. An entry that is <c>null</c> is not drift; no <see cref="Capture"/> wrote it, so
     /// the batch is refused instead. A game reading its own save file draws that same line one step
     /// earlier, and two edges answering differently about one entry is how a save that needed a
     /// single line skipping came to be discarded whole.

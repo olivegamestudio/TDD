@@ -94,8 +94,17 @@ public static class SaveGameSerializer
 
     /// <summary>
     /// Whether a quest entry names a quest at all. A missing, <c>null</c> or blank identifier is
-    /// not a name: no quest is registered under one, and no save this build wrote holds one.
+    /// not a name: no quest can be registered under one — <see cref="QuestLog.Register"/> refuses
+    /// it — and no save this build wrote holds one.
     /// </summary>
+    /// <remarks>
+    /// The first half of that used to be an assumption. Nothing stopped a campaign registering a
+    /// quest under a blank identifier, and one that did would have its progress captured and then
+    /// dropped here, so the entry this method skips as meaningless was the only record of a quest
+    /// the player had really finished. <see cref="QuestLog.Register"/> now closes that door, which
+    /// is why this can state it. Both edges test the identifier the same way, and that agreement is
+    /// pinned by tests rather than left to the two of them to keep separately.
+    /// </remarks>
     /// <param name="quest">The parsed quest entry.</param>
     /// <returns><c>true</c> when the entry names something.</returns>
     static bool NamesAQuest(QuestProgress quest) => !string.IsNullOrWhiteSpace(quest.QuestId);
