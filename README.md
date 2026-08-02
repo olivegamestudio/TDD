@@ -53,6 +53,10 @@ dotnet test OliveGameStudio.slnx
 dotnet run --project BattleForce2249.MonoGame
 ```
 
+CI runs the build and the full test suite on every push to `main` and every pull request
+([`.github/workflows/build.yml`](.github/workflows/build.yml)), so a change arrives with a result
+already against it.
+
 ## Status
 
 Engine, screen flow and the quest system are in. Quest 1 auto-starts on a new game, tracks the

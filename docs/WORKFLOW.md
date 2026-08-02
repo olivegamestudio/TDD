@@ -70,8 +70,13 @@ NuGet is reachable, so restore succeeds, and MonoGame's `mgcb` tooling restores 
 `BattleForce2249.MonoGame/.config` — the host builds, not just the libraries.
 
 So verify before handing off, and report what you actually ran. If a build genuinely fails, say
-what failed; "no SDK" is no longer a reason. There is still **no CI** (#34), so beyond an agent's
-own run a human running `dotnet test` is the only confirmation.
+what failed; "no SDK" is no longer a reason.
+
+**CI runs the same two commands.** `.github/workflows/build.yml` builds and tests the solution on
+every push to `main` and every pull request, so a pull request reports a result before it is
+reviewed and a failing test fails the pull request. It does not replace running them yourself —
+it confirms your run on a machine that is not yours, which is the part an agent container cannot
+do for itself.
 
 Tests that assert on user-facing text must pin the culture. A test comparing against an English
 literal with no culture pinned fails on any machine not running in English; this has already
