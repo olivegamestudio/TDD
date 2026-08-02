@@ -87,6 +87,12 @@ public sealed class Quest(QuestDefinition definition)
     /// Puts the quest straight into a state read back from a save game, without raising
     /// <see cref="Started"/> or <see cref="Completed"/> — the player already lived those moments.
     /// </summary>
+    /// <remarks>
+    /// This takes the state it is given, forwards or back; it is not the place that decides which
+    /// of several saved states a quest should come back in. A save naming one quest more than once
+    /// is resolved by <see cref="QuestLog.Restore"/>, which calls this only for a state that
+    /// carries the quest further than the one already applied.
+    /// </remarks>
     /// <param name="state">The state the quest was saved in.</param>
     /// <exception cref="ArgumentOutOfRangeException">
     /// <paramref name="state"/> is not one of the states a quest has. A quest holding a state that

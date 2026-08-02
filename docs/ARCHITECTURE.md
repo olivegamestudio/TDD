@@ -57,8 +57,15 @@ corrected once already — a quest library that owns a player and a position is 
   neither start nor complete and nothing downstream would report it, so a restore that would brick
   the quest fails where it happens rather than somewhere the player discovers it. Pilgrimage is a
   library other games will use; it should not quietly hold a state that does not exist.
+- `QuestState` / `QuestStateExtensions` — the lifecycle as a set of values and as an order. The
+  members are declared in the order a quest passes through them, and `IsBehind` is the one place
+  that order is read, so "further on" is a stated rule rather than an enum's declaration order
+  relied on by accident. A value outside the lifecycle is behind nothing — it is not a point on
+  the lifecycle at all, so it is refused rather than quietly dropped for standing behind
+  something.
 - `QuestLog` — the player's quests, republishing their events so subscribers listen in one place.
-  `Capture`/`Restore` keep quest persistence a quest concern.
+  `Capture`/`Restore` keep quest persistence a quest concern. `Capture` writes one entry per quest;
+  `Restore` tolerates a file that does not, and says which entry wins.
 - `ICampaign` — the seam a game supplies quests through.
 
 The game side supplies where things actually are:
