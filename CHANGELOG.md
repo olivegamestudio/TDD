@@ -62,6 +62,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Quest 1's title in seven languages** — English (source), French, Italian, German, Spanish,
   Brazilian Portuguese and Japanese, shipped as `Text/<culture>.json` beside the game. Adding a
   language is a file drop: no rebuild, no satellite assembly. ([#1](https://github.com/olivegamestudio/TDD/issues/1))
+- **`Position.DistanceToSegment`** — the closest a position came to a journey between two others.
+  Engine geometry, knowing nothing about quests: it is what lets a system that reacts to the
+  player ask "how close did they get" rather than "where were they when the frame ended". The
+  journey is rescaled before the arithmetic squares anything, so it holds at any magnitude rather
+  than silently degrading to sampling one end above 1.3e154. ([#8](https://github.com/olivegamestudio/TDD/issues/8))
 - **Project documentation** — this changelog, a README, and the design canon, architecture notes
   and workflow under `docs/`.
 - **Continuous integration** — `.github/workflows/build.yml` builds and tests the whole solution,
@@ -71,6 +76,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   fails the pull request. ([#34](https://github.com/olivegamestudio/TDD/issues/34))
 
 ### Changed
+
+- **Quest proximity triggers are swept across the frame rather than sampled at the end of it.**
+  `QuestProximityWatcher.Update` takes where the frame began as well as where it ended, and fires
+  a trigger on the closest the player came to its marker anywhere along that journey. It is a
+  behaviour change only where the old measure was wrong: a frame that carried the ship from
+  outside a trigger to outside it on the far side used to fire nothing, which made whether a quest
+  started a property of where the frames happened to fall. The watcher still remembers nothing —
+  the journey is passed in, so a resumed save cannot sweep the line between where the player was
+  and where they are put down. The single position overload remains, meaning a frame the player
+  did not move in. ([#8](https://github.com/olivegamestudio/TDD/issues/8))
 
 - **`ISaveProgressService` gained `Load` and `Save`**, both in terms of text, so the engine stays
   agnostic about what a save contains and the same service works for any game built on it. ([#2](https://github.com/olivegamestudio/TDD/pull/2))

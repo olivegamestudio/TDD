@@ -75,6 +75,16 @@ The game side supplies where things actually are:
 - `QuestProximityWatcher` — measures the player against the markers each frame and calls the
   quest API when a trigger fires. It keeps no memory of what it has already fired; the quest
   model absorbs repeat calls.
+
+  What it measures is the *journey* the frame covered — `Position.DistanceToSegment`, closest
+  approach — rather than the point the frame ended at. Sampling one point a frame makes a trigger
+  a property of the frame rate: a frame that carries the ship from one side of a marker to the
+  other fires nothing, and the only thing preventing it is the markers being authored generously.
+  Pillar 1 says that is the model's problem rather than content's.
+
+  It keeps no memory of the previous position either, which is why the journey is passed in. A
+  watcher that remembered would draw a line across a resumed save, where the player is put down
+  somewhere else rather than flying there, and fire every marker in between.
 - `GameSession` — the game in progress. Starts or resumes, and saves when a quest starts or
   completes rather than every frame.
 

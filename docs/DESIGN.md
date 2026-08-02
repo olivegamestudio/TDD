@@ -29,6 +29,10 @@ on its own, nothing layered on top rescues it.
 convenience. Systems that react to the player read position; they do not dictate how the player
 got there. Triggers are tolerant enough that a ship travelling at speed still fires them — a
 trigger a fast ship flies straight through is a bug against this pillar, not a tuning detail.
+Held by the model rather than by the content: a trigger is measured against the whole journey a
+frame covered, so it fires at any frame length and marker tolerance is a matter of how forgiving
+the objective should feel rather than the only thing standing between the player and a quest that
+sometimes does not start.
 
 ### 2. The conspiracy finds you
 

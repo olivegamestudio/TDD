@@ -440,10 +440,27 @@ public sealed class GameScreenTests : HostTestBase
         Assert.Single(Session.Quests.Completed);
     }
 
-    // NOTE: the rendering branch's "sweep across the frame" test (a long frame that flies straight
-    // past the exit marker still completing Quest 1) was dropped during integration. main's
-    // QuestProximityWatcher measures the frame's end position only (2-arg Update), so a marker can
-    // be tunnelled past on a very long frame. Re-adding the swept-segment check is a follow-up.
+    [Fact]
+    public void ALongFrameThatFliesStraightPastTheExitMarker_StillCompletesQuest1()
+    {
+        // the trap pillar 1 names, through the real composition. Quest 1's exit marker is 1000
+        // units forward with a 50 unit trigger; a single frame long enough to carry the ship from
+        // well short of it to well past it lands on neither side of that trigger, and point
+        // sampling would have flown the player straight through the objective.
+        FixedShipInput pilot = new();
+        IHost host = StartTheGame(services => services.AddSingleton<IShipInput>(pilot));
+
+        Play(host, frames: 1);                                  // the start marker begins quest 1
+        Assert.Single(Session.Quests.Active);
+
+        Session.Player.MoveTo(new Position(0, 900));             // outside the 50 unit trigger
+        pilot.Controls = FullAhead;
+
+        host.Update(TimeSpan.FromSeconds(5));                    // one frame, straight past the exit
+
+        Assert.True(Session.Player.Position.Y > 1050, "the frame did not carry the ship past the marker");
+        Assert.Single(Session.Quests.Completed);
+    }
 
     [Fact]
     public void FlyingTheShip_MovesTheOneOnScreen()
