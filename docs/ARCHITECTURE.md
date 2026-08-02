@@ -65,13 +65,36 @@ The game side supplies where things actually are:
 
 - `IWorld` / `BattleForceWorld` — the player's start position and each quest's `QuestMarkers`.
   Forward travel is along the positive Y axis.
-- `QuestProximityWatcher` — measures the player against the markers each frame and calls the
-  quest API when a trigger fires. It keeps no memory of what it has already fired; the quest
-  model absorbs repeat calls.
+- `QuestProximityWatcher` — measures the markers against the ground the player covered this frame
+  and calls the quest API when a trigger fires. It keeps no memory of what it has already fired;
+  the quest model absorbs repeat calls. It keeps no memory of where the player *was*, either — the
+  caller passes both ends of the frame's journey, because a remembered previous position would
+  sweep a line nobody travelled the moment the player is placed rather than flown.
 - `GameSession` — the game in progress. Starts or resumes, and saves when a quest starts or
   completes rather than every frame.
 
 Ids are never translated. A save written in one language has to load in another.
+
+### Quest triggers are swept, not sampled
+
+A frame is not a moment. Asking "is the player near this marker *now*" fires a trigger only when a
+frame happens to end inside it, and the faster the ship travels the more of the world each frame
+skips — so a trigger can be flown straight through. `Position.DistanceToSegment` asks the question
+a trigger actually means: how close did this marker come to the line the player covered? The
+fraction along the journey is clamped to `[0, 1]`, so the measurement is to the segment and never
+to the line through it — a marker beyond either end is measured to that end. That clamp is what
+keeps the sweep from widening a trigger sideways: the swept distance is never greater than the
+distance to either end, so sweeping can only bring a marker closer and nothing that fired before
+stops firing.
+
+Two consequences worth knowing rather than rediscovering. A frame long enough to cover a quest's
+whole field starts **and** completes it — a quest played in one frame, not a quest skipped —
+because `Start` is applied before the end trigger is checked. And because the moments inside a
+frame are not ordered, that holds in either direction of travel: a frame flown backwards across
+the field completes the quest too. Ordering within a frame would mean a trigger that depends on
+which way the ship was pointing, and `QuestDefinition` makes no claim about direction. Both need a
+stall of several seconds to reach, and on such a stall a quest that silently fails to fire is the
+worse answer.
 
 ## Saved progress
 
@@ -171,7 +194,9 @@ singleton and a cached list would freeze the player's language at startup.
 
 `BattleForceHost` wires company screen → menu screen → game screen. `IFrameTimeController`
 filters frame time before the screen director sees it. Entering `GameScreen` begins or resumes
-the session; its `Update` drives the proximity watcher once the session is ready.
+the session; its `Update` drives the proximity watcher once the session is ready. It reads the
+player's position before anything moves them and hands the watcher both ends of the frame, so
+whatever comes to move the ship belongs between those two lines.
 
 Loading happens off the frame loop, and nothing in the shipping game holds the task `Enter()`
 starts — so `GameScreen` logs a failure through `ILogger` before rethrowing rather than dropping

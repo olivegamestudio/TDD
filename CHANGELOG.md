@@ -50,6 +50,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A quest trigger can no longer be stepped over by a single frame.** `QuestProximityWatcher`
+  measured the player against each marker once per frame, at whatever position the frame ended on,
+  so a trigger fired only if a frame happened to *land* inside it — a frame carrying the ship from
+  just outside one side of a marker to just outside the other flew straight through a trigger it
+  passed within metres of. It now measures each marker against the segment the frame covered, via
+  the new `Position.DistanceToSegment`, so a marker on the ground the player crossed is a marker
+  they passed, at any frame length. The distance is to the segment and not the line through it, so
+  nothing is widened sideways and ground not yet covered is not near. Pillar 1 in `docs/DESIGN.md`
+  names a trigger a fast ship flies through as a defect rather than a tuning detail; until now the
+  only thing preventing it was how generously the content authored its
+  distances. ([#8](https://github.com/olivegamestudio/TDD/issues/8))
 - **A save the game could not read no longer freezes it, and is no longer overwritten.**
   `Continue` documented a fallback to a new game when the save "cannot be read" but only recovered
   from damaged *content*; the read itself was unguarded, so an `IOException` from a file locked by

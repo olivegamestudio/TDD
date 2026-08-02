@@ -28,7 +28,9 @@ on its own, nothing layered on top rescues it.
 **What this asks of the code.** Movement and physics are never subordinated to another system's
 convenience. Systems that react to the player read position; they do not dictate how the player
 got there. Triggers are tolerant enough that a ship travelling at speed still fires them — a
-trigger a fast ship flies straight through is a bug against this pillar, not a tuning detail.
+trigger a fast ship flies straight through is a bug against this pillar, not a tuning detail. That
+is why proximity is measured against the ground a frame covered and not the point it ended on: a
+trigger must not depend on a frame happening to land inside it.
 
 ### 2. The conspiracy finds you
 
@@ -74,7 +76,7 @@ exists today.
 
 | Pillar | Standing |
 | ------ | -------- |
-| 1. Flying feels good | Not yet exercised. Nothing moves the ship in the running game; movement and physics are issue #3. Quest triggers are already sized for a ship at speed. |
+| 1. Flying feels good | Not yet exercised. Nothing moves the ship in the running game; movement and physics are issue #3. Triggers no longer depend on being sized for a ship at speed: they are measured against the ground a frame covered rather than the point it ended on, so a fast ship cannot fly through one (#8). Generous distances are now a tuning choice rather than the only safeguard. |
 | 2. The conspiracy finds you | Held. Quest 1 opens on immediate personal survival. |
 | 3. Locations have layers | Not yet expressed. The world models coordinates, not places; markers are held per quest. |
 | 4. The world was here first | Partly expressed. The save carries position and quest state only — there is no persistent record distinct from perishable position yet, and world progression currently advances from the game screen. The rule against silently discarding the record is honoured early: a save that could only not be *read* is played over but never written to, so a file locked for a moment is not replaced by a new game. A save that is genuinely *damaged* is still discarded, which is right while a save holds nothing precious and becomes the wrong answer once the persistent record lands. |

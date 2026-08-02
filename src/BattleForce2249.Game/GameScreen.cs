@@ -55,6 +55,14 @@ public sealed class GameScreen(
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// The position is read before anything moves the player, and both ends of the frame's journey
+    /// are handed to the watcher, so a marker cannot be stepped over by a frame that carried the
+    /// player past it. The watcher deliberately remembers nothing, so this is the only place that
+    /// knows where the frame opened — anything added here that moves the player belongs
+    /// <em>between</em> these two lines. Nothing does yet: movement and physics are issue #3, and
+    /// until they land both ends of every journey coincide.
+    /// </remarks>
     public void Update(TimeSpan frameTime)
     {
         if (!session.IsReady)
@@ -62,7 +70,9 @@ public sealed class GameScreen(
             return;
         }
 
-        questProximity.Update(session.Quests, session.Player.Position);
+        Position from = session.Player.Position;
+
+        questProximity.Update(session.Quests, from, session.Player.Position);
     }
 
     /// <summary>
