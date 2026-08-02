@@ -59,11 +59,31 @@ Engine, screen flow and the quest system are in. Quest 1 auto-starts on a new ga
 player forward through the collapsing debris field, and completes at the exit marker, with
 progress persisted across sessions and its title translated into seven languages.
 
+A save the game cannot read never stops it and is never lost: one that was merely locked is played
+over and left alone, because it may be intact, and one this build refuses is moved aside to
+`save.corrupt.json` before the new game writes — so a shape a later build could read is still
+there. If it cannot even be moved, nothing is written at all.
+
+A save that contradicts itself costs no progress either: one naming the same quest twice — once
+completed, once never started — resumes completed, because the furthest state a file records is
+the one taken, whichever line it is on. That is the only reading whose answer does not depend on
+the order the entries are in, and a duplicate can only come from a file that was hand-edited or
+merged, where the order says nothing. See
+[the saved progress notes](docs/ARCHITECTURE.md#saved-progress).
+
+Two ways the engine could fail quietly are closed. A menu press stays with the button it started
+on, so a button that disables itself as it activates — the menu's own idiom — no longer hands the
+press to whichever button focus landed on, and the wrong action no longer runs on release. And a
+screen navigation that redirects round in a circle now throws, naming the path it took, instead of
+spinning inside the call while the update loop stops ticking and the window goes black. See
+[the screen flow and menu input notes](docs/ARCHITECTURE.md#screen-flow).
+
 Not yet built:
 
 - **Ship movement and physics** (#3) — nothing moves the ship in the running game, so Quest 1 is
   currently completable by test rather than by playing.
-- **Any on-screen quest display** — no HUD, no quest log.
+- **Any on-screen quest display** — no HUD, no quest log. The session knows when the player's
+  progress is not being saved, but there is nowhere yet to tell them.
 - **Language selection** — translations follow the machine's own culture.
 - **A persistent record** — experience, credits and quest history that survive death, which
   pillar 4 calls for.

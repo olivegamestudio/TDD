@@ -280,6 +280,138 @@ public sealed class UIControllerTests
         Assert.False(fired);
     }
 
+    // ---- the press belongs to the button that was pressed -------------------
+    // A pressed action may move focus — deliberately via FocusOn, or as a side
+    // effect of disabling its own button, which re-homes focus. The press must
+    // stay with the button the player actually pressed, so the release commits
+    // that button and no other.
+
+    [Fact]
+    public void PressAction_ThatDisablesItsOwnButton_MustNotCommitADifferentButton()
+    {
+        // MenuScreen.OnStartReleased already uses this idiom: disable the button as it
+        // activates so it cannot be triggered twice. Doing that on the DOWN hook must not
+        // hand the press over to whichever button focus re-homes to.
+        UIController controller = new();
+        Button start = new("start");
+        Button options = new("options");
+        controller.Add(start);                  // auto-focused
+        controller.Add(options);
+
+        List<string> committed = [];
+        controller.OnPressed(start, () => controller.Disable(start));
+        controller.OnReleased(start, () => committed.Add("start"));
+        controller.OnReleased(options, () => committed.Add("options"));
+
+        controller.Press(start);
+        controller.Release();
+
+        Assert.Empty(committed);                // options was never touched by the player
+    }
+
+    [Fact]
+    public void Held_TracksThePressedButton_EvenIfThePressActionMovesFocus()
+    {
+        UIController controller = new();
+        Button a = new("a");
+        Button b = new("b");
+        controller.Add(a);
+        controller.Add(b);
+
+        controller.OnPressed(a, () => controller.FocusOn(b));
+
+        controller.Press(a);
+
+        Assert.Same(a, controller.Held);
+    }
+
+    [Fact]
+    public void Release_Commits_TheButtonThatWasPressed_NotWhereFocusMoved()
+    {
+        UIController controller = new();
+        Button a = new("a");
+        Button b = new("b");
+        controller.Add(a);
+        controller.Add(b);
+
+        List<string> committed = [];
+        controller.OnPressed(a, () => controller.FocusOn(b));   // press action re-aims focus
+        controller.OnReleased(a, () => committed.Add("a"));
+        controller.OnReleased(b, () => committed.Add("b"));
+
+        controller.Press(a);
+        controller.Release();
+
+        Assert.Equal("a", Assert.Single(committed));    // a is still enabled, so a commits
+    }
+
+    [Fact]
+    public void PressAction_MayCancelThePressItStarted()
+    {
+        // The press is armed before the pressed hook runs, so a hook that decides the
+        // press should not stand — a drag threshold, a guard that rejects the input —
+        // can abort it with Cancel() and have that stick.
+        UIController controller = new();
+        Button start = new("start");
+        controller.Add(start);
+
+        bool fired = false;
+        controller.OnPressed(start, controller.Cancel);
+        controller.OnReleased(start, () => fired = true);
+
+        controller.Press();
+
+        Assert.Null(controller.Held);           // the cancel was not overwritten
+
+        controller.Release();
+
+        Assert.False(fired);
+    }
+
+    // ---- what a disabled button does to a press in flight -------------------
+    // Settled here: disabling a held button suppresses its commit but does not
+    // cancel the press. Enablement is read at the moment of release, so a button
+    // re-enabled before the player lets go still commits. Disable governs whether
+    // a button may act; Cancel is the way to abandon a press outright.
+
+    [Fact]
+    public void DisablingTheHeldButton_SuppressesItsCommit()
+    {
+        UIController controller = new();
+        Button start = new("start");
+        Button other = new("other");
+        controller.Add(start);
+        controller.Add(other);                  // keeps focus re-homing in play
+
+        bool fired = false;
+        controller.OnPressed(start, () => controller.Disable(start));
+        controller.OnReleased(start, () => fired = true);
+
+        controller.Press(start);
+        controller.Release();
+
+        Assert.False(fired);                    // disabled at release → no commit
+    }
+
+    [Fact]
+    public void HeldButton_ReEnabledBeforeRelease_StillCommits()
+    {
+        UIController controller = new();
+        Button start = new("start");
+        controller.Add(start);
+
+        bool fired = false;
+        controller.OnReleased(start, () => fired = true);
+
+        controller.Press();
+        controller.Disable(start);              // e.g. a service went away mid-press...
+        controller.Enable(start);               // ...and came back before the player let go
+
+        controller.Release();
+
+        Assert.True(fired);                     // enablement is read at release
+    }
+
     // ---- two buttons that share a name -------------------------------------
     // IUIController is a singleton, so every screen's buttons live in one node
     // list. Two screens may each reasonably label a button BACK, CONTINUE or

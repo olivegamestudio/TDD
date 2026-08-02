@@ -70,6 +70,11 @@ public sealed class UIController : IUIController
     /// The <c>Held</c> property represents the button that is actively
     /// engaged between a press and release action. This property will
     /// return <c>null</c> if no button is being held at the moment.
+    /// <para>
+    /// It follows the button that was pressed, which is not necessarily the focused one: a pressed
+    /// action may move focus, and a held button may be disabled, without either changing what the
+    /// player is holding down.
+    /// </para>
     /// </remarks>
     public Button? Held => _pressing;
 
@@ -94,6 +99,12 @@ public sealed class UIController : IUIController
     /// <remarks>
     /// If a specific button is provided and it is enabled, the focus will move to this button, and its associated action will be processed.
     /// In the absence of a specified button, the currently focused element is pressed, provided it is enabled.
+    /// <para>
+    /// The press is held by the button that was pressed, not by whatever is focused once the pressed
+    /// action returns. The action is free to move focus — <see cref="FocusOn"/> directly, or
+    /// <see cref="Disable"/>, which re-homes focus as a side effect — and the release still commits
+    /// the button the player pressed.
+    /// </para>
     /// </remarks>
     public void Press(Button? button = null)
     {
@@ -104,21 +115,28 @@ public sealed class UIController : IUIController
             {
                 return;
             }
-            
+
             FocusOn(button);
         }
-        
-        if (_focusedElement is not null)
+
+        if (_focusedElement is null)
         {
-            Node node = Require(_focusedElement);
-            if (!node.Enabled)
-            {
-                return;
-            }
-            
-            node.PressedAction?.Invoke();
-            _pressing = _focusedElement;
+            return;
         }
+
+        // Captured before the action runs: _focusedElement may point somewhere else by the
+        // time it returns, and the press belongs to the button the player actually pressed.
+        Button pressed = _focusedElement;
+        Node node = Require(pressed);
+        if (!node.Enabled)
+        {
+            return;
+        }
+
+        // Armed before the action runs so that a pressed action may Cancel() the press it
+        // started; arming afterwards would overwrite that decision.
+        _pressing = pressed;
+        node.PressedAction?.Invoke();
     }
 
     /// <summary>
@@ -128,6 +146,12 @@ public sealed class UIController : IUIController
     /// If a button is currently being pressed, this method sets it to null, retrieves its associated node,
     /// and invokes the node's press action if the node is enabled. No action is performed if no button
     /// is currently pressed.
+    /// <para>
+    /// Enablement is read here, at the moment of release, not at the moment of the press. Disabling a
+    /// held button therefore suppresses its commit, and re-enabling it before the player lets go
+    /// restores it. <see cref="Disable"/> governs whether a button may act; <see cref="Cancel"/> is the
+    /// way to abandon a press outright.
+    /// </para>
     /// </remarks>
     public void Release()
     {
@@ -152,6 +176,12 @@ public sealed class UIController : IUIController
     /// This method resets the state of the pressing operation in the UI controller, ensuring that
     /// the action linked to the currently held button is not executed. Typically used to handle scenarios
     /// where an input operation is interrupted or deliberately aborted.
+    /// <para>
+    /// A pressed action may cancel the very press that invoked it: <see cref="Press"/> arms the hold
+    /// before running the action, so the decision made inside it stands and the button does not commit
+    /// on release. This is the way to abandon a press — <see cref="Disable"/> only withholds the
+    /// commit, and the press it belongs to survives being re-enabled.
+    /// </para>
     /// </remarks>
     public void Cancel() => _pressing = null;
 
@@ -192,12 +222,27 @@ public sealed class UIController : IUIController
     /// Disables the specified button, preventing it from receiving input or triggering actions.
     /// </summary>
     /// <param name="button">The button to be disabled.</param>
+    /// <remarks>
+    /// Disabling the focused button moves focus: it is re-homed to the first enabled button, or
+    /// cleared if there is none. That side effect is worth knowing about because disabling a button
+    /// as it activates — so it cannot fire twice — is an idiom this codebase uses. It does not
+    /// disturb a press in flight: <see cref="Held"/> follows the button that was pressed, not focus,
+    /// so the press stays where it started and is merely withheld from committing while the button
+    /// is disabled.
+    /// </remarks>
     public void Disable(Button button) => SetEnabled(button, false);
 
     /// <summary>
     /// Enables the specified button, allowing it to be interacted with within the user interface.
     /// </summary>
     /// <param name="button">The button to enable within the UI system.</param>
+    /// <remarks>
+    /// The counterpart to the re-homing in <see cref="Disable"/>: enabling a button while nothing
+    /// is focused adopts it. Disabling can leave a screen with no focus at all — it clears focus
+    /// when no button is left enabled to take it — and this is what gives input somewhere to go
+    /// again. <c>MenuScreen</c> relies on it: the start button is disabled until the save has been
+    /// read, and enabling it is what focuses it.
+    /// </remarks>
     public void Enable(Button button) => SetEnabled(button, true);
 
     /// <summary>
