@@ -294,6 +294,51 @@ public sealed class GameScreenTests : HostTestBase
     }
 
     [Fact]
+    public void AFrameThatFliesTheShipClearPastTheExitMarker_StillCompletesQuest1()
+    {
+        // the ticket, through the shipping composition. One stalled frame carries the ship from
+        // short of the exit marker to hundreds of units beyond it; sampling where it finished
+        // would leave the quest running and the player wondering why the debris field never ended.
+        FixedShipInput pilot = new();
+        IHost host = StartTheGame(services => services.AddSingleton<IShipInput>(pilot));
+
+        Play(host, frames: 1);                                  // the start marker begins quest 1
+        Assert.Single(Session.Quests.Active);
+
+        Session.Player.MoveTo(new Position(0, 940));
+        pilot.Controls = FullAhead;
+
+        host.Update(TimeSpan.FromSeconds(5));
+
+        // the frame really did overshoot: it is the sweep completing the quest, not the arrival
+        Assert.True(
+            Session.Player.Position.Y > 1000 + 50,
+            $"the frame stopped at {Session.Player.Position.Y}, inside the trigger, so this proves nothing");
+        Assert.Single(Session.Quests.Completed);
+        Assert.Empty(Session.Quests.Active);
+    }
+
+    [Fact]
+    public void AFrameThatFliesWideOfTheExitMarker_LeavesQuest1Running()
+    {
+        // the other half: sweeping must not turn a trigger into a corridor
+        FixedShipInput pilot = new();
+        IHost host = StartTheGame(services => services.AddSingleton<IShipInput>(pilot));
+
+        Play(host, frames: 1);
+        Assert.Single(Session.Quests.Active);
+
+        // alongside the exit marker's lane and 300 units to the side of it, flying past
+        Session.Player.MoveTo(new Position(300, 940));
+        pilot.Controls = FullAhead;
+
+        host.Update(TimeSpan.FromSeconds(5));
+
+        Assert.Single(Session.Quests.Active);
+        Assert.Empty(Session.Quests.Completed);
+    }
+
+    [Fact]
     public void EnteringTheScreen_BringsTheShipToRest()
     {
         // the save carries where the player is, never how fast they were going

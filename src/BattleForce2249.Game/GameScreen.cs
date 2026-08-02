@@ -70,11 +70,18 @@ public sealed class GameScreen(
             return;
         }
 
-        // the ship flies first, so the quests are measured against where the player got to this
-        // frame rather than where they were at the end of the last one
+        // where this frame's travel begins, kept so the quests can be measured against the ground
+        // the ship covers rather than the point it happens to finish on. Read here rather than
+        // remembered between frames, which is what keeps both this screen and the watcher free of
+        // memory — and means a player who was placed rather than flown, entering the screen or
+        // resuming a save, does not drag a phantom journey behind them from the last game.
+        Position from = session.Player.Position;
+
+        // the ship flies first, so the quests are measured against the journey this frame made
+        // rather than the one before it
         ship.Update(session.Player, pilot.Read(), frameTime);
 
-        questProximity.Update(session.Quests, session.Player.Position);
+        questProximity.Update(session.Quests, from, session.Player.Position);
     }
 
     /// <summary>

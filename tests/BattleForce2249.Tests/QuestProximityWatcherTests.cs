@@ -196,4 +196,188 @@ public sealed class QuestProximityWatcherTests
 
         watcher.Update(new QuestLog(), StartMarker);       // must not throw
     }
+
+    // ---- sweeping, so a fast ship cannot step over a marker ----
+
+    [Fact]
+    public void StartsTheQuest_WhenOneFrameCarriesThePlayerStraightPastTheStartMarker()
+    {
+        // the defect: 200 short of the marker to 200 past it, in one frame. Neither end is inside
+        // the 25 unit trigger, so sampling either one misses a marker the player flew through.
+        QuestProximityWatcher watcher = CreateWatcher();
+
+        watcher.Update(_quests, new Position(0, -200), new Position(0, 200));
+
+        Assert.Equal(QuestState.Active, Quest1.State);
+    }
+
+    [Fact]
+    public void CompletesTheQuest_WhenOneFrameCarriesThePlayerStraightPastTheEndMarker()
+    {
+        QuestProximityWatcher watcher = CreateWatcher();
+        Quest1.Start();
+
+        watcher.Update(_quests, new Position(0, 900), new Position(0, 1100));
+
+        Assert.Equal(QuestState.Completed, Quest1.State);
+    }
+
+    [Theory]
+    [InlineData(60)]
+    [InlineData(200)]
+    [InlineData(1_000)]
+    [InlineData(50_000)]
+    public void FiresAtAnyFrameLength(double distanceCovered)
+    {
+        // whatever a stalled frame, a faster ship or a tighter trigger does to the numbers, a
+        // journey through a marker is a journey through it.
+        //
+        // Asserted on the event rather than the state: the longest of these sweeps past the end
+        // marker as well and finishes the quest in the same update, so "did it start" is the
+        // question this is asking and "is it Active" is not.
+        QuestProximityWatcher watcher = CreateWatcher();
+        int started = 0;
+        _quests.QuestStarted += (_, _) => started++;
+        Position before = new(0, -distanceCovered / 2);
+        Position after = new(0, distanceCovered / 2);
+
+        watcher.Update(_quests, before, after);
+
+        Assert.Equal(1, started);
+    }
+
+    [Fact]
+    public void StartsAndCompletesInOneFrame_WhenTheFrameSweepsPastBothMarkers()
+    {
+        // one frame spanning the whole debris field still leaves the quest correctly finished
+        // rather than stuck half started
+        QuestProximityWatcher watcher = CreateWatcher();
+
+        watcher.Update(_quests, new Position(0, -100), new Position(0, 1100));
+
+        Assert.Equal(QuestState.Completed, Quest1.State);
+    }
+
+    [Fact]
+    public void DoesNotStartTheQuest_ForAJourneyThatPassesWideOfTheMarker()
+    {
+        // the sweep must not widen the trigger sideways: this one goes the whole length of the
+        // field and is never nearer than 200 units
+        QuestProximityWatcher watcher = CreateWatcher();
+
+        watcher.Update(_quests, new Position(200, -500), new Position(200, 500));
+
+        Assert.Equal(QuestState.NotStarted, Quest1.State);
+    }
+
+    [Fact]
+    public void DoesNotStartTheQuest_ForAJourneyHeadingTowardsTheMarkerThatNeverArrives()
+    {
+        // aimed straight at the start marker and stopping 200 short. Measuring the line the player
+        // was travelling along, rather than the stretch they actually covered, would fire this.
+        QuestProximityWatcher watcher = CreateWatcher();
+
+        watcher.Update(_quests, new Position(0, 500), new Position(0, 200));
+
+        Assert.Equal(QuestState.NotStarted, Quest1.State);
+    }
+
+    [Fact]
+    public void DoesNotCompleteTheQuest_ForAJourneyThatTurnsBackShortOfTheEndMarker()
+    {
+        QuestProximityWatcher watcher = CreateWatcher();
+        Quest1.Start();
+
+        watcher.Update(_quests, new Position(0, 800), new Position(0, 940));
+
+        Assert.Equal(QuestState.Active, Quest1.State);
+    }
+
+    [Fact]
+    public void RaisesStartedOnce_HoweverManyFramesSweepAcrossTheMarker()
+    {
+        QuestProximityWatcher watcher = CreateWatcher();
+        int started = 0;
+        _quests.QuestStarted += (_, _) => started++;
+
+        for (int frame = 0; frame < 10; frame++)
+        {
+            watcher.Update(_quests, new Position(0, -200), new Position(0, 200));
+        }
+
+        Assert.Equal(1, started);
+    }
+
+    [Fact]
+    public void AJourneyThatWentNowhere_IsMeasuredAsThePointItStayedAt()
+    {
+        // the two argument overload's whole contract, stated from the other side
+        QuestProximityWatcher watcher = CreateWatcher();
+
+        watcher.Update(_quests, new Position(0, 25.001), new Position(0, 25.001));
+
+        Assert.Equal(QuestState.NotStarted, Quest1.State);
+    }
+
+    // ---- and in the order the markers were reached ----
+
+    [Fact]
+    public void AJourneyFlownBackwards_StartsTheQuestWithoutFinishingIt()
+    {
+        // the question sweeping raises and sampling never could. One frame from beyond the exit
+        // marker to before the start marker passes both, but it passed the exit on the way *in*:
+        // the player has begun the quest and has the whole field still to fly. Completing it here
+        // would hand out a finished quest for a journey made before it began.
+        QuestProximityWatcher watcher = CreateWatcher();
+
+        watcher.Update(_quests, new Position(0, 1100), new Position(0, -100));
+
+        Assert.Equal(QuestState.Active, Quest1.State);
+    }
+
+    [Fact]
+    public void AJourneyFlownBackwards_LeavesTheQuestCompletableByFlyingItForwards()
+    {
+        // and the quest is not left in a corner: having started at the wrong end, flying the field
+        // the right way still finishes it
+        QuestProximityWatcher watcher = CreateWatcher();
+        watcher.Update(_quests, new Position(0, 1100), new Position(0, -100));
+
+        watcher.Update(_quests, new Position(0, -100), new Position(0, 1100));
+
+        Assert.Equal(QuestState.Completed, Quest1.State);
+    }
+
+    [Fact]
+    public void AQuestAlreadyRunning_IsCompletedByAJourneyFlownInAnyDirection()
+    {
+        // ordering only applies within the frame that starts a quest. A quest running before the
+        // frame opened has been running for all of it, so where along the journey the exit marker
+        // was passed does not matter — a ship reversing onto the marker has still reached it.
+        QuestProximityWatcher watcher = CreateWatcher();
+        Quest1.Start();
+
+        watcher.Update(_quests, new Position(0, 1100), new Position(0, 900));
+
+        Assert.Equal(QuestState.Completed, Quest1.State);
+    }
+
+    [Fact]
+    public void AQuestWhoseMarkersCoincide_IsStillFinishedOnArrival_WhenSwept()
+    {
+        // the marker is reached at one instant, so start and end are passed at the same fraction.
+        // The ordering rule has to admit that rather than insisting the end came strictly later.
+        QuestLog quests = new();
+        quests.Register(new QuestDefinition(
+            "quest-1",
+            "A title",
+            new QuestTrigger(QuestTriggerKind.Proximity, 25),
+            new QuestTrigger(QuestTriggerKind.Proximity, 25)));
+        QuestProximityWatcher watcher =
+            new(new TestWorld(new QuestMarkers("quest-1", EndMarker, EndMarker)));
+
+        watcher.Update(quests, new Position(0, 0), new Position(0, 2000));
+
+        Assert.Equal(QuestState.Completed, quests.Find("quest-1")!.State);
+    }
 }

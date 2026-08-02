@@ -65,9 +65,10 @@ The game side supplies where things actually are:
 
 - `IWorld` / `BattleForceWorld` — the player's start position and each quest's `QuestMarkers`.
   Forward travel is along the positive Y axis.
-- `QuestProximityWatcher` — measures the player against the markers each frame and calls the
-  quest API when a trigger fires. It keeps no memory of what it has already fired; the quest
-  model absorbs repeat calls.
+- `QuestProximityWatcher` — measures the ground the player covered each frame against the markers
+  and calls the quest API when a trigger fires. It keeps no memory of what it has already fired,
+  nor of where the player was; the quest model absorbs repeat calls, and the caller has both ends
+  of a frame's travel to hand.
 - `GameSession` — the game in progress. Starts or resumes, and saves when a quest starts or
   completes rather than every frame.
 
@@ -186,6 +187,43 @@ Anything that *holds* a translated string, though, has to re-read it: `BattleFor
 builds its list on each read rather than in a field initialiser, because the campaign is a DI
 singleton and a cached list would freeze the player's language at startup.
 
+## Quest triggers are swept, not sampled
+
+A proximity trigger is measured against the whole of the ground a frame covered, not the point the
+frame finished on. `Position.ClosestApproachTo` measures a marker against the *segment* the player
+travelled — clamped to its ends, so a marker beyond either one is measured to that end and the
+trigger is never widened sideways into the line beyond the journey.
+
+Sampling the end point alone fired a trigger only when a frame happened to *land* inside it, so a
+frame carrying the ship from just outside one side of a marker to just outside the other flew
+straight through it. Pillar 1 in `docs/DESIGN.md` calls that a bug rather than a tuning detail, and
+until this landed the only thing preventing it was how generous the authored distances happened to
+be — a stalled frame, a faster ship or a tighter trigger authored for a small object each brought
+it back, and each would have been diagnosed as a quest that mysteriously sometimes does not start.
+
+Two things follow from sweeping that sampling never had to answer:
+
+- **Both of a quest's markers can be passed in one frame.** A frame long enough to fly the whole
+  debris field starts quest 1 *and* completes it, rather than skipping it. That is a quest played
+  in one frame, not a quest given away.
+- **So the markers are applied in the order they were reached.** `ClosestApproachTo` reports how
+  far into the journey the closest approach happened, and a quest started within a frame is only
+  completed by an exit marker passed no earlier in that journey than its start marker was.
+  Otherwise one long frame flown *backwards* across the field would finish a quest on the strength
+  of a leg flown before it began. A quest already running when the frame opened has been running
+  for all of it, so its exit marker counts wherever along the journey it was passed — reversing
+  onto a marker is still reaching it.
+
+Nothing remembers anything. `GameScreen.Update` reads the position before it flies the ship and
+passes both ends to the watcher, so neither the screen nor the watcher carries state between
+frames. A remembered previous position would be wrong the moment the player is *placed* rather
+than flown — entering the screen, or resuming a save — because the next frame would then sweep a
+phantom journey from wherever the last game ended and fire every trigger along a line nobody
+travelled.
+
+`Pilgrimage` is untouched by all of this. The quest model declares the rule and holds no
+coordinates; measuring is the presentation's job.
+
 ## Screen flow
 
 `BattleForceHost` wires company screen → menu screen → game screen. `IFrameTimeController`
@@ -203,10 +241,6 @@ game that has quietly stopped.
 
 - Nothing binds a real input device. The ship flies from `IShipInput`, and the MonoGame host still
   resolves the engine's `NeutralShipInput`, so the shipping game has nobody at the controls.
-- Quest triggers are sampled, not swept. `QuestProximityWatcher` measures the player once a frame,
-  so a frame long enough to carry the ship further than a trigger's distance steps over it. Quest
-  1's markers are sized clear of that at any playable frame rate, but the tolerance is the only
-  thing preventing it.
 - Nothing displays a quest title. There is no HUD or quest log; that is a separate `ENGINE`
   issue. `IGameSession.SaveError` is unread for the same reason — there is nowhere to say it.
 - Nothing selects a language. Translations are reachable only through the machine's own culture.

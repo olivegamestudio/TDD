@@ -21,6 +21,68 @@ public readonly record struct Position(double X, double Y)
         ((other.X - X) * (other.X - X)) + ((other.Y - Y) * (other.Y - Y)));
 
     /// <summary>
+    /// Measures the shortest distance from this position to the straight line segment running from
+    /// <paramref name="from"/> to <paramref name="to"/> — the ground something covered, rather than
+    /// the point it finished on.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is what lets a test against a moving object be about the whole of a frame's travel. A
+    /// point measured against another point only answers "was it near at that instant", so anything
+    /// moving faster than the thing it is measured against can pass clean between two samples.
+    /// </para>
+    /// <para>
+    /// The segment is a segment, not the infinite line through it: a point beyond either end is
+    /// measured to that end. That is what keeps this from widening a test sideways — somewhere the
+    /// traveller was heading for but never reached is still as far away as it ever was.
+    /// </para>
+    /// </remarks>
+    /// <param name="from">Where the travel began.</param>
+    /// <param name="to">Where it ended. May be the same as <paramref name="from"/>.</param>
+    /// <returns>The distance in world units, never negative.</returns>
+    public double DistanceToSegment(Position from, Position to) =>
+        ClosestApproachTo(from, to).Distance;
+
+    /// <summary>
+    /// Measures how near the journey from <paramref name="from"/> to <paramref name="to"/> came to
+    /// this position, and how far into that journey it happened.
+    /// </summary>
+    /// <remarks>
+    /// The fraction is the half a plain distance cannot give back. Two points measured against one
+    /// journey are otherwise unordered, so a caller cannot tell whether the traveller reached one
+    /// before the other — and a rule about the order they were passed in is then unwriteable.
+    /// <see cref="DistanceToSegment"/> is this with the fraction dropped, for callers that only ask
+    /// how close.
+    /// </remarks>
+    /// <param name="from">Where the travel began.</param>
+    /// <param name="to">Where it ended. May be the same as <paramref name="from"/>.</param>
+    /// <returns>The closest approach; its fraction is 0 when nothing moved.</returns>
+    public ClosestApproach ClosestApproachTo(Position from, Position to)
+    {
+        double dx = to.X - from.X;
+        double dy = to.Y - from.Y;
+        double lengthSquared = (dx * dx) + (dy * dy);
+
+        if (lengthSquared == 0)
+        {
+            // nothing moved, so the journey is a point: the ordinary distance, and every part of a
+            // journey of no length is its start
+            return new ClosestApproach(DistanceTo(from), 0);
+        }
+
+        // how far along the journey the closest point lies, as a fraction of its length, clamped
+        // to the ends so the measurement is against the segment and not the line through it
+        double along = Math.Clamp(
+            (((X - from.X) * dx) + ((Y - from.Y) * dy)) / lengthSquared,
+            0,
+            1);
+
+        return new ClosestApproach(
+            DistanceTo(new Position(from.X + (along * dx), from.Y + (along * dy))),
+            along);
+    }
+
+    /// <summary>
     /// Produces the position reached by moving from here by the given amount on each axis.
     /// </summary>
     /// <param name="dx">The distance to move along the X axis.</param>
