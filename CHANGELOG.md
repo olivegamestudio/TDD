@@ -63,6 +63,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A save holding no campaign progress no longer strands the player where it says.** Drift is
+  tolerated on purpose, so a readable save whose every quest entry names nothing this build ships
+  — a dropped quest, no quest at all, or no entries — restored an empty quest log while still
+  putting the player at its coordinates. Quest 1 begins within 25 units of the marker a new game
+  spawns on, so a player set down 700 units out had nothing active, nothing to fly towards, and
+  got further from the only trigger that could help with every frame of flying forward; the only
+  way out was backwards, through the debris field quest 1 is about escaping. `GameSession.Continue`
+  now uses the saved position only when at least one registered quest came back started or
+  completed. The file is still read rather than refused, because a refused save is set aside and
+  written over while a declined position leaves it on
+  disk. ([#44](https://github.com/olivegamestudio/TDD/issues/44))
 - **A save naming one quest twice no longer undoes the progress it also records.** `QuestLog.Restore`
   applied entries in order, so the last one won by accident of iteration — a file holding `quest-1`
   as both `Completed` and `NotStarted` handed the player back a campaign they had finished. It now

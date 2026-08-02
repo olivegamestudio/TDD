@@ -94,12 +94,54 @@ public sealed class GameSession : IGameSession
         }
 
         Reset();
-        Player.MoveTo(new Position(save.PlayerX, save.PlayerY));
         Quests.Restore(save.Quests);
+
+        // Reset has already put the player where a new game begins, which is where a campaign
+        // nobody has started belongs. Moving them is what resuming a game in progress means.
+        if (HasBegun)
+        {
+            Player.MoveTo(new Position(save.PlayerX, save.PlayerY));
+        }
 
         _autoSave = true;
         IsReady = true;
     }
+
+    /// <summary>
+    /// Whether the campaign restored from a save has actually been played — at least one quest the
+    /// campaign ships came back started or finished.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// It decides whether a saved position is used, because a position is only progress beside the
+    /// quest progress it was taken with. Reading a save is deliberately forgiving about quests: an
+    /// entry naming a quest this build no longer ships is ignored, and so is one naming no quest at
+    /// all. A file whose every entry is drift is therefore perfectly readable and restores nothing,
+    /// so the quest log comes back exactly as a new game's while the coordinates put the player
+    /// somewhere a new game never starts.
+    /// </para>
+    /// <para>
+    /// That combination strands them. Quest 1 begins within 25 units of a marker a new game spawns
+    /// the player on, so a player set down 700 units out has no quest active, nothing to fly
+    /// towards, and gets further from the only trigger that could help with every frame of flying
+    /// forward — the one direction the game teaches. The game is not frozen, but the only way out
+    /// of it is backwards, through the debris field quest 1 is about escaping.
+    /// </para>
+    /// <para>
+    /// The file is still read rather than refused, and that is the cheaper mistake of the two. A
+    /// refused save is set aside and replaced by the new game written over it, so the player loses
+    /// the file as well as the position. Declining only the position leaves the file where it is
+    /// until real progress is made and written over it.
+    /// </para>
+    /// <para>
+    /// What the line costs is a save taken after the player has travelled but before any quest has
+    /// begun: resuming it sends them back to the start. No such save can be written today —
+    /// progress is captured when a quest changes state, and quest 1 begins on the starting marker
+    /// — but a campaign whose first quest does not start where the player spawns would make one,
+    /// and this needs revisiting with it.
+    /// </para>
+    /// </remarks>
+    bool HasBegun => Quests.Quests.Any(quest => quest.State is not QuestState.NotStarted);
 
     /// <summary>
     /// Starts a new game in place of a save this build refused, keeping the refused content first.
