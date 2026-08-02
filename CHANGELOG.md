@@ -52,6 +52,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   language is a file drop: no rebuild, no satellite assembly. ([#1](https://github.com/olivegamestudio/TDD/issues/1))
 - **Project documentation** — this changelog, a README, and the design canon, architecture notes
   and workflow under `docs/`.
+- **Continuous integration** — `.github/workflows/build.yml` builds and tests the whole solution,
+  MonoGame host included, on every push to `main` and every pull request. Until it landed, nothing
+  in this repository had ever been compiled by anything but the author of the change: pull requests
+  carried no checks at all, and several were stacked on one another unbuilt. A failing test now
+  fails the pull request. ([#34](https://github.com/olivegamestudio/TDD/issues/34))
 
 ### Changed
 
