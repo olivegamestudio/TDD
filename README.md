@@ -78,6 +78,14 @@ screen navigation that redirects round in a circle now throws, naming the path i
 spinning inside the call while the update loop stops ticking and the window goes black. See
 [the screen flow and menu input notes](docs/ARCHITECTURE.md#screen-flow).
 
+A third is closed with them: two buttons named the same thing are two buttons. One controller is
+shared by every screen, so two screens are free to label a button `BACK` without either author
+knowing the other did — and while UI elements were records, `==` compared names and both resolved
+to whichever was registered first. One screen's `Disable` greyed out the other's button and one
+screen's `OnReleased` overwrote the other's handler, silently. Elements are identities now, so a
+button is only ever itself, and asking the controller about one it does not hold says so instead of
+answering about its namesake. See [the UI element notes](docs/ARCHITECTURE.md#ui-elements).
+
 Not yet built:
 
 - **Ship movement and physics** (#3) — nothing moves the ship in the running game, so Quest 1 is

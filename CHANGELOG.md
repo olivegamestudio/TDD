@@ -69,8 +69,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   registered as a singleton, two screens each labelling a button `BACK` shared one node. One
   screen's `Disable` greyed out the other's button and one screen's `OnReleased` overwrote the
   other's handler, silently. `Add` now also rejects a button it already holds, since the second
-  node it used to create could never be reached.
-  ([#13](https://github.com/olivegamestudio/TDD/issues/13))
+  node it used to create could never be reached — but never a button that merely shares a name with
+  one it holds, which is the case the rule exists for. The visible change for callers is that a
+  button the controller does not hold is now an error rather than a misdirection: `OnPressed`,
+  `OnReleased`, `Press`, `Enable`, `Disable`, `IsEnabled` and both ends of `Link` throw
+  `InvalidOperationException` instead of acting on the namesake. `FocusOn` is the exception — it
+  does not check, so focus aimed at an unmanaged button surfaces at the next `Press`.
+  ([#13](https://github.com/olivegamestudio/TDD/issues/13), [#27](https://github.com/olivegamestudio/TDD/pull/27))
 - **A save naming one quest twice no longer undoes the progress it also records.** `QuestLog.Restore`
   applied entries in order, so the last one won by accident of iteration — a file holding `quest-1`
   as both `Completed` and `NotStarted` handed the player back a campaign they had finished. It now
