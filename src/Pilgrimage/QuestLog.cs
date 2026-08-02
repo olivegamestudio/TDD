@@ -90,6 +90,12 @@ public sealed class QuestLog
     /// <summary>
     /// Takes the state of every registered quest, for persisting.
     /// </summary>
+    /// <remarks>
+    /// One entry per quest is load bearing rather than incidental: <see cref="Restore"/> reads a
+    /// second entry naming a quest as a file that was hand-edited or merged, and resolves it on
+    /// that basis. A change here that emitted a quest more than once would undercut that reasoning
+    /// silently.
+    /// </remarks>
     /// <returns>One entry per registered quest.</returns>
     public IReadOnlyList<QuestProgress> Capture() =>
         [.. _quests.Values.Select(quest => new QuestProgress(quest.Id, quest.State))];

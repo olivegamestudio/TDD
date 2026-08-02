@@ -38,6 +38,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `save.json` becomes `save.corrupt.json`, one generation kept — and exposes `SetAsideFilePath`,
   because "where did my game go" is a question it is otherwise the only thing able to
   answer. ([#46](https://github.com/olivegamestudio/TDD/issues/46), [#61](https://github.com/olivegamestudio/TDD/pull/61))
+- **`QuestStateExtensions.IsBehind`** — reads `QuestState` as the order a quest passes through
+  rather than as a set of values, so "further on" is something a caller can ask rather than an
+  enum's declaration order relied on by accident. `QuestState` now says its members are declared in
+  lifecycle order and that the order is load bearing; saves are unaffected, because they carry the
+  name and never the ordinal. Used to resolve a save that names one quest twice, below. ([#72](https://github.com/olivegamestudio/TDD/issues/72), [#82](https://github.com/olivegamestudio/TDD/pull/82))
 - **`OliveGameStudio.Localisation`** — `ITextProvider` and a JSON-backed `JsonTextProvider` owning
   the culture fallback chain, caching and the missing-key policy. A language is a file named after
   its culture; fallback is applied per key, and a key present in no language throws
@@ -67,7 +72,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   hand-edited or merged file, where the order says nothing about which entry is right. Stated on
   `QuestState`, whose declaration order is now load bearing, and readable through the new
   `QuestStateExtensions.IsBehind`. A state outside the lifecycle is still refused wherever it
-  appears. ([#72](https://github.com/olivegamestudio/TDD/issues/72))
+  appears. ([#72](https://github.com/olivegamestudio/TDD/issues/72), [#82](https://github.com/olivegamestudio/TDD/pull/82))
 - **A save the game could not read no longer freezes it, and is no longer overwritten.**
   `Continue` documented a fallback to a new game when the save "cannot be read" but only recovered
   from damaged *content*; the read itself was unguarded, so an `IOException` from a file locked by
