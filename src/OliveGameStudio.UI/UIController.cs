@@ -30,6 +30,10 @@ public sealed class UIController : IUIController
     /// This method associates a button press with a specific action, allowing custom behavior to be defined
     /// for each button press interaction within the user interface.
     /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// The button is not managed by this controller. A button that merely shares a name with a
+    /// managed one is not managed, so the wiring cannot land on the wrong button.
+    /// </exception>
     public void OnPressed(Button button, Action action)
     {
         Node node = Require(button);
@@ -45,6 +49,10 @@ public sealed class UIController : IUIController
     /// This method allows custom behavior to be defined for the release interaction of a specific button
     /// within the user interface.
     /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// The button is not managed by this controller. A same-named stranger throws here rather than
+    /// overwriting the managed button's handler, which is what used to happen.
+    /// </exception>
     public void OnReleased(Button button, Action action)
     {
         Node node = Require(button);
@@ -90,6 +98,11 @@ public sealed class UIController : IUIController
     /// This method retrieves the enabled state of a button managed by the UI controller.
     /// Ensure that the button is properly registered with the controller before invoking this method.
     /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// The button is not managed by this controller. There is no state to report for a button it
+    /// does not hold, and a managed button of the same name is a different button whose state
+    /// would be a wrong answer rather than a near one.
+    /// </exception>
     public bool IsEnabled(Button button) => Require(button).Enabled;
 
     /// <summary>
@@ -106,6 +119,11 @@ public sealed class UIController : IUIController
     /// the button the player pressed.
     /// </para>
     /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// The button is not managed by this controller, or — when none is given — the focused button
+    /// is not. <see cref="FocusOn"/> does not validate, so focus aimed at an unmanaged button is
+    /// caught here rather than where it was set.
+    /// </exception>
     public void Press(Button? button = null)
     {
         if (button is not null)
@@ -194,6 +212,10 @@ public sealed class UIController : IUIController
     /// <param name="destination">The destination button that will be associated in the specified direction.</param>
     /// <exception cref="InvalidOperationException">Thrown when the source or destination button cannot be found in the UI hierarchy.</exception>
     /// <exception cref="NotSupportedException">Thrown if an invalid or unsupported direction is provided.</exception>
+    /// <remarks>
+    /// Both ends are matched by identity. A button sharing a name with a managed one cannot be
+    /// found, so a screen cannot accidentally wire its navigation into another screen's menu.
+    /// </remarks>
     public void Link(Button button, Direction direction, Button destination)
     {
         Node? existingNode = _nodes.FirstOrDefault(it => it.Button == button);
@@ -230,6 +252,11 @@ public sealed class UIController : IUIController
     /// so the press stays where it started and is merely withheld from committing while the button
     /// is disabled.
     /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// The button is not managed by this controller. Since every screen shares one controller, a
+    /// same-named button belonging to another screen is a stranger here and is refused rather than
+    /// greyed out.
+    /// </exception>
     public void Disable(Button button) => SetEnabled(button, false);
 
     /// <summary>
@@ -243,6 +270,10 @@ public sealed class UIController : IUIController
     /// again. <c>MenuScreen</c> relies on it: the start button is disabled until the save has been
     /// read, and enabling it is what focuses it.
     /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// The button is not managed by this controller, a same-named one belonging to another screen
+    /// included.
+    /// </exception>
     public void Enable(Button button) => SetEnabled(button, true);
 
     /// <summary>
@@ -264,6 +295,10 @@ public sealed class UIController : IUIController
     /// </summary>
     /// <param name="button">The button whose enabled state is to be modified.</param>
     /// <param name="enabled">A boolean value indicating whether the button should be enabled (true) or disabled (false).</param>
+    /// <remarks>
+    /// The focus comparison below is identity, like every other lookup here: disabling one screen's
+    /// button must not unfocus another screen's button of the same name.
+    /// </remarks>
     void SetEnabled(Button button, bool enabled)
     {
         Node node = Require(button);
@@ -291,6 +326,13 @@ public sealed class UIController : IUIController
     /// This allows the element to participate in UI interactions such as receiving focus or being pressed.
     /// </summary>
     /// <param name="element">The UI element to be added to the controller.</param>
+    /// <remarks>
+    /// The guard keys on the button, never on its name. A second button labelled the same as one
+    /// already added is a different button and is accepted — refusing it would turn the very case
+    /// this rule exists for, two screens each with a <c>BACK</c>, into a startup exception.
+    /// Non-button elements are held but not made into nodes, so they are neither focusable nor
+    /// subject to the guard.
+    /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// The button is already managed by this controller. A second node for it would be
     /// unreachable by construction — every lookup finds the first — so the double add fails
@@ -324,6 +366,12 @@ public sealed class UIController : IUIController
     /// within the controller.
     /// </summary>
     /// <param name="button">The <see cref="Button"/> instance to be focused.</param>
+    /// <remarks>
+    /// This is the one entry point that does not require the button to be managed, so focus may be
+    /// left pointing at a button this controller does not hold. The next <see cref="Press"/> throws
+    /// when it tries to resolve it; before elements became identities it silently found the managed
+    /// button of the same name and ran that one's action instead.
+    /// </remarks>
     public void FocusOn(Button button)
     {
         _focusedElement = button;

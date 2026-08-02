@@ -217,6 +217,20 @@ Two rules follow, and both are pinned by tests:
   construction, since every lookup finds the first, so the double add throws rather than leaving a
   button that silently stops responding.
 
+The consequence for callers is that a stranger is now an error rather than a misdirection. Every
+entry point that takes a button — `OnPressed`, `OnReleased`, `Press`, `Enable`, `Disable`,
+`IsEnabled`, and both ends of `Link` — throws `InvalidOperationException` when the button is not one
+this controller holds, and *not held* includes a button whose name matches a managed one exactly.
+(Everything routed through `Require` names the button in the message; `Link` reports its two ends
+separately and does not.) That is the trade the fix makes: a screen that wires up a button it never
+added used to quietly operate somebody else's, and now says so on the first call.
+
+`FocusOn` is the one that does not check. Focus may be pointed at a button the controller does not
+hold, and the failure surfaces at the next `Press`, which throws when it tries to resolve it. Before
+the elements became identities that call found the managed namesake instead and fired *its* action,
+so this is loud where it was silent — but it is still later than the mistake, and it is recorded in
+the gaps below rather than claimed as closed.
+
 ## Screen flow
 
 `BattleForceHost` wires company screen → menu screen → game screen. `IFrameTimeController`
@@ -299,3 +313,9 @@ it is what puts focus back.
 - Nothing selects a language. Translations are reachable only through the machine's own culture.
 - There is no persistent record (experience, credits, quest history) separate from the saved
   position. See pillar 4 in `docs/DESIGN.md`.
+- `UIController.FocusOn` accepts a button the controller does not hold, so a mistake there is
+  reported by the next `Press` rather than by the call that made it. Related: the re-home in
+  `SetEnabled` picks the first enabled button anywhere in the controller, and the controller is
+  shared by every screen, so disabling a screen's focused button can land focus on a button
+  belonging to a screen that is not current. Both are about which buttons a controller should be
+  answering for at all, which is a scoping question the singleton has not been asked yet.
