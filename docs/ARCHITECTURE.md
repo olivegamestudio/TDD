@@ -68,6 +68,30 @@ The game side supplies where things actually are:
 - `QuestProximityWatcher` — measures the player against the markers each frame and calls the
   quest API when a trigger fires. It keeps no memory of what it has already fired; the quest
   model absorbs repeat calls.
+
+**Quest triggers are swept, not sampled.** The watcher measures each marker against the *segment*
+the player covered this frame, not the point the frame ended on. Sampling a point fires a trigger
+only when a frame happens to land inside it, so a frame carrying the ship from just outside one
+side of a marker to just outside the other fires nothing — a trigger flown straight through, which
+`docs/DESIGN.md` pillar 1 calls a bug rather than a tuning detail. At today's numbers marker
+tolerance hid it; a stalled frame, a faster ship or a tighter trigger authored for a small object
+each brought it back. `Position.DistanceToSegment` does the measuring, clamped to the ends so a
+sweep brings a marker nearer but never widens a trigger sideways.
+
+The sweep keeps the order the ground was covered in. `Position.FractionAlongSegment` says how far
+along a journey each marker was reached, and a quest that *starts* on a given frame only completes
+on that same frame if its end marker was reached no earlier than its start marker. One frame flown
+backwards across the whole field therefore starts the quest and leaves it in progress, rather than
+finishing something the player reached the objective of before they reached its beginning. A quest
+already under way is not asked — arriving at the objective completes it whichever way round the
+player flew through.
+
+Nothing remembers a previous position for this. `Player.TakeJourney` hands over the ground flown
+since it was last called and begins a new journey from where the player is now, and `MoveTo` — a
+new game, or a save resumed — ends the journey rather than extending it. That distinction has to
+live on the player, because the player is the only thing that can tell having flown somewhere
+apart from having been put there; a remembered position anywhere else would sweep a resumed game
+across every marker between the origin and the save.
 - `GameSession` — the game in progress. Starts or resumes, and saves when a quest starts or
   completes rather than every frame.
 

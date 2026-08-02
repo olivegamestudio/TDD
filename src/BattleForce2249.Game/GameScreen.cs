@@ -62,7 +62,10 @@ public sealed class GameScreen(
             return;
         }
 
-        questProximity.Update(session.Quests, session.Player.Position);
+        // the ground covered since the last frame, not the point this one ended on: a trigger the
+        // ship flies straight through is a bug against pillar 1, not a tuning detail
+        (Position from, Position to) = session.Player.TakeJourney();
+        questProximity.Update(session.Quests, from, to);
     }
 
     /// <summary>

@@ -196,4 +196,191 @@ public sealed class QuestProximityWatcherTests
 
         watcher.Update(new QuestLog(), StartMarker);       // must not throw
     }
+
+    // ---- sweeping the ground covered, rather than sampling where the frame ended ----
+
+    [Fact]
+    public void StartsTheQuest_WhenOneFrameCarriesThePlayerStraightPastTheStartMarker()
+    {
+        // The reproduction. Neither end of this frame is inside the 25 unit start trigger — the
+        // player begins 200 short of the marker and finishes 200 past it — so sampling either end
+        // fires nothing and the ship flies through a trigger it passed dead centre of.
+        QuestProximityWatcher watcher = CreateWatcher();
+
+        watcher.Update(_quests, new Position(0, -200), new Position(0, 200));
+
+        Assert.Equal(QuestState.Active, Quest1.State);
+    }
+
+    [Fact]
+    public void CompletesTheQuest_WhenOneFrameCarriesThePlayerStraightPastTheEndMarker()
+    {
+        QuestProximityWatcher watcher = CreateWatcher();
+        Quest1.Start();
+
+        watcher.Update(_quests, new Position(0, 800), new Position(0, 1200));
+
+        Assert.Equal(QuestState.Completed, Quest1.State);
+    }
+
+    [Theory]
+    [InlineData(60)]
+    [InlineData(200)]
+    [InlineData(1_000)]
+    [InlineData(50_000)]
+    public void StartsTheQuest_AtAnyFrameLength(double unitsCoveredThisFrame)
+    {
+        // a stalled frame, a faster ship, or a tighter trigger authored for a small object all
+        // make the frame longer relative to the marker; none of them may skip it
+        QuestProximityWatcher watcher = CreateWatcher();
+        int started = 0;
+        _quests.QuestStarted += (_, _) => started++;
+
+        watcher.Update(
+            _quests,
+            new Position(0, -unitsCoveredThisFrame / 2),
+            new Position(0, unitsCoveredThisFrame / 2));
+
+        Assert.Equal(1, started);
+    }
+
+    [Fact]
+    public void StartsAndCompletesTheQuest_WhenOneFrameCoversTheWholeField()
+    {
+        // A frame long enough to fly the whole of quest 1 plays it rather than skipping it. New,
+        // and correct: the player covered every unit of ground the quest asks for.
+        QuestProximityWatcher watcher = CreateWatcher();
+
+        watcher.Update(_quests, new Position(0, -100), new Position(0, 1100));
+
+        Assert.Equal(QuestState.Completed, Quest1.State);
+    }
+
+    // ---- the sweep must not widen a trigger sideways ----
+
+    [Fact]
+    public void DoesNotStartTheQuest_ForAJourneyThatPassesWideOfTheMarker()
+    {
+        // the length of the field, but 200 units to the side of it
+        QuestProximityWatcher watcher = CreateWatcher();
+
+        watcher.Update(_quests, new Position(200, -500), new Position(200, 1500));
+
+        Assert.Equal(QuestState.NotStarted, Quest1.State);
+    }
+
+    [Fact]
+    public void DoesNotStartTheQuest_ForAJourneyThatStopsShortOfTheMarker()
+    {
+        // aimed straight at the marker, but the frame ended 200 units before reaching it: a
+        // segment, not the infinite line through it
+        QuestProximityWatcher watcher = CreateWatcher();
+
+        watcher.Update(_quests, new Position(0, -500), new Position(0, -200));
+
+        Assert.Equal(QuestState.NotStarted, Quest1.State);
+    }
+
+    [Fact]
+    public void StartsTheQuest_ForAJourneyPassingAtExactlyTheTriggerDistance()
+    {
+        QuestProximityWatcher watcher = CreateWatcher();
+
+        watcher.Update(_quests, new Position(25, -500), new Position(25, 500));
+
+        Assert.Equal(QuestState.Active, Quest1.State);
+    }
+
+    [Fact]
+    public void DoesNotStartTheQuest_ForAJourneyPassingJustOutsideTheTriggerDistance()
+    {
+        QuestProximityWatcher watcher = CreateWatcher();
+
+        watcher.Update(_quests, new Position(25.0001, -500), new Position(25.0001, 500));
+
+        Assert.Equal(QuestState.NotStarted, Quest1.State);
+    }
+
+    [Fact]
+    public void RaisesStartedOnce_HoweverManyFramesSweepTheMarker()
+    {
+        QuestProximityWatcher watcher = CreateWatcher();
+        int started = 0;
+        _quests.QuestStarted += (_, _) => started++;
+
+        for (int frame = 0; frame < 10; frame++)
+        {
+            watcher.Update(_quests, new Position(0, -200), new Position(0, 200));
+        }
+
+        Assert.Equal(1, started);
+    }
+
+    // ---- the order the ground was covered in ----
+
+    [Fact]
+    public void AJourneyFlownBackwards_StartsTheQuestWithoutCompletingIt()
+    {
+        // The player passed the exit before they passed the entrance, so they cannot have finished
+        // the quest on this frame — they reached its objective before they had begun it. Sweeping
+        // measures the ground covered; it does not lose the order it was covered in.
+        QuestProximityWatcher watcher = CreateWatcher();
+
+        watcher.Update(_quests, new Position(0, 1100), new Position(0, -100));
+
+        Assert.Equal(QuestState.Active, Quest1.State);
+    }
+
+    [Fact]
+    public void AJourneyFlownBackwards_CompletesAQuestThatWasAlreadyUnderway()
+    {
+        // The ordering rule only governs a quest that began on this very frame. A player who has
+        // been on the quest since an earlier frame reaches the objective by arriving at it, and
+        // which way round they flew through it is not the quest's business.
+        QuestProximityWatcher watcher = CreateWatcher();
+        Quest1.Start();
+
+        watcher.Update(_quests, new Position(0, 1100), new Position(0, -100));
+
+        Assert.Equal(QuestState.Completed, Quest1.State);
+    }
+
+    [Fact]
+    public void AQuestStartedBackwards_CompletesOnTheNextFrameFlownForward()
+    {
+        // and it is a delay, not a lockout: the quest that began on the way back finishes the
+        // moment the player flies to its exit
+        QuestProximityWatcher watcher = CreateWatcher();
+        watcher.Update(_quests, new Position(0, 1100), new Position(0, -100));
+
+        watcher.Update(_quests, new Position(0, -100), new Position(0, 1100));
+
+        Assert.Equal(QuestState.Completed, Quest1.State);
+    }
+
+    // ---- a standing frame is a swept frame whose ends coincide ----
+
+    [Fact]
+    public void SweepingAJourneyThatWentNowhere_IsTheSameAsSamplingThatPoint()
+    {
+        // why the single-position overload can delegate rather than live alongside a second rule
+        QuestProximityWatcher watcher = CreateWatcher();
+
+        watcher.Update(_quests, StartMarker, StartMarker);
+
+        Assert.Equal(QuestState.Active, Quest1.State);
+    }
+
+    [Fact]
+    public void FiresNothing_ForAJourneyWithAnEndThatIsNotANumber()
+    {
+        // Pinned rather than accepted quietly: a non-finite position measures NaN against every
+        // marker and every comparison against NaN is false, so the sweep fires nothing at all
+        // rather than firing wrongly. Keeping positions finite is the save boundary's rule.
+        QuestProximityWatcher watcher = CreateWatcher();
+
+        watcher.Update(_quests, StartMarker, new Position(double.NaN, double.NaN));
+
+        Assert.Equal(QuestState.NotStarted, Quest1.State);
+    }
 }

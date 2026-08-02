@@ -20,13 +20,19 @@ public sealed class GameScreenTests : HostTestBase
     /// Drives the host through the company screen and a real press of the menu's start button,
     /// leaving the game screen active — the same path a player takes on a new game launch.
     /// </summary>
-    IHost StartTheGame()
+    /// <param name="also">Anything else the test needs registered, after the two above so it wins.</param>
+    IHost StartTheGame(Action<IServiceCollection>? also = null)
     {
-        Configure(services: services => services
-            // the real UI controller, so pressing the start button raises its action
-            .AddSingleton<IUIController, UIController>()
-            // the shipping director, so navigating a screen actually enters it
-            .AddSingleton<IScreenDirector, LifecycleScreenDirector>());
+        Configure(services: services =>
+        {
+            services
+                // the real UI controller, so pressing the start button raises its action
+                .AddSingleton<IUIController, UIController>()
+                // the shipping director, so navigating a screen actually enters it
+                .AddSingleton<IScreenDirector, LifecycleScreenDirector>();
+
+            also?.Invoke(services);
+        });
 
         IHost host = CreateHost();
         host.Start();
@@ -103,6 +109,58 @@ public sealed class GameScreenTests : HostTestBase
         Assert.Equal(BattleForceCampaign.Quest1Id, quest.Id);
         Assert.Empty(Session.Quests.Active);
         Assert.True(Session.Player.Position.DistanceTo(markers.End) <= 50 + 10);
+    }
+
+    [Fact]
+    public void OneLongFrame_CompletesQuest1_WithoutStandingOnTheExitMarker()
+    {
+        // The end of #8, driven the way the game will drive it. The player is flown from 500 short
+        // of the exit marker to 500 past it inside a single frame, so no frame ever *lands* inside
+        // the 50 unit end trigger — under point sampling the quest would still be in progress with
+        // the debris field a thousand units behind.
+        IHost host = StartTheGame();
+        host.Update(TimeSpan.FromSeconds(1 / 60.0));
+        Assert.Single(Session.Quests.Active);
+
+        Session.Player.MoveTo(new Position(0, 500));
+        host.Update(TimeSpan.FromSeconds(1 / 60.0));           // takes the placement, covers no ground
+        Session.Player.MoveBy(0, 1000);
+        host.Update(TimeSpan.FromSeconds(1 / 60.0));
+
+        Quest quest = Assert.Single(Session.Quests.Completed);
+        Assert.Equal(BattleForceCampaign.Quest1Id, quest.Id);
+        Assert.True(
+            Session.Player.Position.DistanceTo(new Position(0, 1000)) > 50,
+            "the player finished inside the end trigger, so this did not test the sweep");
+    }
+
+    [Fact]
+    public void ResumingASaveDoesNotSweepTheGroundTheGameWasNeverFlownAcross()
+    {
+        // A resumed player was placed, not flown. If the first frame swept the line from wherever
+        // the player happened to be to where the save puts them, it would fly them through every
+        // marker in between on a journey nobody made — and quest 1 would complete itself on the
+        // frame the save was read.
+        //
+        // The save is far enough out to put the exit marker between the origin and the player. No
+        // shipping playthrough writes this one; it is the shape of a save, chosen so the phantom
+        // journey would cross something.
+        InMemorySaveProgressService saves = new()
+        {
+            Content = SaveGameSerializer.Serialize(new SaveGame
+            {
+                PlayerX = 0,
+                PlayerY = 5000,
+                Quests = [new QuestProgress(BattleForceCampaign.Quest1Id, QuestState.Active)],
+            }),
+        };
+
+        IHost host = StartTheGame(services => services.AddSingleton<ISaveProgressService>(saves));
+        host.Update(TimeSpan.FromSeconds(1 / 60.0));
+
+        Assert.Equal(new Position(0, 5000), Session.Player.Position);
+        Assert.Empty(Session.Quests.Completed);
+        Assert.Equal(BattleForceCampaign.Quest1Id, Assert.Single(Session.Quests.Active).Id);
     }
 
     [Fact]

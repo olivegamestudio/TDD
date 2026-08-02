@@ -74,7 +74,7 @@ exists today.
 
 | Pillar | Standing |
 | ------ | -------- |
-| 1. Flying feels good | Not yet exercised. Nothing moves the ship in the running game; movement and physics are issue #3. Quest triggers are already sized for a ship at speed. |
+| 1. Flying feels good | Partly held. Nothing moves the ship in the running game yet; movement and physics are issue #3. But triggers no longer depend on a ship being slow enough to land inside one: they are measured against the ground covered each frame rather than the point it ended on, so a trigger cannot be flown through at any speed or frame length (#8). |
 | 2. The conspiracy finds you | Held. Quest 1 opens on immediate personal survival. |
 | 3. Locations have layers | Not yet expressed. The world models coordinates, not places; markers are held per quest. |
 | 4. The world was here first | Partly expressed. The save carries position and quest state only — there is no persistent record distinct from perishable position yet, and world progression currently advances from the game screen. The rule against silently discarding the record is honoured early: a save that could only not be *read* is played over but never written to, so a file locked for a moment is not replaced by a new game. A save that is genuinely *damaged* is still discarded, which is right while a save holds nothing precious and becomes the wrong answer once the persistent record lands. |
