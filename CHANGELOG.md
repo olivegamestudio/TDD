@@ -31,6 +31,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **`IShipInput`** — the seam gameplay input arrives through, because the platform host owns the
   real device. The engine ships `NeutralShipInput` as the default, so a game composes and runs with
   nobody at the controls; a host registers its keyboard or gamepad after `AddOliveGameStudio`. ([#3](https://github.com/olivegamestudio/TDD/issues/3))
+- **A keyboard and a gamepad at the controls.** The desktop host binds both through
+  `AddDesktopPilot`, so Quest 1 is completable by a person rather than only by a test. W/A/S/D or
+  the arrow keys, either hand alone; the gamepad's left stick for both axes, with a fifth of its
+  travel as a dead zone so a worn stick does not fly the ship on its own. Both connected at once
+  are arbitrated by `FirstActiveShipInput` — asked in order, gamepad first, the first device asking
+  for anything winning outright rather than the two summing into something neither hand asked for.
+  What a device means (`ShipControls.FromKeys`, `ShipControls.FromStick`) is engine code; which key
+  and which stick is the host's. An axis a device cannot report reads as hands off rather than
+  throwing on the frame path. ([#9](https://github.com/olivegamestudio/TDD/issues/9))
 - **`BattleForceShip`** — the game's ship: 180 units per second per second against a drag of 0.9,
   settling at 200 units a second, and 4.5 radians a second at full helm — a little under a second
   and a half to come about. Quest 1's exit marker is a run of roughly six seconds at full

@@ -35,6 +35,10 @@ services.AddBattleForce(configuration);
 // implementation; configuration tunes it.
 // services.AddSingleton<IFrameTimeController, ScaledFrameTimeController>();
 
+// Puts a person at the controls, on the same seam and for the same reason: the engine's default
+// is NeutralShipInput, so without this line the game launches and the ship never moves.
+services.AddDesktopPilot();
+
 using ServiceProvider provider = services.BuildServiceProvider();
 
 using BattleForceGame game = new(provider.GetRequiredService<IHost>());

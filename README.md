@@ -55,10 +55,11 @@ dotnet run --project BattleForce2249.MonoGame
 
 ## Status
 
-Engine, screen flow, the quest system and ship movement are in. Quest 1 auto-starts on a new game,
-tracks the player forward through the collapsing debris field, and completes at the exit marker —
-flown there, with thrust and a helm and momentum through the turns — with progress persisted
-across sessions and its title translated into seven languages.
+Engine, screen flow, the quest system and ship movement are in, and a keyboard and gamepad are
+bound to the controls. Quest 1 auto-starts on a new game, tracks the player forward through the
+collapsing debris field, and completes at the exit marker — flown there by a person, with thrust
+and a helm and momentum through the turns — with progress persisted across sessions and its title
+translated into seven languages.
 
 A save the game cannot read never stops it and is never written over: a damaged save is replaced,
 but one that was merely locked is played over and left alone, because it may be intact. See
@@ -66,8 +67,6 @@ but one that was merely locked is played over and left alone, because it may be 
 
 Not yet built:
 
-- **A real input device** — the ship is flown through `IShipInput`, and the MonoGame host does not
-  bind a keyboard or gamepad to it yet, so the shipping game still has nobody at the controls.
 - **Swept quest triggers** — the player is sampled once a frame, so a badly stalled frame can step
   a fast ship over a marker. Quest 1's markers are sized well clear of it at any playable frame
   rate.

@@ -89,6 +89,18 @@ physics.
 - `IShipInput` — where the pilot's intent comes from. The platform host owns the real device, so
   the engine ships the seam and `NeutralShipInput`, which asks for nothing. A host registers a
   keyboard or gamepad after `AddOliveGameStudio` and wins under the engine's `AddSingleton`.
+- `ShipControls.FromKeys` and `ShipControls.FromStick` — what a device *means*, which is engine
+  work; which key and which stick is the host's, which is why the mapping lives here and the
+  bindings live in `BattleForce2249.MonoGame`. Opposite keys cancel rather than one winning, and a
+  stick's travel past its dead zone is rescaled over the full range so crossing the dead zone asks
+  for a little rather than jumping to the dead zone's worth of thrust.
+- `FirstActiveShipInput` — several devices bound at once, asked in order, the first one asking for
+  anything winning outright. Adding their answers together would give the ship something neither
+  hand asked for. The arbitration is per device rather than per axis, and stateless, so letting go
+  of one device hands control straight to the other. It turns on `ShipControls.IsNeutral`, whose
+  exact comparison is only safe because the constructor has already read an unreadable axis as 0 —
+  `NaN == 0` is false, so without that a device nobody can read would claim to be the one in use
+  and shut out the device that works.
 - `ShipMovement` — carries a `Heading` and a `Velocity`, applies thrust along the heading, and
   moves the `Player` by the ground covered. Momentum survives a turn; a turn points the ship
   somewhere new rather than teleporting the velocity there.
@@ -201,8 +213,13 @@ game that has quietly stopped.
 
 ## Known gaps
 
-- Nothing binds a real input device. The ship flies from `IShipInput`, and the MonoGame host still
-  resolves the engine's `NeutralShipInput`, so the shipping game has nobody at the controls.
+- Reading a real device is not covered by a test. `Keyboard.GetState` and `GamePad.GetState` are
+  static calls into MonoGame with no seam in front of them, so nothing in the suite invokes
+  `KeyboardShipInput.Read` or `GamePadShipInput.Read`. What is untested is the few lines naming the
+  keys and the stick axes; everything they feed — `ShipControls.FromKeys`, `ShipControls.FromStick`
+  and `FirstActiveShipInput` — is engine code and is covered, and
+  `tests/BattleForce2249.MonoGame.Tests` pins that the host resolves its own pilot rather than
+  `NeutralShipInput`, in both registration orderings.
 - Quest triggers are sampled, not swept. `QuestProximityWatcher` measures the player once a frame,
   so a frame long enough to carry the ship further than a trigger's distance steps over it. Quest
   1's markers are sized clear of that at any playable frame rate, but the tolerance is the only
