@@ -230,6 +230,13 @@ public sealed class UIController : IUIController
     /// Enables the specified button, allowing it to be interacted with within the user interface.
     /// </summary>
     /// <param name="button">The button to enable within the UI system.</param>
+    /// <remarks>
+    /// The counterpart to the re-homing in <see cref="Disable"/>: enabling a button while nothing
+    /// is focused adopts it. Disabling can leave a screen with no focus at all — it clears focus
+    /// when no button is left enabled to take it — and this is what gives input somewhere to go
+    /// again. <c>MenuScreen</c> relies on it: the start button is disabled until the save has been
+    /// read, and enabling it is what focuses it.
+    /// </remarks>
     public void Enable(Button button) => SetEnabled(button, true);
 
     /// <summary>

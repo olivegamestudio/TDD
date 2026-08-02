@@ -61,9 +61,14 @@ public interface IUIController
     void Disable(Button button);
 
     /// <summary>
-    /// Enables the specified component, allowing it to interact and function within the application.
+    /// Enables the specified button, allowing it to interact and function within the application.
     /// </summary>
-    /// <param name="component">The component instance to be enabled.</param>
+    /// <param name="button">The button to be enabled.</param>
+    /// <remarks>
+    /// The counterpart to the re-homing in <see cref="Disable"/>: enabling a button while nothing
+    /// is focused adopts it, so a screen that disabled its way down to no focus at all has
+    /// somewhere for input to go again as soon as one button comes back.
+    /// </remarks>
     void Enable(Button button);
 
     /// <summary>

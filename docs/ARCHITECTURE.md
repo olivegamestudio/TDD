@@ -262,6 +262,12 @@ commit without cancelling the press, and re-enabling it before the player lets g
 `Disable` governs whether a button may act; `Cancel` abandons a press. Conflating them would leave
 no way to say the first without also saying the second.
 
+Focus moves in both directions and only `Disable`/`Enable` move it on their own. Disabling the
+focused button re-homes focus to the first enabled one, or clears it when none is left; enabling a
+button while nothing is focused adopts it. `MenuScreen` depends on the pair — the start button is
+disabled until the save has been read, which leaves the screen with no focus at all, and enabling
+it is what puts focus back.
+
 ## Known gaps
 
 - Nothing moves the ship. Quest 1 is completable by test, not by playing — movement and physics
