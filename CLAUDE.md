@@ -40,8 +40,8 @@ dotnet test OliveGameStudio.slnx
 
 That restores MonoGame's `mgcb` tooling and builds the host as well as the libraries. If it does
 fail for you, say so plainly at handoff rather than implying a green build — but say what failed,
-because "no SDK" is no longer a reason. There is still no CI (#34), so until that lands a human
-running `dotnet test` is the only confirmation beyond your own.
+because "no SDK" is no longer a reason. CI runs on every push to `main` and on every pull request,
+so a red build is visible before review.
 
 ## Keeping the record straight
 
