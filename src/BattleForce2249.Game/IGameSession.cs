@@ -33,6 +33,11 @@ public interface IGameSession
     /// Gets the most recent automatic save, so a caller that needs the write to have landed —
     /// tests, or a shutdown path — can await it.
     /// </summary>
+    /// <remarks>
+    /// Awaiting it waits out every save queued ahead of it as well, because saves are written one
+    /// at a time and in the order they were asked for. There is no state of affairs in which this
+    /// has completed and an earlier save has not.
+    /// </remarks>
     Task PendingSave { get; }
 
     /// <summary>
@@ -78,6 +83,20 @@ public interface IGameSession
     /// <summary>
     /// Writes the current player position and quest states to the save game.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The snapshot is taken when this is called; the write itself waits for any save already
+    /// outstanding. So two saves are never in flight against the same storage at once, and the
+    /// last one asked for is the last one to land — which is what stops an older snapshot
+    /// overwriting a newer one and quietly handing the player back progress they had passed.
+    /// </para>
+    /// <para>
+    /// Only the failure of <em>this</em> write is raised. A save queued in front of this one that
+    /// failed was already reported to whoever asked for it, and does not stop this one running:
+    /// the storage may be free again by now, and a session that gave up saving after one bad
+    /// moment would lose far more than it protects.
+    /// </para>
+    /// </remarks>
     /// <returns>A task that completes once the save has been written.</returns>
     Task Save();
 }

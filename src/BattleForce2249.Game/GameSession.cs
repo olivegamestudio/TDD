@@ -7,11 +7,41 @@ namespace BattleForce2249;
 /// The default <see cref="IGameSession"/>. It holds the player and the quest log, and persists both
 /// through the engine's save progress service whenever a quest starts or completes.
 /// </summary>
+/// <remarks>
+/// <para>
+/// Saves are queued, never issued together. The session marks itself ready to play before its
+/// first write has landed — loading is deliberately kept off the frame loop — so on any storage
+/// that does not answer within a frame the game is already running while a write is outstanding,
+/// and the first frame of a new game starts quest 1 and asks for a second write of the same file.
+/// Two snapshots of one file with nothing ordering them means the older can land last, and the
+/// player is handed back a game in which the opening quest never began, with no file corrupted
+/// and nothing raised to say so.
+/// </para>
+/// <para>
+/// Ordering them is the session's job rather than the storage's, because only the session knows
+/// which of two snapshots is the newer: the service is handed two pieces of text and has no way to
+/// tell them apart. What a service must do when it <em>is</em> written to twice at once — which
+/// this no longer does, but another caller still might — is the service's own contract.
+/// </para>
+/// </remarks>
 public sealed class GameSession : IGameSession
 {
     readonly ISaveProgressService _saveProgressService;
     readonly ICampaign _campaign;
     readonly IWorld _world;
+
+    /// <summary>
+    /// Guards <see cref="_lastWrite"/>. Quest events arrive on the frame loop and a shutdown flush
+    /// need not, so the one place the queue is read and replaced is not left to luck.
+    /// </summary>
+    readonly Lock _saveOrder = new();
+
+    /// <summary>
+    /// The write at the back of the queue: every new save waits for it before starting, and then
+    /// becomes it. Ordering the writes is the session's job because only the session knows which
+    /// of two snapshots is the newer — the storage sees two payloads and no way to tell.
+    /// </summary>
+    Task _lastWrite = Task.CompletedTask;
 
     /// <summary>
     /// Whether a quest changing state should write a save. It is turned off while a game is being
@@ -58,6 +88,10 @@ public sealed class GameSession : IGameSession
     {
         Reset();
 
+        // Ready before the write has landed, on purpose: waiting here would hold the player on a
+        // blank screen for as long as storage takes, and it would close only this one pair anyway
+        // — any two quest transitions inside one storage latency race the same way. The queue in
+        // Save is what actually orders them.
         _autoSave = true;
         IsReady = true;
 
@@ -146,7 +180,47 @@ public sealed class GameSession : IGameSession
     }
 
     /// <inheritdoc />
-    public Task Save() => _saveProgressService.Save(SaveGameSerializer.Serialize(Capture()));
+    public Task Save()
+    {
+        // The snapshot is taken here, when the save is asked for, and not when its turn to be
+        // written comes round — a queued write must carry the progress that prompted it, or the
+        // queue would just be several writes of whatever the game happened to reach.
+        string content = SaveGameSerializer.Serialize(Capture());
+
+        lock (_saveOrder)
+        {
+            Task write = WriteAfter(_lastWrite, content);
+            _lastWrite = write;
+            return write;
+        }
+    }
+
+    /// <summary>
+    /// Writes <paramref name="content"/> once <paramref name="previous"/> has finished, which is
+    /// what keeps two writes of the same save off the same storage at once.
+    /// </summary>
+    /// <remarks>
+    /// The failure of the write in front is deliberately not observed here. It belongs to whoever
+    /// asked for that write and has already been reported to them — <see cref="TrySave"/> records
+    /// it on <see cref="SaveError"/>, and <see cref="Save"/> raises it — so re-raising it would
+    /// hand one caller a problem it never had, and swallowing the whole queue behind one bad
+    /// moment would undo the decision to keep saving after a failure.
+    /// </remarks>
+    /// <param name="previous">The write this one waits for.</param>
+    /// <param name="content">The snapshot to write.</param>
+    async Task WriteAfter(Task previous, string content)
+    {
+        try
+        {
+            await previous;
+        }
+        catch
+        {
+            // not ours to report
+        }
+
+        await _saveProgressService.Save(content);
+    }
 
     /// <summary>
     /// Saves, recording a storage failure rather than raising it. Every automatic save runs through

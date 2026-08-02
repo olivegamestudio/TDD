@@ -146,6 +146,29 @@ Nothing reads `SaveError` yet. Telling the player their save is locked needs a H
 exist; the information is recorded so that whatever gains the ability to say it has something to
 read.
 
+#### One write at a time, in the order they were asked for
+
+The session becomes ready to play before its first save has landed — loading is deliberately kept
+off the frame loop — so on storage that does not answer within a frame the game is already running
+while a write is outstanding. The first frame of a new game puts the player inside quest 1's start
+trigger, and that asks for a second write of the same file. Two snapshots of one file with nothing
+ordering them means the older can land last, and the player is handed back a game in which the
+opening quest never began: no file corrupted, no exception raised, `SaveError` still `null`.
+
+So `GameSession.Save` snapshots the session when it is *called* and queues the write behind any
+save already outstanding. Two writes are never in flight against the same storage at once, and the
+last save asked for is the last to land. `PendingSave` is therefore the whole queue up to it, not
+just the most recent request.
+
+Ordering is the session's job and not the storage's, because only the session knows which of two
+snapshots is the newer — the service is handed two pieces of text with no way to tell them apart.
+A write that fails is reported to whoever asked for it and does not take the queue behind it down:
+the storage may be free again by the next quest, which is the same reasoning that leaves saving on
+after a failure.
+
+What an `ISaveProgressService` must guarantee when it *is* written to twice at once, by some other
+caller, is the service's own contract and is not settled here.
+
 ## Localised text
 
 A language is a file named after its culture — `Text/en.json`, `Text/pt-BR.json` — holding a flat

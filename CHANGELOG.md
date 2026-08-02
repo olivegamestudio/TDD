@@ -50,6 +50,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A new game no longer has two saves of the same file in flight at once.** `GameSession` marks
+  itself ready to play before its first save has landed, by design — loading is kept off the frame
+  loop — so on storage that does not answer within a frame the first frame started quest 1 and
+  asked for a second write while the first was still outstanding. Nothing ordered the two, so the
+  older snapshot could land last and hand the player back a game in which the opening quest never
+  began, with no file corrupted and nothing raised to say so. Saves are now snapshotted when they
+  are asked for and written one at a time in that order, so the last save requested is the last to
+  land, and `PendingSave` waits out the whole queue rather than only the most recent request. A
+  write that fails is still reported to its own caller and still does not stop the next one from
+  running. ([#63](https://github.com/olivegamestudio/TDD/issues/63))
 - **A save the game could not read no longer freezes it, and is no longer overwritten.**
   `Continue` documented a fallback to a new game when the save "cannot be read" but only recovered
   from damaged *content*; the read itself was unguarded, so an `IOException` from a file locked by
