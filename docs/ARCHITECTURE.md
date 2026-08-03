@@ -22,10 +22,11 @@ to know about ships, quests or credits is on the wrong side of this line.
 | Project | Holds |
 | ------- | ----- |
 | `OliveGameStudio` | Engine composition and service registration. |
-| `OliveGameStudio.Abstractions` | `IHost`, `IScreen`, `IScreenDirector`, `ISaveProgressService`. |
+| `OliveGameStudio.Abstractions` | `IHost`, `IScreen`, `IScreenDirector`, `ISaveProgressService`, and the shapes a platform host reports its devices in — `InputFrame`, `KeyboardFrame`, `GamePadFrame`, `ControlDevice`, `IInputRouter`. |
 | `OliveGameStudio.Screen` | `ScreenDirector`, `LifecycleScreenDirector`. |
 | `OliveGameStudio.UI`, `.UI.Abstractions` | Menu and button navigation. Not ship control. |
 | `OliveGameStudio.FrameRate` | Frame time filtering, so a paused or slowed game holds still while frames keep arriving. |
+| `OliveGameStudio.Input` | `InputRouter` — where a frame of input goes, and which device the game is being played on. |
 | `OliveGameStudio.Progress` | `LocalSaveProgressService`, persisting save text to a file. |
 | `OliveGameStudio.World` | `Position`, `Player`. The spatial model, plus the ship's physics and `IShipInput` — what an input means, never which device produced it. |
 | `OliveGameStudio.Localisation` | `ITextProvider`, `JsonTextProvider`, `MissingTextException`. |
@@ -329,7 +330,8 @@ starts clean.
 ## Menu input
 
 `OliveGameStudio.UI` drives buttons, not the ship. A button press is two events with a gap between
-them: `Press` arms the hold, `Release` commits it, and `Cancel` abandons it.
+them: `Press` arms the hold, `Release` commits it, and `Cancel` abandons it. What calls them is
+`InputRouter` — see [Input](#input) for which frames reach here and which fall through to the ship.
 
 **The press belongs to the button that was pressed.** `Held` follows that button and not the focused
 one, because a pressed action is free to move focus while the player is still holding the key —
@@ -364,44 +366,99 @@ prevent, and the routing decision does not need it. A focused button that is dis
 disabled is a statement about pressing, which `Press` declines on its own, and a menu whose only
 button is greyed out is still a menu the player is looking at rather than a cue to fly the ship.
 
-## Ship input
+## Input
 
-`IShipInput` is the seam gameplay input arrives through, and it follows the engine/game split the
-same way saved progress does: **the engine provides the service, the host provides the device.**
-`OliveGameStudio.World` owns what an input *means* — `ShipControls.FromKeys` for the digital case,
-`ShipControls.FromStick` for the analogue one, and `FirstActiveShipInput` for choosing between
-devices. `BattleForce2249.MonoGame` owns which keys and which stick.
+**Input is pushed, not pulled.** `IHost.Input(InputFrame)` is called once a frame by the platform
+host, before `Update`, with every device it owns read into one snapshot. That ordering is what
+makes "which device is the player on" a question the game can answer at all: a game that reached
+for each device where it happened to need one would read the keyboard in one place for the menu and
+in another for the ship, with no single point that could compare them.
 
-**Arbitration is per device, not per axis.** Devices are asked in order and the first one asking
-for anything answers for the whole frame. Summing two devices would turn two half-turns into a
-full one; arbitrating per axis is the same summing in a form the player cannot see. It holds no
-state, so putting one device down hands over on the very next frame. The gamepad is asked first —
-a resting pad is zeroed by its dead zone, so it costs the keyboard nothing.
+The snapshot is device-shaped but meaning-level. `KeyboardFrame` says *ahead*, *astern*, *port*,
+*starboard*, *confirm* — never which keys those are, which stays the host's decision. `GamePadFrame`
+carries the stick raw, with the platform's own dead zone turned off, plus whether a pad is plugged
+in at all: a disconnected pad and a pad being held still are the same numbers and are not the same
+thing.
+
+### Routing is UI first, and the device is locked
+
+`InputRouter` applies two rules and is little more than them.
+
+**UI first.** A frame belongs to the user interface while something there is focused, and falls
+through to the ship when nothing is. It asks `IUIController.HasFocus` every frame rather than
+remembering, because `Add`, `Disable` and `Enable` all move focus on their own. A frame that goes
+to the UI also writes `ShipControls.Neutral` to the ship — nothing clears the ship's controls on
+its own, and a ship left on its last value flies on for as long as the menu is up.
+
+**A press is an edge.** A held key arrives on every frame for as long as it is held; a button is
+pressed once. The router keeps one bit of state between frames for this, and keeps it whether or
+not the frame went to the UI — so a confirm held while flying, on the frame something takes focus,
+is not read as the player aiming at a button that has only just appeared.
+
+**The device is locked at the start press** (#117) and stays locked for the session. It is taken at
+the press rather than the release, because the menu commits its start button on release and enters
+the game screen from there; choosing at the release would leave the frame in between with no device
+chosen. Before anything is pressed the ship is hands off — the game cannot be reached without
+pressing start, so that state is not one the player can fly in. When nothing is locked yet the pad
+is asked first: a player who has picked up a pad has plainly chosen it, and a keyboard nobody is at
+cannot press anything.
+
+The lock covers the whole control method, not only the flight controls: once a device has the game,
+the other one cannot work the menu either. That is the point — a pad left plugged in with something
+resting on the stick cannot take the ship from the person flying it on the keys, and a second person
+cannot work the menu of a game they are not playing.
+
+**It supersedes `FirstActiveShipInput` for this game.** Free per-frame arbitration is still the
+right answer for a game that wants a player to put one device down and pick another up mid-flight,
+and the class remains in `OliveGameStudio.World` for one; Battle Force 2249 is not one. The price is
+paid when the chosen device goes away: a pad unplugged mid-flight leaves the ship hands off rather
+than handing it to the keyboard. That is the intended reading of "locked for the session" and not an
+oversight — silently moving the player onto a device they did not choose is the failure the lock
+exists to prevent, and a ship coasting to a stop is at least visible.
+
+### Where the two halves meet
+
+`IShipInput` is read on the frame path and cannot go looking for a device; a router cannot reach
+into physics that has not run yet. `RoutedShipInput` is the seam between them: the router writes the
+frame's controls, the physics reads them. It holds the last value rather than clearing on read, so a
+frame updated or drawn twice sees the same controls both times — which puts the obligation on the
+router to write *every* frame, including the frames it writes `Neutral`.
+
+The engine registers it as both itself and `IShipInput`, so `AddOliveGameStudio` composes to a
+playable game with nobody at the controls, exactly as `NeutralShipInput` did before it.
 
 **An axis that cannot be read is hands off, guarded twice.** `Math.Sign` throws on `NaN` rather
 than returning 0, and an ordered comparison against `NaN` is false either way round, so a dead zone
 test does not catch one. `PastDeadZone` catches an unreadable axis; the `ShipControls` constructor
 catches a `NaN` arriving by any other route. The two cover different holes and neither is spare.
-`ShipControls.IsNeutral` compares exactly against zero and is only safe because of the second: a
-device reporting `NaN` would otherwise claim to be the one in use and shut every device behind it
-out.
+`ShipControls.IsNeutral` compares exactly against zero and is only safe because of the second.
 
 **The dead zone is the game's, not the platform's.** The host reads the pad with MonoGame's dead
-zone off and applies `GamePadShipInput.DeadZone` itself, so there is one stated number rather than
-whatever the driver decided.
+zone off and hands `DesktopGamePad.DeadZone` to the router at composition, so there is one stated
+number rather than whatever the driver decided. `InputRouter.DefaultDeadZone` is what a host that
+says nothing gets — a default so a game composes flyable, not a measurement of anybody's hardware.
 
 ## Known gaps
 
 - `Keyboard.GetState` and `GamePad.GetState` are static calls into MonoGame with no seam in front
   of them, so nothing invokes `Read()` on a real device. What is untested is the few lines naming
-  the keys and the stick axes; everything they feed is engine code and is covered.
-  `tests/BattleForce2249.MonoGame.Tests` pins the registration in both orderings and pins the
-  shipped dead zone, which no other project can see.
+  the keys, the stick axes and the confirm buttons; everything they feed is engine code and is
+  covered. `tests/BattleForce2249.MonoGame.Tests` pins the shipped dead zone, which no other
+  project can see, and drives the composed container's router end to end.
+- **A mis-ordered composition no longer fails loudly.** `AddDesktopPilot` above `AddBattleForce`
+  used to leave the game with nobody at the controls, which a test could see. Both registrations
+  now produce an `InputRouter` differing only in the dead zone, so the same mistake is a game
+  flying on `InputRouter.DefaultDeadZone` instead — and while the two numbers happen to agree, no
+  test can tell. The guard is now the shipped number being pinned through the real container.
 - Nobody has *felt* the handling. `BattleForceShip`'s tuning has only been checked against quest
   1's distances, and as of the input binding a person can actually fly it. Worth a play session
   before the numbers are treated as settled.
-- There are no on-screen key prompts; nothing tells the player which keys fly the ship. That is
-  `ENGINE` work and needs localised text.
+- There are no on-screen key prompts; nothing tells the player which keys fly the ship, that Enter
+  or Space starts the game, or which device the game locked to. That is `ENGINE` work and needs
+  localised text.
+- **Lateral thrusters are not modelled.** `ShipControls` has two axes, so rotate, ahead and astern
+  are reachable and strafe left/right are not. #7 asked for six movements; this is the sixth and
+  seventh, and it is a change to the shipped physics that has not been decided.
 - Nothing displays a quest title. There is no HUD or quest log; that is a separate `ENGINE`
   issue. `IGameSession.SaveError` is unread for the same reason — there is nowhere to say it.
 - Nothing selects a language. Translations are reachable only through the machine's own culture.

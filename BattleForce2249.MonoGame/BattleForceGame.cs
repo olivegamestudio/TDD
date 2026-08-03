@@ -43,6 +43,12 @@ public class BattleForceGame : Game
 
     protected override void Update(GameTime gameTime)
     {
+        // Input first, so the frame acts on what the player is doing now rather than on what they
+        // were doing last frame. Both devices are read once, here, and handed over together: the
+        // game decides which of them it is being played on, and it cannot make that decision from
+        // readings taken at different moments.
+        _host.Input(new InputFrame(DesktopKeyboard.Read(), DesktopGamePad.Read()));
+
         _host.Update(gameTime.ElapsedGameTime);
         base.Update(gameTime);
     }

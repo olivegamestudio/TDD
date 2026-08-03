@@ -8,8 +8,9 @@ namespace OliveGameStudio;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Adds the default engine services: screen direction, UI control, save progress, ship input,
-    /// frame time filtering, and the camera the world is drawn through.
+    /// Adds the default engine services: screen direction, UI control, save progress, input
+    /// routing and the ship input it writes to, frame time filtering, and the camera the world is
+    /// drawn through.
     /// </summary>
     /// <remarks>
     /// Services are registered with <c>AddSingleton</c>, so a caller that registers its own
@@ -26,9 +27,18 @@ public static class ServiceCollectionExtensions
             .AddSingleton<IUIController, UIController>()
             .AddSingleton<ISaveProgressService, LocalSaveProgressService>()
 
-            // nobody at the controls until the platform host binds a real keyboard or gamepad,
-            // because the device is the host's to own; register another after this call
-            .AddSingleton<IShipInput, NeutralShipInput>()
+            // Where the ship's controls are left for the physics to pick up. It reads as nobody at
+            // the controls until something routes a frame into it, because the device is the
+            // platform host's to own and it may never push one.
+            .AddSingleton<RoutedShipInput>()
+            .AddSingleton<IShipInput>(services => services.GetRequiredService<RoutedShipInput>())
+
+            // Registered by hand rather than by type so the dead zone is a stated argument. A host
+            // that knows its own hardware registers another after this call; one that says nothing
+            // gets InputRouter.DefaultDeadZone rather than a stick read raw.
+            .AddSingleton<IInputRouter>(services => new InputRouter(
+                services.GetRequiredService<IUIController>(),
+                services.GetRequiredService<RoutedShipInput>()))
 
             // one camera for the whole game: everything drawn in the world has to agree about
             // where the viewport is, or two things at the same world position draw apart

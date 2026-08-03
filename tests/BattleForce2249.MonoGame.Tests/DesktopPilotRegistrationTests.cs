@@ -4,64 +4,89 @@ using OliveGameStudio;
 namespace BattleForce2249.MonoGame.Tests;
 
 /// <summary>
-/// Covers the one thing about the desktop pilot that can be checked without a device: that the
-/// host composes to it rather than to the engine's default, and that it stops composing to it if
-/// the registration ever moves back above <c>AddBattleForce</c>.
+/// Covers what can be checked about the desktop pilot without a device: that the shipping
+/// composition wires the pushed input path end to end, and that the dead zone the composed game
+/// actually flies on is this host's number.
 /// </summary>
+/// <remarks>
+/// The old ordering guard — register the pilot above <c>AddBattleForce</c> and watch the game go
+/// unflyable — has no equivalent any more, and that is worth saying rather than leaving to be
+/// noticed. Both registrations now produce an <see cref="InputRouter"/>, differing only in the
+/// dead zone they were handed, so a mis-ordered composition is not a game with nobody at the
+/// controls: it is a game flying on <see cref="InputRouter.DefaultDeadZone"/> instead. The tests
+/// below pin the number in effect through the real container, which is the form that guard can
+/// still take, and it has teeth the moment the two numbers stop agreeing.
+/// </remarks>
 public sealed class DesktopPilotRegistrationTests
 {
-    static IShipInput Resolve(Action<IServiceCollection> compose)
+    /// <summary>
+    /// Builds the shipping composition and starts the game on the pad, which is what makes the pad
+    /// the device the game is played on.
+    /// </summary>
+    sealed class ComposedGame : IDisposable
     {
-        ServiceCollection services = new();
-        services.AddLogging();
+        readonly ServiceProvider _provider;
 
-        compose(services);
+        public ComposedGame()
+        {
+            ServiceCollection services = new();
+            services.AddLogging();
+            services.AddBattleForce();
+            services.AddDesktopPilot();
 
-        using ServiceProvider provider = services.BuildServiceProvider();
-        return provider.GetRequiredService<IShipInput>();
+            _provider = services.BuildServiceProvider();
+
+            IUIController ui = _provider.GetRequiredService<IUIController>();
+            Button start = new("START");
+            ui.Add(start);
+            ui.FocusOn(start);
+
+            Router.Route(Pad(confirm: true));
+            Router.Route(Pad(confirm: false));
+            ui.UnFocus();
+        }
+
+        public IInputRouter Router => _provider.GetRequiredService<IInputRouter>();
+
+        public IShipInput Pilot => _provider.GetRequiredService<IShipInput>();
+
+        public void Dispose() => _provider.Dispose();
+    }
+
+    static InputFrame Pad(double thrust = 0, bool confirm = false) =>
+        new(KeyboardFrame.None, new GamePadFrame(Connected: true, thrust, Turn: 0, confirm));
+
+    [Fact]
+    public void TheComposedGame_PutsRoutedInputWhereThePhysicsReadsIt()
+    {
+        // the whole pushed path in one assertion: a frame handed to the router the container built
+        // reaches the IShipInput the container hands the game screen. Registering the two
+        // separately would leave the ship reading a different object for ever, and nothing else in
+        // this project would notice.
+        using ComposedGame game = new();
+
+        game.Router.Route(Pad(thrust: 1));
+
+        Assert.Equal(1, game.Pilot.Read().Thrust);
     }
 
     [Fact]
-    public void TheHost_FliesOnItsOwnDevices_RatherThanOnTheEnginesDefault()
+    public void TheComposedGame_FliesOnTheHostsDeadZone()
     {
-        IShipInput input = Resolve(services =>
-        {
-            services.AddBattleForce();
-            services.AddDesktopPilot();
-        });
+        using ComposedGame game = new();
 
-        Assert.IsType<FirstActiveShipInput>(input);
+        game.Router.Route(Pad(thrust: DesktopGamePad.DeadZone - 0.01));
+        Assert.True(game.Pilot.Read().IsNeutral, "a stick inside the dead zone flew the ship");
+
+        game.Router.Route(Pad(thrust: DesktopGamePad.DeadZone + 0.01));
+        Assert.False(game.Pilot.Read().IsNeutral, "a stick past the dead zone did not fly the ship");
     }
 
     [Fact]
-    public void TheGamepadIsAskedBeforeTheKeyboard()
+    public void TheComposedGame_IsLockedToTheDeviceThatStartedIt()
     {
-        // order is the whole of the arbitration policy, so it is pinned rather than left to the
-        // order the devices happen to appear in a constructor call
-        FirstActiveShipInput input = (FirstActiveShipInput)Resolve(services =>
-        {
-            services.AddBattleForce();
-            services.AddDesktopPilot();
-        });
+        using ComposedGame game = new();
 
-        Assert.Collection(
-            input.Devices,
-            device => Assert.IsType<GamePadShipInput>(device),
-            device => Assert.IsType<KeyboardShipInput>(device));
-    }
-
-    [Fact]
-    public void RegisteringBeforeAddBattleForce_LeavesTheGameUnflyable()
-    {
-        // not a wish for this ordering but a guard on the one above: the engine registers its
-        // default with AddSingleton, so a tidy-up that moved AddDesktopPilot up the composition
-        // root would silently give the shipping game nobody at the controls
-        IShipInput input = Resolve(services =>
-        {
-            services.AddDesktopPilot();
-            services.AddBattleForce();
-        });
-
-        Assert.IsType<NeutralShipInput>(input);
+        Assert.Equal(ControlDevice.GamePad, game.Router.LockedTo);
     }
 }

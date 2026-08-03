@@ -35,9 +35,9 @@ services.AddBattleForce(configuration);
 // implementation; configuration tunes it.
 // services.AddSingleton<IFrameTimeController, ScaledFrameTimeController>();
 
-// The keyboard and the gamepad, for the same reason and in the same place: the engine ships
-// nobody at the controls, and the input device is the platform host's to own. Without this line
-// the game launches, starts quest 1, and the ship sits on the start marker for ever.
+// The dead zone this host's hardware wants, for the same reason and in the same place: the engine
+// ships a default that is nobody's measurement in particular, and the pad is the platform host's
+// to know. The devices themselves are read by the frame loop and pushed into the game.
 services.AddDesktopPilot();
 
 using ServiceProvider provider = services.BuildServiceProvider();

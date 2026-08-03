@@ -9,6 +9,27 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The player flies the ship.** `IHost.Input(InputFrame)` is the entry a platform host pushes one
+  frame of device state through, once a frame, before `Update` — `KeyboardFrame` and `GamePadFrame`
+  in one snapshot, so the game can compare devices rather than reading each where it happens to
+  need one. `InputRouter` routes it: **UI first**, so a frame belongs to the menu while something
+  there is focused and to the ship when nothing is, with the ship written `Neutral` on the frames
+  it does not get. A press is treated as an edge, so a held key presses a button once and a confirm
+  already held when a menu appears presses nothing. `RoutedShipInput` is where the router leaves
+  the frame's controls for the physics to read, and is what the engine now registers as
+  `IShipInput`. Before this, nothing carried a key press to the menu at all: the shipping game
+  could not be started by a person.
+  ([#7](https://github.com/olivegamestudio/TDD/issues/7))
+
+- **The control device is locked at the start press.** The device that presses start is the device
+  the game is played on, for the session — flight controls *and* menu. A pad left plugged in with
+  something resting on the stick cannot take the ship from somebody flying it on the keys, and a
+  second person cannot work the menu of a game they are not playing. It is taken at the press
+  rather than the release, since the menu commits on release and enters the game screen from there.
+  The cost is stated rather than hidden: a pad unplugged mid-flight leaves the ship hands off
+  rather than handing it to a device the player did not choose.
+  ([#117](https://github.com/olivegamestudio/TDD/issues/117))
+
 - **`IUIController.HasFocus`** — the query input routing needs before it can decide who a frame's
   input belongs to. The interface could set focus but not be asked about it, and a router cannot
   remember what it last focused because `Add`, `Disable` and `Enable` all move focus on their own.
@@ -29,6 +50,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   putting one device down hands over on the next frame. `BattleForce2249.MonoGame` binds the
   devices through `AddDesktopPilot()`, after `AddBattleForce` so it wins over the engine's
   `NeutralShipInput`. ([#9](https://github.com/olivegamestudio/TDD/issues/9))
+
+  *How the devices reach the game changed before this shipped — see the Changed entry for
+  [#7](https://github.com/olivegamestudio/TDD/issues/7). The keys, the stick and the dead zone are
+  the same; the arbitration is not.*
 
 - **The `Pilgrimage` quest system.** A standalone quest library with no project references:
   `QuestDefinition` and `QuestTrigger` for authored content, `Quest` for the
@@ -85,6 +110,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   fails the pull request. ([#34](https://github.com/olivegamestudio/TDD/issues/34))
 
 ### Changed
+
+- **The desktop devices are pushed rather than pulled, and no longer arbitrate.** The `IShipInput`
+  implementations the MonoGame host bound in [#9](https://github.com/olivegamestudio/TDD/issues/9)
+  — `KeyboardShipInput` and `GamePadShipInput` — are now `DesktopKeyboard` and `DesktopGamePad`,
+  which read the same keys and the same stick into an `InputFrame` the frame loop hands to
+  `IHost.Input`. They gained the confirm binding a menu needs: Enter or Space, A or Start.
+  `AddDesktopPilot()` no longer binds devices — it states this host's dead zone to the router, and
+  still has to be called after `AddBattleForce` for the same reason. `FirstActiveShipInput` is
+  untouched and stays in the engine, but the shipping game no longer composes to it: the device
+  lock replaces free per-frame arbitration, which is what
+  [#117](https://github.com/olivegamestudio/TDD/issues/117) decided.
+  ([#7](https://github.com/olivegamestudio/TDD/issues/7))
 
 - **Quest proximity triggers are swept across the frame rather than sampled at the end of it.**
   `QuestProximityWatcher.Update` takes where the frame began as well as where it ended, and fires
