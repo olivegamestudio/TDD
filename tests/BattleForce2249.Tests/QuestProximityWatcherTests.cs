@@ -16,6 +16,9 @@ public sealed class QuestProximityWatcherTests
     {
         public Position PlayerStart => StartMarker;
 
+        // a test world that names no places: whatever enters it enters where it starts
+        public Position Introduce(Ship ship, string location) => PlayerStart;
+
         public IReadOnlyList<QuestMarkers> QuestMarkers { get; } = markers;
     }
 

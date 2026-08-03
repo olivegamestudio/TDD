@@ -47,6 +47,9 @@ public sealed class RefusedSaveEndToEndAdversarialTests : IDisposable
     {
         public Position PlayerStart => Start;
 
+        // a test world that names no places: whatever enters it enters where it starts
+        public Position Introduce(Ship ship, string location) => PlayerStart;
+
         public IReadOnlyList<QuestMarkers> QuestMarkers { get; } = markers;
     }
 
@@ -63,6 +66,7 @@ public sealed class RefusedSaveEndToEndAdversarialTests : IDisposable
     static GameSession CreateSession(ISaveProgressService store) =>
         new(store,
             new TestCampaign(Quest("quest-1")),
+            new TestRoster(),
             new TestWorld(new QuestMarkers("quest-1", Start, End)));
 
     /// <summary>

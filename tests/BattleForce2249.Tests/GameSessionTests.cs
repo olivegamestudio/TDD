@@ -17,6 +17,9 @@ public sealed class GameSessionTests
     {
         public Position PlayerStart => Start;
 
+        // a test world that names no places: whatever enters it enters where it starts
+        public Position Introduce(Ship ship, string location) => PlayerStart;
+
         public IReadOnlyList<QuestMarkers> QuestMarkers { get; } = markers;
     }
 
@@ -38,6 +41,7 @@ public sealed class GameSessionTests
         return new GameSession(
             saves,
             new TestCampaign([.. ids.Select(id => Quest(id))]),
+            new TestRoster(),
             new TestWorld([.. ids.Select(id => new QuestMarkers(id, Start, End))]));
     }
 

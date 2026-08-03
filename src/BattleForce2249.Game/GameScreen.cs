@@ -9,8 +9,7 @@ namespace BattleForce2249;
 /// what it finds — proximity is the presentation's job, not the quest model's — and then hands the
 /// result to the drawing side as a pose. Drawing follows the ship rather than leading it.
 /// </summary>
-/// <param name="session">The game in progress.</param>
-/// <param name="ship">The ship's physics, which carries the player around the world.</param>
+/// <param name="session">The game in progress, including the ship it is being flown in.</param>
 /// <param name="pilot">Where the pilot's intent comes from this frame.</param>
 /// <param name="questProximity">Applies the quests' proximity triggers against the world.</param>
 /// <param name="camera">The camera the world is drawn through.</param>
@@ -18,7 +17,6 @@ namespace BattleForce2249;
 /// <param name="stars">The stars the ship flies through.</param>
 public sealed class GameScreen(
     IGameSession session,
-    ShipMovement ship,
     IShipInput pilot,
     QuestProximityWatcher questProximity,
     ICamera camera,
@@ -38,10 +36,10 @@ public sealed class GameScreen(
     /// <returns>Always <see cref="EnterResult.Stay"/>; this screen is where gameplay happens.</returns>
     public EnterResult Enter()
     {
-        // a fresh flight every time the screen is entered: the save carries where the player is,
-        // never how fast they were going, so nothing should be inherited from a previous session
-        ship.Reset();
-
+        // A fresh flight every time the screen is entered: the save carries where the player is,
+        // never how fast they were going, so nothing is inherited from a previous session. Nothing
+        // is reset here to get that — starting or resuming builds a new ship, and a new ship is at
+        // rest facing forward because that is what a new one is.
         Started = session.Continue();
         return EnterResult.Stay;
     }
@@ -61,6 +59,10 @@ public sealed class GameScreen(
         // a second a long frame steps clean over a 50 unit trigger, and a marker that fires only
         // when a frame happens to land inside it is the trap pillar 1 names.
         Position began = session.Player.Position;
+
+        // read per frame rather than held, because starting or resuming the game replaces the ship;
+        // a screen holding the one it was built with would go on flying a ship nobody is in
+        ShipMovement ship = session.Ship.Movement;
 
         // the ship flies first, so the quests are measured against where the player got to this
         // frame rather than where they were at the end of the last one

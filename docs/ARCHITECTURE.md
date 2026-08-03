@@ -28,7 +28,7 @@ to know about ships, quests or credits is on the wrong side of this line.
 | `OliveGameStudio.FrameRate` | Frame time filtering, so a paused or slowed game holds still while frames keep arriving. |
 | `OliveGameStudio.Input` | `InputRouter` — where a frame of input goes, and which device the game is being played on. |
 | `OliveGameStudio.Progress` | `LocalSaveProgressService`, persisting save text to a file. |
-| `OliveGameStudio.World` | `Position`, `Player`. The spatial model, plus the ship's physics and `IShipInput` — what an input means, never which device produced it. |
+| `OliveGameStudio.World` | `Position`, `Player`. The spatial model, plus the ship's physics and `IShipInput` — what an input means, never which device produced it. Also `Ship`, `ShipProfile`, `Meter`, `Item` and `Inventory`: a hull, the condition it is in, and the things that can be held. |
 | `OliveGameStudio.Rendering` | `Camera2D` — the world-to-screen transform, and the only place the world's axes and the screen's are reconciled. |
 | `OliveGameStudio.Localisation` | `ITextProvider`, `JsonTextProvider`, `MissingTextException`. |
 | `Pilgrimage` | The quest system. No project references at all, by design. |
@@ -72,8 +72,9 @@ corrected once already — a quest library that owns a player and a position is 
 
 The game side supplies where things actually are:
 
-- `IWorld` / `BattleForceWorld` — the player's start position and each quest's `QuestMarkers`.
-  Forward travel is along the positive Y axis.
+- `IWorld` / `BattleForceWorld` — the player's start position, each quest's `QuestMarkers`, and
+  `Introduce`, which brings a ship into the world at a named place. Forward travel is along the
+  positive Y axis.
 - `QuestProximityWatcher` — measures the player against the markers each frame and calls the
   quest API when a trigger fires. It keeps no memory of what it has already fired; the quest
   model absorbs repeat calls.
@@ -91,6 +92,63 @@ The game side supplies where things actually are:
   completes rather than every frame.
 
 Ids are never translated. A save written in one language has to load in another.
+
+## The character and the ship
+
+The skeleton of the RPG model, and one rule holds all of it together:
+
+> **The character persists; the ship does not.**
+
+That is pillar 4 expressed as ownership rather than as a paragraph. Everything the player *has* —
+progression, credits, standing, possessions, quest history — hangs off the character. The hull they
+are sitting in hangs off nothing: it is built when a game starts and thrown away when the next one
+does. Losing a ship must not be able to take the rest with it, so the rest does not live on the
+ship.
+
+**Content and instance are paired the same way `QuestDefinition` and `Quest` already are.**
+
+| Content (authored, never changes) | Instance (played, changes) |
+| --- | --- |
+| `CharacterTemplate` — id, translated name, hull, start location, starting inventory | `Character` — template, `Progression`, credits, `Reputation`, `Inventory`, `QuestLog`, current `Ship` |
+| `ShipProfile` — handling, health, durability, loadout | `Ship` — `Handling`, `Loadout`, `Health`, `Shield`, `Durability`, `Movement` |
+
+`ICharacterRoster` / `BattleForceRoster` is the seam the game supplies characters through, exactly
+as `ICampaign` supplies quests: the roster is a singleton and builds its templates on each read,
+because the names are translated and a list built in a field initialiser would freeze the player's
+language at startup.
+
+**The ship owns the physics that flies it.** `Ship` builds its own `ShipMovement` from its own
+`Handling`, and neither is registered in the container any more. Registered side by side — which is
+what `AddSingleton(DisgracedShip.Handling)` and `AddSingleton<ShipMovement>()` were — the flown ship
+and the owned ship could be given two different sets of numbers, and nothing would say so. It also
+removes a reset: entering the game screen used to call `ShipMovement.Reset()` so a resumed game
+began stationary, and now a new game simply builds a new ship, which has never been anywhere.
+
+**The world is the placement authority.** `IWorld.Introduce(ship, location)` brings a ship into the
+world at a *named place* and answers where that put it; `BattleForceWorld` resolves `Mines` to the
+same position a new game already started at, stated once so the place and the spawn point cannot
+drift apart. Content names places and never states coordinates — a coordinate in content is a number
+that has to be kept in step with the world by hand, and it leaves a place with no identity beyond
+where it happens to be, which is what pillar 3 asks for. A place the world does not have is refused:
+that is a content mistake, and failing where the content is read beats stranding the player
+somewhere nobody chose.
+
+It *answers* rather than places because position still lives on `Player`. When a ship carries its
+own position this becomes a placement and the answer goes away.
+
+**What this deliberately does not do.**
+
+- **Nothing here is saved.** `SaveGame` still carries position and quest state only. Widening it
+  changes what older saves can be read back into, which is a decision of its own rather than a side
+  effect of the model existing.
+- **No curve, no combat, no wear.** `Progression.Advance` is called with the points a level is
+  worth rather than working them out; nothing damages a ship or wears one out. Numbers invented here
+  would be numbers the design then has to argue with.
+- **`Item` is an identifier and nothing else**, and `Inventory` serves both what a character owns
+  and what a ship is fitted with. Slots, categories, stacking and what happens at zero durability
+  are open decisions, and a shape invented ahead of them is a shape to migrate away from.
+- **`DisgracedShip.Profile`'s health and durability are placeholders.** The handling beside them is
+  not — that is the tuning quest 1 was checked against.
 
 ## Saved progress
 
@@ -602,8 +660,21 @@ says nothing gets — a default so a game composes flyable, not a measurement of
 - Nothing displays a quest title. There is no HUD or quest log; that is a separate `ENGINE`
   issue. `IGameSession.SaveError` is unread for the same reason — there is nowhere to say it.
 - Nothing selects a language. Translations are reachable only through the machine's own culture.
-- There is no persistent record (experience, credits, quest history) separate from the saved
-  position. See pillar 4 in `docs/DESIGN.md`.
+- **The persistent record exists but is not persisted.** `Character` holds experience, credits,
+  standing, possessions and quest history, and it survives losing the ship — but `SaveGame` still
+  writes position and quest state only, so none of it survives closing the game. Widening the save
+  shape changes what older saves can be read back into, so it is its own decision. See pillar 4 in
+  `docs/DESIGN.md`.
+- **Nothing fills the ship's condition in, and nothing empties it.** `Ship` has health, shield and
+  durability; no combat damages them, no wear reduces them, and no equipped item supplies a shield,
+  so every ship's shield maximum is zero. What happens when a meter reaches zero is undecided, and
+  the item half of that question is open.
+- **Nothing selects a character.** `ICharacterRoster.Starting` is what a new game plays as, and
+  `Templates` holds one entry. Choosing between them is a screen nobody has asked for yet.
+- `SaveGameSerializerTests.Deserialize_KeepsAPositionAtTheFarEdgeOfWhatCanBeDrawn` formats
+  `float.MaxValue` with the machine's culture, so it builds invalid JSON and fails under
+  `LANG=fr_FR.UTF-8`. CI runs in English, so it is green there. It is the same class of defect the
+  testing note in `docs/WORKFLOW.md` describes, on a number rather than on user-facing text.
 - The re-home in `SetEnabled` picks the first enabled button anywhere in the controller, and the
   controller is shared by every screen, so disabling a screen's focused button can land focus on a
   button belonging to a screen that is not current. `FocusOn` refusing strangers (#101) closed the

@@ -53,13 +53,15 @@ public static class BattleForceServiceCollectionExtensions
         services
             .AddOliveGameStudio()
 
-            // the ship the game is flown in: the engine owns the physics, the game owns the
-            // numbers that decide how it handles
-            .AddSingleton(DisgracedShip.Handling)
-            .AddSingleton<ShipMovement>()
+            // The ship is not registered. It is transient — one per game rather than one per
+            // process — so the session builds it from the character it is playing, and whatever
+            // needs it reads it from there. Registered here it would be a singleton that outlives
+            // the game it belongs to, and the numbers it flew on could be set to disagree with the
+            // ship the player owns.
 
-            // the quest content, the world its markers stand in, and the watcher that measures
-            // the player against them
+            // the characters the game can be played as, the quest content, the world it all stands
+            // in, and the watcher that measures the player against the markers
+            .AddSingleton<ICharacterRoster, BattleForceRoster>()
             .AddSingleton<ICampaign, BattleForceCampaign>()
             .AddSingleton<IWorld, BattleForceWorld>()
             .AddSingleton<QuestProximityWatcher>()

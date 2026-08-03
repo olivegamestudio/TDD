@@ -19,7 +19,34 @@ public interface IGameSession
     Player Player { get; }
 
     /// <summary>
-    /// Gets the player's quests.
+    /// Gets the character being played: what the player has earned, owns and has done.
+    /// </summary>
+    /// <remarks>
+    /// Replaced when a game starts or resumes, because a new game is a new character. Anything that
+    /// wants the current one reads it from here per use rather than holding on to it.
+    /// </remarks>
+    Character Character { get; }
+
+    /// <summary>
+    /// Gets the ship the game is currently flown in.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The session owns it because the ship is transient — it belongs to the game being played, not
+    /// to the container. Starting or resuming builds a new one from the character's hull, which is
+    /// what makes a resumed game begin at rest facing forward: there is nothing left over from the
+    /// last one to inherit.
+    /// </para>
+    /// <para>
+    /// It carries its own <see cref="Ship.Movement"/>, so whatever flies the ship and whatever owns
+    /// it cannot be given two different sets of numbers.
+    /// </para>
+    /// </remarks>
+    Ship Ship { get; }
+
+    /// <summary>
+    /// Gets the player's quests. The same log the <see cref="Character"/> records their story in;
+    /// its identity outlives any one character, because the session subscribes to it once.
     /// </summary>
     QuestLog Quests { get; }
 

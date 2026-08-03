@@ -35,6 +35,9 @@ public sealed class ResumedPositionBoundaryAdversarialTests
     {
         public Position PlayerStart => OffOrigin;
 
+        // a test world that names no places: whatever enters it enters where it starts
+        public Position Introduce(Ship ship, string location) => PlayerStart;
+
         public IReadOnlyList<QuestMarkers> QuestMarkers { get; } = markers;
     }
 
@@ -49,6 +52,7 @@ public sealed class ResumedPositionBoundaryAdversarialTests
     GameSession CreateSession(params string[] questIds) =>
         new(_saves,
             new TestCampaign([.. questIds.Select(Quest)]),
+            new TestRoster(),
             new TestWorld([.. questIds.Select(id => new QuestMarkers(id, OffOrigin, End))]));
 
     // ---- a campaign that ships no quests ----

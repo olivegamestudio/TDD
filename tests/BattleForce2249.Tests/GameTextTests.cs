@@ -24,6 +24,11 @@ public sealed class GameTextTests
     const string Quest1TitleInEnglish = "Get out. The debris field is collapsing around you.";
 
     /// <summary>
+    /// The English name of the character the game is played as.
+    /// </summary>
+    const string DisgracedNameInEnglish = "The Disgraced";
+
+    /// <summary>
     /// Gets every language the game is translated into, English aside.
     /// </summary>
     public static IEnumerable<object[]> TranslatedCultures =>
@@ -34,6 +39,7 @@ public sealed class GameTextTests
     {
         Assert.Equal(JsonTextProvider.DefaultSourceLanguage, _text.SourceLanguage);
         Assert.Equal(Quest1TitleInEnglish, _text.TextIn("en")["Quest1Title"]);
+        Assert.Equal(DisgracedNameInEnglish, _text.TextIn("en")["DisgracedName"]);
     }
 
     [Fact]
@@ -105,6 +111,30 @@ public sealed class GameTextTests
     public void Get_ThrowsForAKeyThatExistsInNoLanguage()
     {
         Assert.Throws<MissingTextException>(() => GameText.Get("not-a-key"));
+    }
+
+    [Fact]
+    public void DisgracedName_IsReadInThePlayersLanguage()
+    {
+        using CultureScope _ = new("de");
+
+        Assert.Equal("Der Geächtete", GameText.DisgracedName);
+    }
+
+    [Fact]
+    public void DisgracedName_IsEnglish_WhenThePlayersLanguageIsNotTranslated()
+    {
+        using CultureScope _ = new("nl");
+
+        Assert.Equal(DisgracedNameInEnglish, GameText.DisgracedName);
+    }
+
+    [Fact]
+    public void TheRoster_TakesTheCharactersNameFromTheTranslations()
+    {
+        using CultureScope _ = new("ja");
+
+        Assert.Equal("汚名を着せられし者", new BattleForceRoster().Starting.Name);
     }
 
     [Fact]

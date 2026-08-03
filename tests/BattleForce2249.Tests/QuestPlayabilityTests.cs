@@ -47,6 +47,7 @@ public sealed class QuestPlayabilityTests
     const int FrameLimit = 10_000;
 
     readonly ICampaign _campaign = new BattleForceCampaign();
+    readonly ICharacterRoster _roster = new BattleForceRoster();
     readonly IWorld _world = new BattleForceWorld();
     readonly InMemorySaveProgressService _saves = new();
 
@@ -57,9 +58,9 @@ public sealed class QuestPlayabilityTests
     public static TheoryData<string> QuestIds =>
         [.. new BattleForceCampaign().Quests.Select(quest => quest.Id)];
 
-    GameSession CreateSession() => new(_saves, _campaign, _world);
+    GameSession CreateSession() => new(_saves, _campaign, _roster, _world);
 
-    GameSession CreateSession(ISaveProgressService saves) => new(saves, _campaign, _world);
+    GameSession CreateSession(ISaveProgressService saves) => new(saves, _campaign, _roster, _world);
 
     QuestProximityWatcher CreateWatcher() => new(_world);
 

@@ -34,6 +34,9 @@ public sealed class GameSessionSaveOrderingTests
     {
         public Position PlayerStart => Start;
 
+        // a test world that names no places: whatever enters it enters where it starts
+        public Position Introduce(Ship ship, string location) => PlayerStart;
+
         public IReadOnlyList<QuestMarkers> QuestMarkers { get; } = markers;
     }
 
@@ -45,6 +48,7 @@ public sealed class GameSessionSaveOrderingTests
                 new QuestTrigger(QuestTriggerKind.Proximity, 25),
                 new QuestTrigger(QuestTriggerKind.Proximity, 50),
                 true)),
+            new TestRoster(),
             new TestWorld(new QuestMarkers(QuestId, Start, End)));
 
     static QuestState StateIn(string? content) =>

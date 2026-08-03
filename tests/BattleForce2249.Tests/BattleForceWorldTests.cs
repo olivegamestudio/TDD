@@ -1,3 +1,4 @@
+using OliveGameStudio;
 using Pilgrimage;
 
 namespace BattleForce2249.Tests;
@@ -51,5 +52,51 @@ public sealed class BattleForceWorldTests
         Assert.All(
             _campaign.Quests,
             quest => Assert.Contains(_world.QuestMarkers, markers => markers.QuestId == quest.Id));
+    }
+
+    // ---- bringing a ship into the world ----
+
+    static Ship AShip() => new(DisgracedShip.Profile);
+
+    [Fact]
+    public void AShipIntroducedAtTheMines_StandsWhereANewGameBegins()
+    {
+        // the world is the placement authority: content names the place, the world says where that
+        // is. Stated once, so the mines and the spawn point cannot drift apart.
+        Assert.Equal(_world.PlayerStart, _world.Introduce(AShip(), BattleForceWorld.Mines));
+    }
+
+    [Fact]
+    public void TheMinesAreWhereQuest1Begins()
+    {
+        // the place the Disgraced starts is the place the opening quest is about escaping, so a
+        // ship put down there is already within reach of quest 1's start marker
+        Position placed = _world.Introduce(AShip(), BattleForceWorld.Mines);
+
+        Assert.True(placed.DistanceTo(Quest1Markers.Start) <= Quest1.Start.Distance);
+    }
+
+    [Fact]
+    public void APlaceTheWorldDoesNotHave_IsRefused()
+    {
+        // a mistake in content rather than something a player did, so it fails where the content is
+        // read instead of stranding the player at coordinates nobody chose
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => _world.Introduce(AShip(), "somewhere-else"));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    public void APlaceNothingCanName_IsRefused(string? location)
+    {
+        Assert.ThrowsAny<ArgumentException>(() => _world.Introduce(AShip(), location!));
+    }
+
+    [Fact]
+    public void IntroducingNoShip_IsRefused()
+    {
+        Assert.Throws<ArgumentNullException>(() => _world.Introduce(null!, BattleForceWorld.Mines));
     }
 }
