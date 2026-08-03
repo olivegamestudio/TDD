@@ -57,6 +57,13 @@ public static class SaveGameSerializer
     /// good, because a refused save is set aside and played over. Every refusal here is final, so
     /// the narrowing is deliberate rather than a convenience.
     /// </para>
+    /// <para>
+    /// <b>A position is refused whole, like a state this build did not write.</b> A file whose
+    /// coordinates are past what can be drawn is reported as "no save" rather than being clamped
+    /// to somewhere the player never was — see <see cref="SaveGame.CanBeResumed"/> for where that
+    /// edge is. Clamping would silently move a player who cannot be told they were moved; this at
+    /// least starts a game that works.
+    /// </para>
     /// </remarks>
     public static SaveGame? Deserialize(string? content)
     {
@@ -77,6 +84,14 @@ public static class SaveGameSerializer
             save = save with { Quests = save.Quests ?? [] };
 
             if (save.Quests.Any(quest => quest is null))
+            {
+                return null;
+            }
+
+            // A position the game cannot be resumed at is not a save this build can read, for the
+            // same reason a quest state it never wrote is not. See SaveGame.CanBeResumed for where
+            // the edge is and why it is there.
+            if (!save.CanBeResumed)
             {
                 return null;
             }

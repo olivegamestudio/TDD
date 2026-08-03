@@ -532,6 +532,42 @@ public sealed class GameScreenTests : HostTestBase
     }
 
     [Fact]
+    public async Task Render_SurvivesASaveWhosePositionIsBeyondWhatTheCameraCanBeAimedAt()
+    {
+        // The route that makes refusing a non-finite camera target safe to land. A coordinate of
+        // 1e300 is a finite double and valid JSON, so nothing on the way in used to stop it — but
+        // GameScreen.PoseOf narrows it to a float on the way to the camera, where it becomes an
+        // infinity. Before the camera guard that was a blank screen; with the guard and nothing
+        // else it would be an exception once per frame, out of the frame loop, which is a worse
+        // failure than the one this issue set out to fix. The save is refused instead, exactly as
+        // a save that will not parse already is.
+        //
+        // This is not a ship that flew too far — it cannot, in any amount of time. The number
+        // arrives fully formed from a file.
+        InMemorySaveProgressService saves = new()
+        {
+            Content = $$"""
+            {
+              "PlayerX": 1e300,
+              "PlayerY": 1e300,
+              "Quests": [ { "QuestId": "{{BattleForceCampaign.Quest1Id}}", "State": "Active" } ]
+            }
+            """,
+        };
+
+        IHost host = StartTheGame(services => services.AddSingleton<ISaveProgressService>(saves));
+        await ((GameScreen)GameScreen).Started;
+
+        Play(host, frames: 1);
+        ((IRenderable)GameScreen).Render(new RecordingRenderer());
+
+        // a new game at the world start, which is what the game already does with a file it
+        // cannot read — not a crash, and not a blank window either
+        Assert.Equal(new BattleForceWorld().PlayerStart, Session.Player.Position);
+        Assert.Equal(Vector2.Zero, Resolve<ICamera>().Target);
+    }
+
+    [Fact]
     public void EnteringTheScreen_BringsTheShipToRest()
     {
         // the save carries where the player is, never how fast they were going

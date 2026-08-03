@@ -110,6 +110,17 @@ A save the campaign has drifted from is tolerated in both directions: a quest th
 this build no longer ships is ignored, and a quest added since the save was written starts from
 the beginning.
 
+**A saved position past what can be drawn is refused, and `SaveGame.CanBeResumed` is the one place
+that edge is stated.** `GameScreen.PoseOf` narrows the world's `double` coordinates to the `float`
+a graphics device holds, so a coordinate beyond `float.MaxValue` becomes an infinity on the way to
+the camera — which refuses one outright. Such a number is a perfectly good `double` that parses and
+round trips, and it can only ever arrive fully formed from a file; the ship cannot fly that far in
+any amount of time. It is refused where it is read rather than beside the narrowing, because a save
+can be declined quietly and a frame cannot. The bound is deliberately the drawable range and *not*
+a world size: the world is unbounded and a long flight has to load, so `float.MaxValue` still
+resumes and `1e300` does not. Anything else needing that edge asks `CanBeResumed` rather than
+restating it.
+
 **Refusal is per file; drift is per entry.** The two look alike and are not the same. A quest entry
 that *names no quest* — a `QuestId` that is absent, `null` or blank — names nothing this build
 ships, so there is nothing to apply it to: it is dropped and the rest of the file is read. A quest
@@ -247,6 +258,28 @@ It is measured the way a ship's heading is measured — zero along the positive 
 angle increasing to starboard — so the game screen hands its heading straight over. A conversion
 would turn the world the wrong way, which is the same agreement `ShipPose.Heading` already asks of
 both sides of the ship, and it is asserted in `GameScreenTests` for the same reason.
+
+**A number the camera cannot use is refused where it is written, not where it is read.** All three
+of `Target`, `PixelsPerUnit` and `Orientation` throw `ArgumentOutOfRangeException` on a value that
+is not finite, and the zoom additionally on one that is not above zero. This is a rule about *how
+it fails*: none of these degrades the picture. Each one feeds every world-to-screen conversion, so
+a `NaN` in any of them draws the entire world — stars, ship, whatever is added later — at a
+position that is nowhere, in full, raising nothing and logging nothing. The symptom is a blank
+window, which names neither the value nor the frame that produced it. Refusing at the setter turns
+that into a stack trace at the assignment.
+
+The check belongs to the camera rather than to the things drawn through it. A renderable guarding
+its own inputs means every renderable ever written has to, each in its own way, and the camera
+still hands a meaningless transform to whichever one forgot: one check where the value is written
+against N where it is read. `ICamera` states the rules so they bind the interface rather than the
+one class, and the star field's own guard against an undrawable zoom is kept as a statement about
+that interface — written as `float.IsFinite(value) && value > 0f`, since asking the negative
+(`value <= 0f`) is answered "fine" by `NaN` and lets through precisely the value it exists to stop.
+
+Refusing at the setter has a cost worth naming: a bad value that used to produce a blank screen now
+produces an exception, and if it arrives every frame it arrives from the frame loop. That is the
+trade taken deliberately — loud for bugs — and it is why a saved position beyond the drawable range
+is declined at the point it is read, above, rather than being allowed to reach the camera.
 
 **The camera turns the world and nothing else.** Two consequences follow, and both are load
 bearing:

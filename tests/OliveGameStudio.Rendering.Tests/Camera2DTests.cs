@@ -251,4 +251,88 @@ public sealed class Camera2DTests
         Assert.Equal(new Vector2(400f, 300f), camera.WorldToScreen(Vector2.Zero, Viewport));
         Assert.Equal(new Vector2(640f, 360f), camera.WorldToScreen(Vector2.Zero, new Vector2(1280f, 720f)));
     }
+
+    [Theory]
+    [InlineData(float.NaN, 0f)]
+    [InlineData(0f, float.NaN)]
+    [InlineData(float.NaN, float.NaN)]
+    [InlineData(float.PositiveInfinity, 0f)]
+    [InlineData(0f, float.NegativeInfinity)]
+    public void TheTarget_RefusesAPositionThatIsNotFinite(float x, float y)
+    {
+        // Subtracted from every world position that is drawn, so one of these puts the whole
+        // world at a position that is nowhere — drawn in full, without an error, to a blank
+        // window. Refused where it is written so the failure names the frame that produced it,
+        // which is the same call the orientation above already makes.
+        Camera2D camera = new();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => camera.Target = new Vector2(x, y));
+    }
+
+    [Fact]
+    public void ARefusedTarget_LeavesTheCameraAsItWas()
+    {
+        // still a usable camera afterwards: it holds the last position it was legitimately
+        // pointed at rather than being left half assigned
+        Camera2D camera = new() { Target = new Vector2(17f, -23f) };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => camera.Target = new Vector2(float.NaN, 0f));
+
+        Assert.Equal(new Vector2(17f, -23f), camera.Target);
+    }
+
+    [Fact]
+    public void TheTarget_HasNoBoundOnHowFarOutItIs()
+    {
+        // the world is unbounded and the player flies forward indefinitely, so distance is not
+        // what is being refused above — only a number that is not one
+        Camera2D camera = new() { Target = new Vector2(float.MaxValue, -float.MaxValue) };
+
+        Assert.Equal(new Vector2(float.MaxValue, -float.MaxValue), camera.Target);
+    }
+
+    [Theory]
+    [InlineData(float.NaN)]
+    [InlineData(float.PositiveInfinity)]
+    [InlineData(float.NegativeInfinity)]
+    public void ThePixelsPerUnit_RefusesAZoomThatIsNotFinite(float pixelsPerUnit)
+    {
+        // multiplied into every world offset, so this scatters the world exactly as a non-finite
+        // target does. It was previously left to whichever caller remembered to check, which was
+        // one caller, checking with an ordered comparison that answers "fine" for NaN.
+        Camera2D camera = new();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => camera.PixelsPerUnit = pixelsPerUnit);
+    }
+
+    [Theory]
+    [InlineData(0f)]
+    [InlineData(-1f)]
+    public void ThePixelsPerUnit_RefusesAZoomThatIsNotPositive(float pixelsPerUnit)
+    {
+        // a zoom of nothing collapses the world to a point, and a negative one turns it inside out
+        Camera2D camera = new();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => camera.PixelsPerUnit = pixelsPerUnit);
+    }
+
+    [Fact]
+    public void ARefusedZoom_LeavesTheCameraAsItWas()
+    {
+        Camera2D camera = new() { PixelsPerUnit = 3f };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => camera.PixelsPerUnit = float.NaN);
+
+        Assert.Equal(3f, camera.PixelsPerUnit);
+    }
+
+    [Fact]
+    public void ThePixelsPerUnit_KeepsAZoomWoundFarDown()
+    {
+        // deliberately still allowed: the star field's clipping at a low zoom is a stated limit
+        // of the star field, not a mistake for the camera to veto
+        Camera2D camera = new() { PixelsPerUnit = 0.000_01f };
+
+        Assert.Equal(0.000_01f, camera.PixelsPerUnit);
+    }
 }
