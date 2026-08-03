@@ -16,6 +16,24 @@ public interface IHost
     void Start();
 
     /// <summary>
+    /// Hands the game one frame of input from the platform host's devices.
+    /// </summary>
+    /// <param name="frame">Every device as the platform host read it this frame.</param>
+    /// <remarks>
+    /// Input is pushed rather than pulled, and that is what makes the device the player is on a
+    /// thing the game can know. A game that reached out for each device when it happened to need
+    /// one would read the keyboard in one place for the menu and in another for the ship, with no
+    /// single point that could say which of them the player is actually using — and choosing
+    /// between devices is exactly the decision this entry exists to allow.
+    /// <para>
+    /// Called once a frame, before <see cref="Update"/>, so a frame acts on the input that arrived
+    /// with it. A platform host that skips it leaves the game with the previous frame's input,
+    /// which is the same as a player holding still.
+    /// </para>
+    /// </remarks>
+    void Input(InputFrame frame);
+
+    /// <summary>
     /// Advances the game state by one frame. Called repeatedly by the platform host for
     /// the lifetime of the game, after <see cref="Start"/>.
     /// </summary>

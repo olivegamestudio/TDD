@@ -90,10 +90,19 @@ screen's `OnReleased` overwrote the other's handler, silently. Elements are iden
 button is only ever itself, and asking the controller about one it does not hold says so instead of
 answering about its namesake. See [the UI element notes](docs/ARCHITECTURE.md#ui-elements).
 
+The game is now flyable by a person. Enter or Space starts it from the menu, W/S/A/D or the arrow
+keys fly the ship, and a gamepad's left stick and A button do the same — whichever device presses
+start is the one the game is played on for the session, so a pad left plugged in with something
+resting on the stick cannot take the ship from somebody flying it on the keys. Input is pushed into
+the game one frame at a time and routed UI first: it works the menu while a button is focused and
+flies the ship when none is. See [the input notes](docs/ARCHITECTURE.md#input).
+
 Not yet built:
 
-- **Ship movement and physics** (#3) — nothing moves the ship in the running game, so Quest 1 is
-  currently completable by test rather than by playing.
+- **Strafing** (#7) — the ship has thrust and helm, so it rotates and burns ahead and astern, but
+  there are no lateral thrusters. Moving sideways means turning, burning and turning back.
+- **On-screen key prompts** — nothing tells the player which keys fly the ship or which device the
+  game locked to.
 - **Any on-screen quest display** — no HUD, no quest log. The session knows when the player's
   progress is not being saved, but there is nowhere yet to tell them.
 - **Language selection** — translations follow the machine's own culture.

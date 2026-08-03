@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\OliveGameStudio.Abstractions\OliveGameStudio.Abstractions.csproj" />
+      <ProjectReference Include="..\OliveGameStudio.UI.Abstractions\OliveGameStudio.UI.Abstractions.csproj" />
+      <ProjectReference Include="..\OliveGameStudio.World\OliveGameStudio.World.csproj" />
+    </ItemGroup>
+
+</Project>

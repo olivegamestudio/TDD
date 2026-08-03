@@ -10,6 +10,7 @@ namespace BattleForce2249;
 public class BattleForceHost(
     IScreenDirector screenDirector,
     IFrameTimeController frameTimeController,
+    IInputRouter inputRouter,
     ICompanyScreen companyScreen,
     IMenuScreen menuScreen,
     IGameScreen gameScreen) : IHost
@@ -24,6 +25,17 @@ public class BattleForceHost(
         screenDirector.NavigateTo(companyScreen);
         
         menuScreen.StartGameRequested += (_, _) => screenDirector.NavigateTo(gameScreen);
+    }
+
+    /// <summary>
+    /// Hands the frame's input to the router, which decides whether it works the menu or flies the
+    /// ship. The host itself makes no routing decision — the rule is engine policy and the screens
+    /// downstream of it are not asked which of them wanted the frame.
+    /// </summary>
+    /// <param name="frame">Every device as the platform host read it this frame.</param>
+    public void Input(InputFrame frame)
+    {
+        inputRouter.Route(frame);
     }
 
     /// <summary>

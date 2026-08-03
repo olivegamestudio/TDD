@@ -4,30 +4,33 @@ using OliveGameStudio;
 namespace BattleForce2249;
 
 /// <summary>
-/// Puts a real pilot at the controls: the desktop input devices this host owns, bound to the
-/// engine's <see cref="IShipInput"/> seam.
+/// Puts a real pilot at the controls: this host's own devices, read by
+/// <see cref="DesktopKeyboard"/> and <see cref="DesktopGamePad"/> and handed to the game through
+/// <see cref="IHost.Input"/>, with the dead zone this host's hardware wants.
 /// </summary>
 public static class DesktopPilotServiceCollectionExtensions
 {
     /// <summary>
-    /// Binds the keyboard and the gamepad to <see cref="IShipInput"/>.
+    /// Routes input with this host's stated dead zone rather than the engine's default.
     /// </summary>
-    /// <param name="services">The collection to bind the devices in.</param>
+    /// <param name="services">The collection to register the router in.</param>
     /// <returns>The same collection, so calls can be chained.</returns>
     /// <remarks>
     /// <para>
-    /// <strong>Must be called after <c>AddBattleForce</c>.</strong> The engine registers
-    /// <see cref="NeutralShipInput"/> as its default with <c>AddSingleton</c>, so the last
-    /// registration is the one resolved — calling this first would leave the game unflyable and
+    /// <strong>Must be called after <c>AddBattleForce</c>.</strong> The engine registers its own
+    /// router with <c>AddSingleton</c>, so the last registration is the one resolved — calling
+    /// this first would leave the game running on <see cref="InputRouter.DefaultDeadZone"/> and
     /// say nothing about it.
     /// </para>
     /// <para>
-    /// The gamepad is asked before the keyboard. A resting pad is zeroed by its dead zone, so
-    /// asking it first costs the keyboard nothing, while a player who has picked up a pad has
-    /// plainly chosen it.
+    /// This is all the binding there is left to do. The devices themselves are read by the frame
+    /// loop and pushed through <see cref="IHost.Input"/> rather than resolved from the container,
+    /// because reading them is a static call into MonoGame with nothing to inject.
     /// </para>
     /// </remarks>
     public static IServiceCollection AddDesktopPilot(this IServiceCollection services) =>
-        services.AddSingleton<IShipInput>(
-            new FirstActiveShipInput(new GamePadShipInput(), new KeyboardShipInput()));
+        services.AddSingleton<IInputRouter>(provider => new InputRouter(
+            provider.GetRequiredService<IUIController>(),
+            provider.GetRequiredService<RoutedShipInput>(),
+            DesktopGamePad.DeadZone));
 }
