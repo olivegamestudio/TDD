@@ -90,6 +90,13 @@ public sealed class GameScreen(
         // that was never drawn. The world moves; the ship holds the middle.
         camera.Target = view.Pose.Position;
 
+        // And turned to the ship's heading, which is what keeps the ship's nose at the top of the
+        // window: the world rotates around the ship rather than the ship rotating within a world
+        // that stays upright. Set here beside the target because the two are one decision — where
+        // the camera is and which way it is facing — and a camera that followed the ship's
+        // position but not its heading would leave the ship spinning on the spot again.
+        camera.Orientation = view.Pose.Heading;
+
         // Before the ship, so the ship is over the stars rather than behind one. It is also what
         // makes the ship look like it is going anywhere: the camera holds the ship still in the
         // middle of the viewport, so the only thing that can move is what is behind it.

@@ -26,6 +26,32 @@ public interface ICamera
     float PixelsPerUnit { get; set; }
 
     /// <summary>
+    /// Which world heading is held pointing up the screen, in radians. Zero leaves the world
+    /// upright, where world forward is screen up.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Measured exactly the way a ship's heading is — zero along the positive world Y axis, the
+    /// angle increasing to starboard — so whatever is being followed can hand its own heading
+    /// straight over. A conversion here would turn the world the wrong way, which is the same
+    /// agreement <c>ShipPose.Heading</c> already asks of both sides of the ship.
+    /// </para>
+    /// <para>
+    /// The world turns about <see cref="Target"/> rather than about the world origin, so the
+    /// point being followed keeps the middle of the viewport however far the camera turns. That
+    /// is the whole of what makes the ship appear to point forward: the ship is drawn where it
+    /// is and the world rotates around it, rather than the ship being spun to face the top of
+    /// the window.
+    /// </para>
+    /// <para>
+    /// It turns the world and nothing else. A sprite that is meant to stay aligned with the
+    /// world has to take this off its own rotation — see <c>ShipView</c> — and anything drawn
+    /// outside the camera, which is every menu and every future HUD, is untouched by it.
+    /// </para>
+    /// </remarks>
+    float Orientation { get; set; }
+
+    /// <summary>
     /// Converts a world position into the pixel it occupies on screen.
     /// </summary>
     /// <param name="world">The position in world units.</param>

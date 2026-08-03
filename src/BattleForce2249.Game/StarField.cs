@@ -170,8 +170,21 @@ public sealed class StarField(ICamera camera) : IRenderable
         // Half the viewport in world units, widened enough that a star just off the edge is still
         // drawn while part of it would show.
         float margin = layer.SizeInPixels / pixelsPerUnit;
-        float halfWidth = viewport.X / (2f * pixelsPerUnit) + margin;
-        float halfHeight = viewport.Y / (2f * pixelsPerUnit) + margin;
+        float halfAcross = viewport.X / (2f * pixelsPerUnit) + margin;
+        float halfUp = viewport.Y / (2f * pixelsPerUnit) + margin;
+
+        // The viewport is upright on the screen and turned in the world, so its corners reach
+        // further along the world's own axes than its edges do. Sowing the upright box the screen
+        // would cover if the camera were level leaves those corners empty, and they are visibly
+        // empty: the stars would drain out of the corners of the window as the ship turns, worst
+        // at the diagonals. These are the extents of the upright box that contains the turned one,
+        // which is the smallest box that is right at every angle. At an upright camera the sine is
+        // zero and the cosine one, so this is exactly the two numbers above.
+        float sin = Math.Abs(MathF.Sin(camera.Orientation));
+        float cos = Math.Abs(MathF.Cos(camera.Orientation));
+
+        float halfWidth = (halfAcross * cos) + (halfUp * sin);
+        float halfHeight = (halfAcross * sin) + (halfUp * cos);
 
         (int firstX, int lastX) = TilesCovering(layerCentre.X, halfWidth, layer.TileSizeInWorldUnits);
         (int firstY, int lastY) = TilesCovering(layerCentre.Y, halfHeight, layer.TileSizeInWorldUnits);
