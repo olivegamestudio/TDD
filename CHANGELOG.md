@@ -155,6 +155,44 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Progress is no longer silently lost to two saves being written at once.** `GameSession` marks a
+  new game ready to play before it awaits its first save — deliberately, so loading stays off the
+  frame loop — and the first frame puts the player inside quest 1's start trigger, which writes the
+  same file again. Two snapshots were outstanding together with nothing ordering them, so the older
+  one, taken before the quest began, was free to land last and become the save. The player was
+  handed back a game in which the opening quest never started, and no file was corrupted, no
+  exception raised and `SaveError` left `null`, so nothing reported it. Saves are now snapshotted
+  when they are *asked for* and queued behind whatever is already outstanding: two writes are never
+  in flight against the same storage, the last save asked for is the last to land, and `PendingSave`
+  is the whole queue up to it rather than that save alone. A failure is raised to the caller who
+  asked for that write and to nobody behind it, and the queue carries on, because a file locked for
+  a moment must not stop the game saving for the rest of the run. `SetAside` is in the same queue —
+  moving a refused save out of the way before the new game is written over it is an ordering
+  guarantee and was worth only as much as the ordering underneath it — and because `IGameSession` is
+  a singleton whose queue has no idea a game has ended, `StartNewGame` and `Continue` wait for
+  everything already asked for before they read or replace the file, so a write left over from the
+  previous game cannot land on top of the one just resumed.
+  ([#63](https://github.com/olivegamestudio/TDD/issues/63))
+
+- **A save service written to twice at once can no longer tear the file, and the contract now says
+  it cannot.** `ISaveProgressService.Save` said only "replacing anything previously saved", which
+  implies a last writer without defining one — and `LocalSaveProgressService` wrote through
+  `File.WriteAllTextAsync`, which truncates and rewrites with no serialisation between callers.
+  Measured at a 200 KB payload, concurrent pairs produced files holding bytes from both writes and
+  raised nothing; on Windows the second write would instead fail `FileShare` and throw, which
+  `GameSession.TrySave` turns into a save error shown to the player for a write that was merely
+  unlucky in its timing. The contract now states that two overlapping writes leave the whole of one
+  of them, that neither may fail on account of the other, and that the last write to *start* is the
+  one that survives — and the shipped service keeps it two ways, because the game's own ordering
+  fix cannot help a second process or another game built on the engine. Everything one instance is
+  asked to do goes through a gate, and a write goes to a file of its own beside the save and is then
+  moved over it, so the save's path never names a half-written file and a reader racing a writer
+  sees one whole save or the other. `Load` now asks the file system once instead of asking whether
+  the save exists and then opening it: `SetAside` moved the file out from under that gap, and a read
+  that had passed the existence check threw `FileNotFoundException` instead of answering. A save
+  that has gone by the time the read reaches it is genuinely no save, and that is now what it says.
+  ([#63](https://github.com/olivegamestudio/TDD/issues/63))
+
 - **A camera target or zoom that is not a number is refused where it is set, instead of drawing the
   whole world nowhere.** `Camera2D.Target` and `PixelsPerUnit` were plain settable values feeding
   straight into `WorldToScreen`. A `NaN` or an infinity in either put *everything* drawn through the
