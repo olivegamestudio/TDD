@@ -72,6 +72,20 @@ public sealed class UIController : IUIController
     public Button? Focused => _focusedElement;
 
     /// <summary>
+    /// Gets whether any element currently holds focus.
+    /// </summary>
+    /// <value>
+    /// <c>true</c> while a button is focused; otherwise <c>false</c>.
+    /// </value>
+    /// <remarks>
+    /// The same field <see cref="Focused"/> reads, narrowed to the one question a consumer holding
+    /// <see cref="IUIController"/> is allowed to ask. Anything holding this type reads
+    /// <see cref="Focused"/> instead and learns which button as well; input routing holds the
+    /// interface, and only needs to know whether the UI owns the frame's input at all.
+    /// </remarks>
+    public bool HasFocus => _focusedElement is not null;
+
+    /// <summary>
     /// Gets the button currently being held down in the user interface.
     /// </summary>
     /// <remarks>

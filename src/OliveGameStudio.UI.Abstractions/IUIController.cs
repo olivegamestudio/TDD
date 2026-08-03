@@ -154,4 +154,32 @@ public interface IUIController
     /// such as during UI state transitions or application resets.
     /// </remarks>
     void UnFocus();
+
+    /// <summary>
+    /// Gets whether any element currently holds focus.
+    /// </summary>
+    /// <value>
+    /// <c>true</c> while a button is focused; otherwise <c>false</c>.
+    /// </value>
+    /// <remarks>
+    /// This is the question input routing asks each frame: a key press belongs to the UI while
+    /// something here is focused, and falls through to the ship when nothing is. Focus arrives and
+    /// leaves by more routes than a caller drives — <see cref="Add"/> adopts the first button,
+    /// <see cref="Disable"/> re-homes or clears, <see cref="Enable"/> adopts again — so the router
+    /// has to ask rather than track what it last set.
+    /// <para>
+    /// It reports the presence of a focus, not which button holds it, because that is the whole of
+    /// what the routing decision needs and every other member here is deliberately blind to which
+    /// button a controller it does not own is on. Handing back the focused <see cref="Button"/>
+    /// would let a consumer act on a button belonging to another screen, which is the thing this
+    /// interface spends its exceptions preventing.
+    /// </para>
+    /// <para>
+    /// Focus is a claim about a button, not about whether it can be pressed: a focused button that
+    /// is disabled still reports <c>true</c>. Disabled is a statement about pressing, which
+    /// <see cref="Press"/> declines on its own, and a menu whose only button is greyed out is still
+    /// a menu the player is looking at.
+    /// </para>
+    /// </remarks>
+    bool HasFocus { get; }
 }

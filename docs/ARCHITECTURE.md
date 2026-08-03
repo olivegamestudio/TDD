@@ -353,6 +353,17 @@ button while nothing is focused adopts it. `MenuScreen` depends on the pair — 
 disabled until the save has been read, which leaves the screen with no focus at all, and enabling
 it is what puts focus back.
 
+**`HasFocus` is the question, and it is asked rather than remembered.** Input routing is UI-first:
+a frame's input belongs to the UI while something is focused, and falls through to the ship when
+nothing is. Because `Add`, `Disable` and `Enable` all move focus on their own, a router that
+tracked what it last focused would be wrong the frame after any of them, so `IUIController` answers
+the question instead. It reports *whether* there is a focus and never *which button holds it* —
+`Focused` stays on `UIController` alone. Naming the button would hand a consumer a button belonging
+to a screen that is not current, which is the mistake every exception in this interface exists to
+prevent, and the routing decision does not need it. A focused button that is disabled still counts:
+disabled is a statement about pressing, which `Press` declines on its own, and a menu whose only
+button is greyed out is still a menu the player is looking at rather than a cue to fly the ship.
+
 ## Ship input
 
 `IShipInput` is the seam gameplay input arrives through, and it follows the engine/game split the
