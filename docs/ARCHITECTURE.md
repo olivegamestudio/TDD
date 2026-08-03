@@ -179,6 +179,62 @@ where two entries under one identifier are one quest described twice. Refusing t
 player everything saved beside it. The rule holds within a single `Restore`; a later call is a
 different save being read, and it is authoritative.
 
+### One thing at a time, in the order it was asked for
+
+Two writes of one file with nothing ordering them cost the player progress, and the split between
+who owes which half of that is the same engine/game seam everything else here follows.
+
+**`GameSession` owns the order.** Every save snapshots the session when it is *asked for* and is
+then queued behind whatever the session already has outstanding, so two writes are never in flight
+against the same storage and the last save asked for is the last to land. Snapshotting at request
+time rather than at write time is the point: a queued write has to carry the progress that prompted
+it, or the queue is just several writes of whatever the game happened to reach by the time each
+one's turn came round. `PendingSave` is the whole queue up to the most recent save rather than that
+save alone, so there is no moment at which it has completed and an earlier write has not. A write
+that fails is raised to the caller that asked for it and to nobody behind it, and the queue carries
+on — a file locked for a moment must not stop the game saving for the rest of the run.
+
+Ordering is the session's rather than the save service's because **only the caller knows which of
+two snapshots is the newer**. The service is handed two pieces of text and has nothing to tell them
+apart by.
+
+**`SetAside` is in the same queue as the writes.** Moving a refused save out of the way *before* the
+new game is written over it is the whole of the guarantee above; a write that overtook the move
+would recreate a save file behind it, so the file the player was told had been kept is no longer the
+only copy. Its failure still reaches `StartNewGameOver`, which is what decides to play the new game
+with saving held back rather than write over a save that could not be moved.
+
+**The queue does not know a game has ended, so the boundary says so.** `IGameSession` is a
+singleton: one session, one queue, every entry into the game screen. `StartNewGame` and `Continue`
+therefore wait for everything already asked for before they read or replace the file, or a write
+left over from the previous game lands after the next one has resumed and puts the older snapshot
+back over it, reporting nothing. It is a wait that is normally already over, and entering the game
+screen is off the frame loop anyway.
+
+**`ISaveProgressService` owns not being torn.** Fixing the session's ordering means *this game* no
+longer overlaps writes; it does not mean nothing ever will — a shutdown flush, a second process, or
+another game built on the engine. So the contract states it: two writes that overlap leave the whole
+of one of them, neither fails on account of the other, and the last one to *start* is the one that
+survives. An overlap is not storage trouble and must not be reported as any, because a caller cannot
+tell the difference and `GameSession.TrySave` would show it to the player as a save error.
+
+`LocalSaveProgressService` keeps that promise twice over, because either half alone is not enough. A
+gate serialises everything one instance is asked to do, which is what gives a defined last writer.
+And a write goes to a file of its own beside the save and is then *moved* over it, so the save's
+path never names a half-written file — which is the half a gate cannot give, since a gate is per
+instance and a second process shares none of it. The move also protects a *reader*, which no amount
+of serialising writers would.
+
+`Load` asks the file system once rather than asking whether the save exists and then opening it.
+Those were two questions with a gap between them, and `SetAside` — the one operation that makes the
+path stop existing — moves the save out from under exactly that gap. A save that has gone by the
+time the read reaches it is genuinely no save, so that is the answer; throwing would reach the
+player as storage trouble for a read that was only unlucky in its timing.
+
+A torn save is worth more care than it looks. It is not a damaged file the player can be warned
+about: the game refuses what it cannot read and plays a new game over it, so what tearing costs is
+the campaign.
+
 ### A save that cannot be read is not a save that is gone
 
 These are two different failures and `GameSession` does not treat them the same. The distinction

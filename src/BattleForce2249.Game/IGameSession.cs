@@ -33,6 +33,13 @@ public interface IGameSession
     /// Gets the most recent automatic save, so a caller that needs the write to have landed —
     /// tests, or a shutdown path — can await it.
     /// </summary>
+    /// <remarks>
+    /// It is the whole queue up to that save rather than that save alone, because saves are written
+    /// one at a time in the order they were asked for. There is no state of affairs in which this
+    /// has completed and a save asked for earlier has not, which is the guarantee a shutdown path
+    /// actually needs. A write that failed does not fault it — <see cref="SaveError"/> is where an
+    /// automatic save's failure is reported.
+    /// </remarks>
     Task PendingSave { get; }
 
     /// <summary>
@@ -88,6 +95,26 @@ public interface IGameSession
     /// <summary>
     /// Writes the current player position and quest states to the save game.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The snapshot is taken when this is <em>called</em>, and the write is queued behind any save
+    /// already outstanding. Two saves of the same file are never in flight together, and the last
+    /// one asked for is the last one to land — so a newer snapshot cannot be overwritten by an
+    /// older one that happened to finish after it, which is what an unordered pair of writes leaves
+    /// to chance.
+    /// </para>
+    /// <para>
+    /// Ordering is the session's rather than the save service's because only the session knows
+    /// which of two snapshots is the newer; the service is handed two pieces of text with no way to
+    /// tell them apart. What the service promises instead is that overlapping writes cannot tear
+    /// the file — see <see cref="ISaveProgressService.Save"/>.
+    /// </para>
+    /// <para>
+    /// A write that fails is raised here, to the caller who asked for it, and to nobody behind it
+    /// in the queue. The queue carries on: a file locked for a moment must not stop the game saving
+    /// for the rest of the run.
+    /// </para>
+    /// </remarks>
     /// <returns>A task that completes once the save has been written.</returns>
     Task Save();
 }

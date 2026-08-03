@@ -14,6 +14,25 @@ public sealed class GameSession : IGameSession
     readonly IWorld _world;
 
     /// <summary>
+    /// Guards <see cref="_queue"/>. Queueing is two steps — read the tail, then replace it — and
+    /// they have to be one, or two callers can both queue behind the same write and run together.
+    /// </summary>
+    readonly Lock _queueLock = new();
+
+    /// <summary>
+    /// Everything the session has asked the save service to do, chained end to end. A new piece of
+    /// work is put behind this rather than started beside it, so the service is never asked to do
+    /// two things at once and the order it is asked in is the order they happen in.
+    /// </summary>
+    /// <remarks>
+    /// Only the caller knows which of two snapshots is the newer — the service is handed two pieces
+    /// of text and has no way to tell them apart — so ordering them is the session's job. Not
+    /// tearing the file when two callers overlap anyway is the service's, and
+    /// <see cref="ISaveProgressService.Save"/> says so.
+    /// </remarks>
+    Task _queue = Task.CompletedTask;
+
+    /// <summary>
     /// Whether a quest changing state should write a save. It is turned off while a game is being
     /// set up, so starting or resuming writes at most one save rather than one per quest.
     /// </summary>
@@ -56,6 +75,8 @@ public sealed class GameSession : IGameSession
     /// <inheritdoc />
     public async Task StartNewGame()
     {
+        await LetTheGameBeforeFinishWriting();
+
         Reset();
 
         _autoSave = true;
@@ -68,6 +89,8 @@ public sealed class GameSession : IGameSession
     public async Task Continue()
     {
         SaveError = null;
+
+        await LetTheGameBeforeFinishWriting();
 
         string? content;
         try
@@ -172,7 +195,7 @@ public sealed class GameSession : IGameSession
         {
             try
             {
-                await _saveProgressService.SetAside();
+                await Queue(() => _saveProgressService.SetAside());
             }
             catch (Exception error) when (IsStorageFailure(error))
             {
@@ -188,7 +211,91 @@ public sealed class GameSession : IGameSession
     }
 
     /// <inheritdoc />
-    public Task Save() => _saveProgressService.Save(SaveGameSerializer.Serialize(Capture()));
+    public Task Save()
+    {
+        // Snapshotted here rather than when the write runs. A queued write has to carry the
+        // progress that prompted it, or the queue is just several writes of whatever the game
+        // happened to reach by the time each one's turn came round.
+        //
+        // Taken outside the queue's lock, which is safe because the session is driven from one
+        // thread: the frame loop starts and completes quests, and Capture reads the player and the
+        // quest log, neither of which is thread-safe against it anyway. Two threads asking to save
+        // at once could snapshot in one order and queue in the other — but a session that could be
+        // driven from two threads has larger problems than the order of its writes, and locking
+        // here would hide that rather than fix it.
+        string content = SaveGameSerializer.Serialize(Capture());
+
+        return Queue(() => _saveProgressService.Save(content));
+    }
+
+    /// <summary>
+    /// Puts a piece of save work behind everything the session has already asked for, and hands
+    /// back a task completing when that work — and so everything before it — has finished.
+    /// </summary>
+    /// <remarks>
+    /// A failure belongs to the caller who asked for that work and to nobody else. The queue itself
+    /// carries on: one write failing because the file was locked for a moment must not stop the
+    /// game saving for the rest of the run, which is why what is chained on is the swallowing task
+    /// rather than the one handed back.
+    /// </remarks>
+    /// <param name="work">What to do once everything queued before it has been done.</param>
+    /// <returns>A task completing when that work has finished, faulted if it failed.</returns>
+    Task Queue(Func<Task> work)
+    {
+        lock (_queueLock)
+        {
+            Task queued = RunAfter(_queue, work);
+            _queue = Swallow(queued);
+            return queued;
+        }
+    }
+
+    /// <summary>
+    /// Runs work once the task before it has finished, however it finished.
+    /// </summary>
+    static async Task RunAfter(Task previous, Func<Task> work)
+    {
+        await previous;
+        await work();
+    }
+
+    /// <summary>
+    /// The same task, complete rather than faulted. It is what the next piece of work waits on, so
+    /// that a failure is reported to its own caller once and not to everyone behind it.
+    /// </summary>
+    static async Task Swallow(Task task)
+    {
+        try
+        {
+            await task;
+        }
+        catch
+        {
+            // deliberately everything: the queue's job is to keep running, and whatever this was it
+            // has already been handed to the caller who asked for the work.
+        }
+    }
+
+    /// <summary>
+    /// Waits for every save the session has already asked for, so that one game's writes are all
+    /// behind it before the next game reads or replaces the file.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <see cref="IGameSession"/> is a singleton, so one session — and one queue — serves every
+    /// entry into the game screen. The queue orders writes against each other; it has no idea that
+    /// the game which asked for one is over. Without this, a write left over from the previous game
+    /// lands after the next one has resumed and puts the older snapshot back over it, and nothing
+    /// anywhere reports it.
+    /// </para>
+    /// <para>
+    /// It is a wait that is normally already over: on the first entry there is nothing queued, and
+    /// on a later one the writes finished while the player was in the menu. Entering the game
+    /// screen is already off the frame loop, so what it costs is a moment on a screen the player is
+    /// waiting on anyway — and what it buys is that the file and the game they are handed agree.
+    /// </para>
+    /// </remarks>
+    Task LetTheGameBeforeFinishWriting() => Queue(() => Task.CompletedTask);
 
     /// <summary>
     /// Saves, recording a storage failure rather than raising it. Every automatic save runs through
