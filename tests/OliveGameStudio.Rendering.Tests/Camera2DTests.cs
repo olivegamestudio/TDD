@@ -13,6 +13,13 @@ public sealed class Camera2DTests
 
     static readonly Vector2 Centre = new(400f, 300f);
 
+    /// <summary>
+    /// A turned camera puts a position through a sine and a cosine in <see cref="float"/>, so the
+    /// results are compared to well within a pixel rather than exactly. Nothing above the
+    /// orientation tests needs this: an upright camera is still exact.
+    /// </summary>
+    const float Tolerance = 0.001f;
+
     [Fact]
     public void TheTarget_LandsInTheMiddleOfTheViewport()
     {
@@ -103,6 +110,136 @@ public sealed class Camera2DTests
         Camera2D camera = new() { Target = new Vector2(300f, 400f), PixelsPerUnit = 4f };
 
         Assert.Equal(Centre, camera.WorldToScreen(camera.Target, Viewport));
+    }
+
+    [Fact]
+    public void ANewCamera_IsUpright()
+    {
+        // world forward is screen up until somebody says otherwise, which is what every test
+        // above this line is written against
+        Camera2D camera = new();
+
+        Assert.Equal(0f, camera.Orientation);
+    }
+
+    [Fact]
+    public void TheOrientation_PutsThatHeading_StraightUpTheScreen()
+    {
+        // the whole point of the property: turn the camera to a heading and whatever lies along
+        // that heading is what the player is looking at the top of the window
+        Camera2D camera = new() { Orientation = MathF.PI / 2f };
+
+        // a quarter turn to starboard, so world starboard — positive X — is now dead ahead
+        Vector2 ahead = camera.WorldToScreen(new Vector2(100f, 0f), Viewport);
+
+        Assert.Equal(Centre.X, ahead.X, Tolerance);
+        Assert.Equal(Centre.Y - 100f, ahead.Y, Tolerance);
+    }
+
+    [Fact]
+    public void TheOrientation_PutsWhatIsBehind_AtTheBottomOfTheScreen()
+    {
+        Camera2D camera = new() { Orientation = MathF.PI / 2f };
+
+        Vector2 behind = camera.WorldToScreen(new Vector2(-100f, 0f), Viewport);
+
+        Assert.Equal(Centre.X, behind.X, Tolerance);
+        Assert.Equal(Centre.Y + 100f, behind.Y, Tolerance);
+    }
+
+    [Fact]
+    public void TurningToStarboard_SwingsTheWorldToPort()
+    {
+        // the sense of the rotation, which is the half of this that can be got backwards without
+        // any test above noticing: turn right and the world appears to swing left. Getting it the
+        // other way round leaves a ship that banks into its own turn.
+        Camera2D camera = new() { Orientation = MathF.PI / 2f };
+
+        // due north, with the camera facing east, is off the ship's port bow — the left of screen
+        Vector2 north = camera.WorldToScreen(new Vector2(0f, 100f), Viewport);
+
+        Assert.Equal(Centre.X - 100f, north.X, Tolerance);
+        Assert.Equal(Centre.Y, north.Y, Tolerance);
+    }
+
+    [Fact]
+    public void TheOrientation_TurnsTheWorldAboutTheTarget_NotAboutTheOrigin()
+    {
+        // what keeps the ship in the middle of the viewport while the world turns around it. A
+        // rotation about the world origin instead would fling the ship off screen the moment it
+        // turned anywhere but at the origin.
+        Camera2D camera = new() { Target = new Vector2(9000f, -4000f), Orientation = 1.1f };
+
+        Assert.Equal(Centre.X, camera.WorldToScreen(camera.Target, Viewport).X, Tolerance);
+        Assert.Equal(Centre.Y, camera.WorldToScreen(camera.Target, Viewport).Y, Tolerance);
+    }
+
+    [Theory]
+    [InlineData(0.3f)]
+    [InlineData(2f)]
+    [InlineData(-1.4f)]
+    public void TheOrientation_TurnsTheWorld_WithoutStretchingIt(float orientation)
+    {
+        // a rotation moves a point around the target and never towards or away from it. A matrix
+        // written with a cosine where a sine belongs still looks plausible at a quarter turn and
+        // squashes the world at every angle in between.
+        Camera2D camera = new() { Orientation = orientation };
+        Vector2 marker = new(300f, -400f);
+
+        Vector2 screen = camera.WorldToScreen(marker, Viewport);
+
+        Assert.Equal(marker.Length(), Vector2.Distance(screen, Centre), Tolerance);
+    }
+
+    [Fact]
+    public void AFullTurn_DrawsWhatNoTurnDraws()
+    {
+        // crossing 0 and 2*pi is ordinary flying, so the angle wraps rather than accumulating
+        // into somewhere the world is drawn differently
+        Camera2D camera = new();
+        Vector2 marker = new(120f, 340f);
+
+        Vector2 upright = camera.WorldToScreen(marker, Viewport);
+        camera.Orientation = MathF.Tau;
+        Vector2 allTheWayRound = camera.WorldToScreen(marker, Viewport);
+
+        Assert.Equal(upright.X, allTheWayRound.X, Tolerance);
+        Assert.Equal(upright.Y, allTheWayRound.Y, Tolerance);
+    }
+
+    [Fact]
+    public void AnUprightCamera_IsUntouchedByTheTurn()
+    {
+        // exact, not approximate: an orientation of zero must cost the transform nothing at all,
+        // or every position in the game moves by a fraction of a pixel the day this was added
+        Camera2D camera = new() { Target = new Vector2(17f, -23f), PixelsPerUnit = 3f };
+
+        // 17 units to starboard of the target and 43 astern of it, at three pixels to the unit
+        Assert.Equal(new Vector2(Centre.X + 51f, Centre.Y + 129f), camera.WorldToScreen(new Vector2(34f, -66f), Viewport));
+    }
+
+    [Theory]
+    [InlineData(float.NaN)]
+    [InlineData(float.PositiveInfinity)]
+    [InlineData(float.NegativeInfinity)]
+    public void TheOrientation_RefusesAnAngleThatIsNotFinite(float orientation)
+    {
+        // the sine of one of these is NaN, which draws every sprite in the world at a position
+        // that is nowhere — in full, without an error, to a blank window. Refused where it is
+        // written so that the failure names the frame that produced it.
+        Camera2D camera = new();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => camera.Orientation = orientation);
+    }
+
+    [Fact]
+    public void ARefusedOrientation_LeavesTheCameraAsItWas()
+    {
+        Camera2D camera = new() { Orientation = 0.75f };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => camera.Orientation = float.NaN);
+
+        Assert.Equal(0.75f, camera.Orientation);
     }
 
     [Fact]

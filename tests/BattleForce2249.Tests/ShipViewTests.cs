@@ -111,6 +111,59 @@ public sealed class ShipViewTests
         Assert.Equal(heading, renderer.Single().Rotation);
     }
 
+    [Theory]
+    [InlineData(0f)]
+    [InlineData(1.5f)]
+    [InlineData(-2.25f)]
+    [InlineData(3f)]
+    public void Render_DrawsTheShipUpright_WhenTheCameraIsTurnedToItsHeading(float heading)
+    {
+        // the point of the whole feature: the ship's nose stays at the top of the window and the
+        // world turns around it, rather than the ship turning within a world that stays upright
+        ShipView view = CreateView(out Camera2D camera);
+        RecordingRenderer renderer = new();
+        view.Pose = new ShipPose(Vector2.Zero, heading);
+        camera.Orientation = heading;
+
+        view.Render(renderer);
+
+        Assert.Equal(0f, renderer.Single().Rotation);
+    }
+
+    [Fact]
+    public void Render_PointsTheSprite_AlongWhateverHeadingTheCameraIsNotHolding()
+    {
+        // a camera turned somewhere other than the ship's own heading is still a camera this has
+        // to draw correctly — the difference is what is drawn, and a hard-coded upright ship
+        // would have every other ship in a scene pointing the same way
+        ShipView view = CreateView(out Camera2D camera);
+        RecordingRenderer renderer = new();
+        view.Pose = new ShipPose(Vector2.Zero, 1.75f);
+        camera.Orientation = 0.5f;
+
+        view.Render(renderer);
+
+        Assert.Equal(1.25f, renderer.Single().Rotation, 4);
+    }
+
+    [Fact]
+    public void Render_KeepsTheShipInTheMiddle_HoweverFarTheCameraIsTurned()
+    {
+        // the turn is about the camera's target, so following the ship's position holds it in the
+        // middle at every heading. A world rotated about its own origin instead throws the ship
+        // off screen the moment it turns anywhere but at the origin.
+        ShipView view = CreateView(out Camera2D camera);
+        RecordingRenderer renderer = new();
+        view.Pose = new ShipPose(new Vector2(-8000f, 250_000f), 2.4f);
+        camera.Target = view.Pose.Position;
+        camera.Orientation = view.Pose.Heading;
+
+        view.Render(renderer);
+
+        Assert.Equal(renderer.ViewportCentre.X, renderer.Single().Position.X, 2);
+        Assert.Equal(renderer.ViewportCentre.Y, renderer.Single().Position.Y, 2);
+    }
+
     [Fact]
     public void Render_SizesTheShipInWorldUnits_NotInTexturePixels()
     {

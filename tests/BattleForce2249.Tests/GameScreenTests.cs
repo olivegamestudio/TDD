@@ -124,6 +124,59 @@ public sealed class GameScreenTests : HostTestBase
     }
 
     [Fact]
+    public void Render_TurnsTheCameraToTheShipsHeading()
+    {
+        // the camera follows where the ship is pointing as well as where it is. Following only
+        // the position leaves the ship spinning in the middle of a world that stays upright,
+        // which is the camera this screen used to have.
+        Camera2D camera = new();
+        StubShipView ship = new() { Pose = new ShipPose(new Vector2(120f, -45f), 1.9f) };
+        GameScreen screen = ScreenFor(camera, ship);
+
+        screen.Render(new RecordingRenderer());
+
+        Assert.Equal(1.9f, camera.Orientation);
+    }
+
+    [Fact]
+    public void Render_KeepsTheCameraOnTheShipsHeading_AsItTurns()
+    {
+        Camera2D camera = new();
+        StubShipView ship = new();
+        GameScreen screen = ScreenFor(camera, ship);
+
+        ship.Pose = new ShipPose(Vector2.Zero, 0.4f);
+        screen.Render(new RecordingRenderer());
+        ship.Pose = new ShipPose(Vector2.Zero, -2.6f);
+        screen.Render(new RecordingRenderer());
+
+        Assert.Equal(-2.6f, camera.Orientation);
+    }
+
+    [Theory]
+    [InlineData(0f)]
+    [InlineData(1.2f)]
+    [InlineData(-0.9f)]
+    [InlineData(4.5f)]
+    public void Render_LeavesTheShipPointingUpTheScreen_WhateverItIsFlying(float heading)
+    {
+        // the two halves of the feature meeting: the screen turns the camera, the view takes the
+        // camera's turn off the ship's own heading, and what the player sees is a ship that never
+        // rotates while the world rotates around it. Asserted through the real view rather than
+        // the stub, because it is the pair that has to agree.
+        Camera2D camera = new();
+        ShipView ship = new(camera) { Pose = new ShipPose(new Vector2(700f, -1300f), heading) };
+        GameScreen screen = ScreenFor(camera, ship);
+        RecordingRenderer renderer = new();
+
+        screen.Render(renderer);
+
+        // last, because the ship is drawn over the stars
+        Assert.Equal(0f, renderer.Drawn[^1].Rotation);
+        Assert.Equal(renderer.ViewportCentre, renderer.Drawn[^1].Position);
+    }
+
+    [Fact]
     public void Render_PutsTheStarsBehindTheShip()
     {
         // sprites stack in the order they are drawn, so the ship goes last. The other way round

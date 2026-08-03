@@ -29,6 +29,7 @@ to know about ships, quests or credits is on the wrong side of this line.
 | `OliveGameStudio.Input` | `InputRouter` — where a frame of input goes, and which device the game is being played on. |
 | `OliveGameStudio.Progress` | `LocalSaveProgressService`, persisting save text to a file. |
 | `OliveGameStudio.World` | `Position`, `Player`. The spatial model, plus the ship's physics and `IShipInput` — what an input means, never which device produced it. |
+| `OliveGameStudio.Rendering` | `Camera2D` — the world-to-screen transform, and the only place the world's axes and the screen's are reconciled. |
 | `OliveGameStudio.Localisation` | `ITextProvider`, `JsonTextProvider`, `MissingTextException`. |
 | `Pilgrimage` | The quest system. No project references at all, by design. |
 | `BattleForce2249` | Game host and DI registration. |
@@ -221,6 +222,56 @@ Anything else is a defect and is still thrown — catching wider would bury real
 Nothing reads `SaveError` yet. Telling the player their save is locked needs a HUD, which does not
 exist; the information is recorded so that whatever gains the ability to say it has something to
 read.
+
+## Drawing the world
+
+Everything in the world is drawn through one `ICamera`, and the camera is the only place the
+world's conventions are reconciled with the screen's. Three of them are pinned there, and
+everything drawn inherits all three:
+
+- **The world's Y axis points forward; the screen's points down.** Fly forward and the world moves
+  down the screen.
+- **Distances are world units until the last moment.** `PixelsPerUnit` converts once, in the
+  camera, which is what keeps a zoom or a resized window from being a change to the physics.
+- **Which way is up is the camera's decision.** `Orientation` is the world heading held pointing up
+  the screen.
+
+`Orientation` turns the world about `Target` rather than about the world origin, so whatever the
+camera follows keeps the middle of the viewport however far it turns. `GameScreen` sets both from
+the ship each frame — position *and* heading, as one decision — and the result is the ship pinned
+pointing up while the world rotates around it. That is the reading chosen for #35 over a camera
+that lags and catches up: the ship's nose is exactly at the top of the window at every moment,
+with no smoothing constant to tune and no wrap to get wrong at 0°/360°.
+
+It is measured the way a ship's heading is measured — zero along the positive world Y axis, the
+angle increasing to starboard — so the game screen hands its heading straight over. A conversion
+would turn the world the wrong way, which is the same agreement `ShipPose.Heading` already asks of
+both sides of the ship, and it is asserted in `GameScreenTests` for the same reason.
+
+**The camera turns the world and nothing else.** Two consequences follow, and both are load
+bearing:
+
+- A sprite meant to stay aligned with the world takes the camera's turn off its own rotation.
+  `ShipView` subtracts it rather than drawing an upright ship, so it is still right for a camera
+  that is *not* following the ship's heading — the day a scene holds a second ship, an upright one
+  would have every ship in it facing the same way. Stars are exempt because a point of light has no
+  orientation to get wrong.
+- Anything drawn outside the camera is untouched. Menus are, and a HUD would be, so screen-aligned
+  is what they stay without asking for it.
+
+**A turned viewport is bigger in the world than an upright one.** The screen is a rectangle, and in
+the world it is a *turned* rectangle whose corners reach further along the world's own axes than
+its edges do. `StarField` sows the upright box that contains the turned one, which is the smallest
+box that is right at every angle; sowing the box the screen would cover if the camera were level
+instead leaves the corners of the window emptying of stars as the ship turns, worst at the
+diagonals. Anything else that decides what to draw from the camera's extents inherits the same
+obligation.
+
+A non-finite `Orientation` is refused by `Camera2D` where it is set. The reason is how it fails
+otherwise: the sine of a non-finite angle is `NaN`, so *every* sprite in the world is drawn — in
+full, with no exception raised — at a position that is nowhere, and what the player sees is a blank
+window with nothing naming the frame that produced it. `Target` and `PixelsPerUnit` do not have
+that guard yet; that is #57.
 
 ## Localised text
 

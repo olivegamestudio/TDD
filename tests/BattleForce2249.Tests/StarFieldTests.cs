@@ -82,6 +82,147 @@ public sealed class StarFieldTests
         }
     }
 
+    /// <summary>
+    /// Asserts that at least one star was drawn inside the box of <paramref name="size"/> pixels
+    /// whose top left corner is <paramref name="corner"/>.
+    /// </summary>
+    /// <remarks>
+    /// The layers these tests sow put a star in every tile, so a box two tiles across contains
+    /// one by construction — it holds a whole tile wherever the grid happens to fall.
+    /// </remarks>
+    static void AssertAStarIn(IEnumerable<Sprite> drawn, Vector2 corner, Vector2 size) =>
+        Assert.Contains(
+            drawn,
+            sprite => sprite.Position.X >= corner.X
+                && sprite.Position.Y >= corner.Y
+                && sprite.Position.X <= corner.X + size.X
+                && sprite.Position.Y <= corner.Y + size.Y);
+
+    /// <summary>
+    /// Asserts that every star near the middle of the viewport in <paramref name="before"/> is
+    /// still there in <paramref name="after"/>, swung about <paramref name="centre"/> by
+    /// <paramref name="orientation"/> and by nothing else.
+    /// </summary>
+    /// <remarks>
+    /// Only the stars near the middle are held to it. A star out towards the edge is genuinely
+    /// carried off screen by a large turn, and this is about the ones that stay.
+    /// </remarks>
+    static void AssertTurnedBy(
+        IReadOnlyList<Sprite> before,
+        IReadOnlyList<Sprite> after,
+        float orientation,
+        Vector2 centre)
+    {
+        // Comfortably inside the shorter half of the viewport, so a star this close to the middle
+        // is still on screen at any angle and cannot be mistaken for one that vanished.
+        const float StaysOnScreen = 250f;
+
+        // The picture turns the opposite way to the camera: turn to starboard and the world
+        // swings to port. On screen, where Y points down, that is a rotation by the negative of
+        // the orientation.
+        float sin = MathF.Sin(-orientation);
+        float cos = MathF.Cos(-orientation);
+
+        Vector2[] expected =
+        [
+            .. before
+                .Select(sprite => sprite.Position - centre)
+                .Where(offset => offset.Length() < StaysOnScreen)
+                .Select(offset => centre + new Vector2(
+                    (offset.X * cos) - (offset.Y * sin),
+                    (offset.X * sin) + (offset.Y * cos)))
+        ];
+
+        // Without this the loop below would pass by being empty, which is no test at all.
+        Assert.NotEmpty(expected);
+
+        foreach (Vector2 position in expected)
+        {
+            AssertSomewhereNear(after, position);
+        }
+    }
+
+    [Theory]
+    [InlineData(MathF.PI / 4f)]
+    [InlineData(-MathF.PI / 4f)]
+    [InlineData(3f * MathF.PI / 4f)]
+    [InlineData(0.6f)]
+    public void Render_FillsTheCornersOfTheScreen_WhileTheCameraIsTurned(float orientation)
+    {
+        // the viewport is upright on the screen and turned in the world, so its corners reach
+        // further along the world's own axes than its edges do. Sow only the upright box and
+        // those corners are empty: the player watches the stars drain out of the corners of the
+        // window as the ship turns, worst at the diagonals, and the field stops reading as a sky.
+        // A fine layer and a small box, deliberately: a box wide enough to reach back towards the
+        // middle of the screen is satisfied by a star nowhere near the corner, which is exactly
+        // the star an unturned field still sows. The box is five tiles across, so it holds a whole
+        // tile at any angle and a star in it is guaranteed rather than lucky.
+        Camera2D camera = new() { Orientation = orientation };
+        StarField field = FieldOf(camera, new StarLayer(1f, 20f, 1, 3f));
+        RecordingRenderer renderer = new();
+
+        Sprite[] drawn = RenderTo(renderer, field);
+
+        Vector2 box = new(100f, 100f);
+        AssertAStarIn(drawn, Vector2.Zero, box);
+        AssertAStarIn(drawn, new Vector2(renderer.ViewportSize.X - box.X, 0f), box);
+        AssertAStarIn(drawn, new Vector2(0f, renderer.ViewportSize.Y - box.Y), box);
+        AssertAStarIn(drawn, renderer.ViewportSize - box, box);
+    }
+
+    [Theory]
+    [InlineData(MathF.PI / 2f)]
+    [InlineData(-MathF.PI / 2f)]
+    [InlineData(0.8f)]
+    public void Render_SwingsTheFieldAboutTheMiddle_AsTheCameraTurns(float orientation)
+    {
+        // the stars go through the same transform the ship does, so turning the camera turns the
+        // field about the point it is holding and moves nothing relative to anything else. This
+        // is what a rotating camera has to look like: the ship still, the sky swinging past it.
+        Camera2D camera = new();
+        StarField field = FieldOf(camera, new StarLayer(1f, 100f, 2, 3f));
+        RecordingRenderer renderer = new();
+
+        Sprite[] upright = RenderTo(renderer, field);
+        camera.Orientation = orientation;
+        Sprite[] turned = RenderTo(renderer, field);
+
+        AssertTurnedBy(upright, turned, orientation, renderer.ViewportCentre);
+    }
+
+    [Fact]
+    public void Render_KeepsTheLayersInStep_WhileTheCameraIsTurned()
+    {
+        // the parallax offset is applied in the world and then turned with everything else, so a
+        // near layer and a far one swing together. Applied after the turn instead, a layer would
+        // slide off in a direction of its own the moment the ship stopped pointing north.
+        Camera2D camera = new()
+        {
+            Target = new Vector2(400f, 900f),
+            Orientation = MathF.PI / 3f,
+        };
+        StarField field = FieldOf(
+            camera,
+            new StarLayer(0.4f, 100f, 2, 3f),
+            new StarLayer(1f, 100f, 2, 6f));
+        RecordingRenderer renderer = new();
+
+        Sprite[] before = RenderTo(renderer, field);
+        camera.Target += new Vector2(0f, 50f);
+        Sprite[] after = RenderTo(renderer, field);
+
+        // flying 50 units forward with the camera turned a third of a half-turn to starboard
+        // sends the fixed layer that far the other way, which is down and to the right of screen
+        Vector2 shift = new(
+            50f * MathF.Sin(MathF.PI / 3f),
+            50f * MathF.Cos(MathF.PI / 3f));
+
+        // the near layer travels the whole of it, the far layer its own share — in the same
+        // direction, which is the part the turn could have got wrong
+        AssertMovedBy(before, after, shift, renderer.ViewportSize, ofScale: 6f / 1024f);
+        AssertMovedBy(before, after, shift * 0.4f, renderer.ViewportSize, ofScale: 3f / 1024f);
+    }
+
     [Fact]
     public void Render_PutsStarsOnScreen()
     {

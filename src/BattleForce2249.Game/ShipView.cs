@@ -66,12 +66,17 @@ public sealed class ShipView(ICamera camera) : IShipView
         // swinging around its top left corner.
         Vector2 origin = new(_texture.Width / 2f, _texture.Height / 2f);
 
-        // The artwork faces up the screen, which is world forward, so a heading of zero needs no
-        // rotation and the heading can be passed straight through.
+        // The artwork faces up the screen, which is world forward, so a heading of zero on an
+        // upright camera needs no rotation. What is drawn is the part of the heading the camera
+        // is not already holding: point the camera at the ship's own heading — which is what the
+        // game screen does — and that difference is zero, so the ship keeps its nose at the top
+        // of the window while the world turns around it. Subtracting rather than passing zero is
+        // what keeps this right for a camera that is *not* following the ship's heading, which is
+        // every other camera a scene might be drawn through.
         renderer.Draw(new Sprite(
             _texture,
             camera.WorldToScreen(Pose.Position, renderer.ViewportSize),
-            Pose.Heading,
+            Pose.Heading - camera.Orientation,
             origin,
             LengthInWorldUnits * camera.PixelsPerUnit / _texture.Height));
     }

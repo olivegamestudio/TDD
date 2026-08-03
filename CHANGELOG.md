@@ -9,6 +9,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The camera turns with the ship, so the ship always points forward.** `ICamera.Orientation` is
+  the world heading held pointing up the screen, and `GameScreen` sets it from the ship's own
+  heading every frame. `Camera2D.WorldToScreen` turns the world about the camera's target rather
+  than about the world origin, so the point being followed keeps the middle of the viewport however
+  far it turns — the ship is drawn where it is and the world rotates around it. `ShipView` draws
+  the ship with the camera's turn taken off its heading, which is zero while the camera is tracking
+  it and still correct for a camera that is not. The star field takes the turn into account when it
+  decides which tiles to sow: a turned viewport's corners reach further along the world's axes than
+  its edges do, and sowing the upright box alone drains the stars out of the corners of the window
+  as the ship turns. An orientation that is not finite is refused where it is set, because its sine
+  is `NaN` and every sprite in the world would otherwise be drawn, in full and without an error, at
+  a position that is nowhere.
+  ([#35](https://github.com/olivegamestudio/TDD/issues/35))
+
 - **The player flies the ship.** `IHost.Input(InputFrame)` is the entry a platform host pushes one
   frame of device state through, once a frame, before `Update` — `KeyboardFrame` and `GamePadFrame`
   in one snapshot, so the game can compare devices rather than reading each where it happens to
