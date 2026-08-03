@@ -4,5 +4,11 @@
 
   // Quest 1 title, shown to the player. An urgent radio-style order to the pilot, who is inside a
   // collapsing debris field. Keep it short and urgent; two clipped sentences.
-  "Quest1Title": "Get out. The debris field is collapsing around you."
+  "Quest1Title": "Get out. The debris field is collapsing around you.",
+
+  // The name the fiction gives the player character: cast out, sole survivor of an erased
+  // bloodline, no faction. A title rather than a birth name, so it takes an article in languages
+  // that use one. The character's gender is not stated anywhere in the design; where a language
+  // forces a choice, the masculine is used as the unmarked form until that decision is made.
+  "DisgracedName": "The Disgraced"
 }

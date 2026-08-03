@@ -207,10 +207,10 @@ public sealed class PlayerControlAcceptanceTests : HostTestBase
         IHost host = AtTheMenu();
         PressStart(host, Keys(confirm: true), Keys());
 
-        double before = Resolve<ShipMovement>().Heading;
+        double before = Session.Ship.Movement.Heading;
         Fly(host, Keys(port: port, starboard: starboard), frames: 60);
 
-        Assert.NotEqual(before, Resolve<ShipMovement>().Heading);
+        Assert.NotEqual(before, Session.Ship.Movement.Heading);
     }
 
     [Fact]

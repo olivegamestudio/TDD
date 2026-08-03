@@ -30,7 +30,20 @@ public sealed class GameScreenTests : HostTestBase
     /// </summary>
     sealed class StubGameSession : IGameSession
     {
+        public StubGameSession()
+        {
+            // the same provisioning the real session does, so a hand assembled screen flies a ship
+            // that came from a character rather than one the test invented
+            Character = new Character(new TestRoster().Starting, Quests);
+            Ship = new Ship(Character.Template.Ship);
+            Character.Board(Ship);
+        }
+
         public Player Player { get; } = new();
+
+        public Character Character { get; }
+
+        public Ship Ship { get; }
 
         public QuestLog Quests { get; } = new();
 
@@ -58,10 +71,8 @@ public sealed class GameScreenTests : HostTestBase
         ICamera camera,
         IShipView view,
         IGameSession? session = null,
-        IShipInput? pilot = null,
-        ShipMovement? ship = null) =>
+        IShipInput? pilot = null) =>
         new(session ?? new StubGameSession(),
-            ship ?? new ShipMovement(DisgracedShip.Handling),
             pilot ?? new NeutralShipInput(),
             new QuestProximityWatcher(new BattleForceWorld()),
             camera,
@@ -266,15 +277,16 @@ public sealed class GameScreenTests : HostTestBase
         // the angle to starboard, so the heading passes through untouched. Negate it — or measure
         // it the other way round on either side — and the sprite turns against the flight.
         StubShipView view = new();
-        ShipMovement ship = new(DisgracedShip.Handling);
+        StubGameSession session = new();
         GameScreen screen = ScreenFor(
             new Camera2D(),
             view,
-            pilot: new FixedShipInput { Controls = new ShipControls(thrust: 1, turn: 1) },
-            ship: ship);
+            session,
+            pilot: new FixedShipInput { Controls = new ShipControls(thrust: 1, turn: 1) });
 
         screen.Update(TimeSpan.FromSeconds(0.2));
 
+        ShipMovement ship = session.Ship.Movement;
         Assert.Equal((float)ship.Heading, view.Pose.Heading);
         Assert.True(ship.Heading > 0, "a turn to starboard should raise the heading");
         Assert.True(view.Pose.Position.X > 0, "a turn to starboard should carry the ship towards +X");
@@ -568,16 +580,21 @@ public sealed class GameScreenTests : HostTestBase
     }
 
     [Fact]
-    public void EnteringTheScreen_BringsTheShipToRest()
+    public async Task EnteringTheScreen_BringsTheShipToRest()
     {
-        // the save carries where the player is, never how fast they were going
+        // The save carries where the player is, never how fast they were going. Nothing resets the
+        // ship to get this any more: entering the screen resumes the game, resuming builds a new
+        // ship from the character's hull, and a new ship has never been anywhere.
         FixedShipInput pilot = new() { Controls = new ShipControls(thrust: 1, turn: 1) };
         IHost host = StartTheGame(services => services.AddSingleton<IShipInput>(pilot));
         Play(host, frames: 120);
 
-        ((IActivatable)GameScreen).Enter();
+        Assert.NotEqual(Velocity.Stationary, Session.Ship.Movement.Velocity);
 
-        ShipMovement ship = Resolve<ShipMovement>();
+        ((IActivatable)GameScreen).Enter();
+        await ((GameScreen)GameScreen).Started;
+
+        ShipMovement ship = Session.Ship.Movement;
         Assert.Equal(Velocity.Stationary, ship.Velocity);
         Assert.Equal(0, ship.Heading);
     }

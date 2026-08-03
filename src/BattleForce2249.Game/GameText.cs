@@ -43,6 +43,16 @@ public static class GameText
     public static string Quest1Title => Get(nameof(Quest1Title));
 
     /// <summary>
+    /// Gets the name of the character the game is played as, as shown to the player.
+    /// </summary>
+    /// <remarks>
+    /// A name the fiction gives the player rather than one they were born with, so it is translated
+    /// like any other thing they read. What identifies the character in a save is
+    /// <see cref="BattleForceRoster.DisgracedId"/>, which is not this and never changes.
+    /// </remarks>
+    public static string DisgracedName => Get(nameof(DisgracedName));
+
+    /// <summary>
     /// Gets a string in the player's language, falling back to English when the current culture has
     /// no translation of it.
     /// </summary>

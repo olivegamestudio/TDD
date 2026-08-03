@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using OliveGameStudio;
 using Pilgrimage;
 
@@ -11,6 +12,7 @@ public sealed class GameSession : IGameSession
 {
     readonly ISaveProgressService _saveProgressService;
     readonly ICampaign _campaign;
+    readonly ICharacterRoster _roster;
     readonly IWorld _world;
 
     /// <summary>
@@ -43,19 +45,42 @@ public sealed class GameSession : IGameSession
     /// </summary>
     /// <param name="saveProgressService">The service the save game is written to and read from.</param>
     /// <param name="campaign">The quests the session plays.</param>
+    /// <param name="roster">The characters the game can be played as.</param>
     /// <param name="world">The world it plays them in.</param>
-    public GameSession(ISaveProgressService saveProgressService, ICampaign campaign, IWorld world)
+    public GameSession(
+        ISaveProgressService saveProgressService,
+        ICampaign campaign,
+        ICharacterRoster roster,
+        IWorld world)
     {
+        ArgumentNullException.ThrowIfNull(saveProgressService);
+        ArgumentNullException.ThrowIfNull(campaign);
+        ArgumentNullException.ThrowIfNull(roster);
+        ArgumentNullException.ThrowIfNull(world);
+
         _saveProgressService = saveProgressService;
         _campaign = campaign;
+        _roster = roster;
         _world = world;
 
         Quests.QuestStarted += OnQuestChanged;
         Quests.QuestCompleted += OnQuestChanged;
+
+        // Provisioned here as well as on every reset, so there is never a moment where the session
+        // exists without a character to play or a ship to fly it in. The alternative is two
+        // properties that are null until a game starts, and every reader of them carrying a check
+        // for a state that only lasts until the screen is entered.
+        Provision();
     }
 
     /// <inheritdoc />
     public Player Player { get; } = new();
+
+    /// <inheritdoc />
+    public Character Character { get; private set; }
+
+    /// <inheritdoc />
+    public Ship Ship { get; private set; }
 
     /// <inheritdoc />
     public QuestLog Quests { get; } = new();
@@ -327,7 +352,8 @@ public sealed class GameSession : IGameSession
         error is IOException or UnauthorizedAccessException;
 
     /// <summary>
-    /// Returns the session to a freshly registered campaign with the player at the world's start.
+    /// Returns the session to a freshly registered campaign, with a new character in a new ship,
+    /// put down where the world says that character starts.
     /// </summary>
     void Reset()
     {
@@ -340,7 +366,33 @@ public sealed class GameSession : IGameSession
             Quests.Register(definition);
         }
 
-        Player.MoveTo(_world.PlayerStart);
+        Provision();
+
+        Player.MoveTo(_world.Introduce(Ship, Character.Template.StartLocation));
+    }
+
+    /// <summary>
+    /// Gives the session a character to play and a ship to fly it in.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Both are built fresh rather than reused. A character carries everything a game earned, so a
+    /// new game must not inherit the last one's; and a ship carries the condition it is in and the
+    /// physics flying it, so a new one is what puts the ship back at rest facing forward. Building
+    /// the ship rather than resetting it means nothing has to remember to.
+    /// </para>
+    /// <para>
+    /// The quest log is deliberately <em>not</em> rebuilt with them. The session subscribes to it
+    /// once and hands it out as <see cref="Quests"/>; replacing it here would leave every subscriber
+    /// listening to a log nothing writes to any more.
+    /// </para>
+    /// </remarks>
+    [MemberNotNull(nameof(Character), nameof(Ship))]
+    void Provision()
+    {
+        Character = new Character(_roster.Starting, Quests);
+        Ship = new Ship(Character.Template.Ship);
+        Character.Board(Ship);
     }
 
     /// <summary>

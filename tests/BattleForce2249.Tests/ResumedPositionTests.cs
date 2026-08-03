@@ -43,6 +43,7 @@ public sealed class ResumedPositionTests
             .End.Distance;
 
     readonly ICampaign _campaign = new BattleForceCampaign();
+    readonly ICharacterRoster _roster = new BattleForceRoster();
     readonly IWorld _world = new BattleForceWorld();
     readonly InMemorySaveProgressService _saves = new();
 
@@ -57,7 +58,7 @@ public sealed class ResumedPositionTests
             { "an entry naming a dropped quest", """{ "QuestId": "quest-99", "State": "Completed" }""" },
         };
 
-    GameSession CreateSession() => new(_saves, _campaign, _world);
+    GameSession CreateSession() => new(_saves, _campaign, _roster, _world);
 
     QuestMarkers Quest1Markers =>
         _world.QuestMarkers.Single(markers => markers.QuestId == BattleForceCampaign.Quest1Id);

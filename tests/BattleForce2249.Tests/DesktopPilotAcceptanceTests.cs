@@ -187,6 +187,6 @@ public sealed class DesktopPilotAcceptanceTests : HostTestBase
 
         Play(host, frames: 1);
 
-        Assert.Equal(Velocity.Stationary, Resolve<ShipMovement>().Velocity);
+        Assert.Equal(Velocity.Stationary, Session.Ship.Movement.Velocity);
     }
 }

@@ -9,6 +9,27 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A character owns the game; a ship is what they are currently sitting in.** `CharacterTemplate`
+  and `Character` pair authored content with the instance that plays it, the same way
+  `QuestDefinition` and `Quest` already do: a character holds `Progression` (experience, level,
+  spend points, gifts), credits, `Reputation` per group, an `Inventory` and their quest history, and
+  survives changing ship. `ShipProfile` and `Ship` do the same for the hull — handling, loadout,
+  and `Meter`s for health, shield and durability. `ICharacterRoster` / `BattleForceRoster` is the
+  seam the game supplies characters through, and the Disgraced is the one it ships, flying
+  `DisgracedShip`'s handling and starting in the mines. The split is pillar 4 as ownership: losing
+  the ship cannot take the record with it.
+
+  The ship is no longer a container singleton. `Ship` builds its own `ShipMovement` from its own
+  handling, so the ship the player owns and the ship they fly cannot be given two different sets of
+  numbers; `GameSession` provisions one per game and `GameScreen` reads `session.Ship`. That also
+  removes a reset — entering the game screen used to bring the physics to rest, and a new game now
+  simply builds a new ship, which has never been anywhere.
+
+  `IWorld.Introduce(ship, location)` brings a ship into the world at a *named* place and answers
+  where that put it, so content names places and never states coordinates. Nothing here is written
+  to the save yet: `SaveGame` still carries position and quest state only.
+  ([#5](https://github.com/olivegamestudio/TDD/issues/5))
+
 - **The camera turns with the ship, so the ship always points forward.** `ICamera.Orientation` is
   the world heading held pointing up the screen, and `GameScreen` sets it from the ship's own
   heading every frame. `Camera2D.WorldToScreen` turns the world about the camera's target rather

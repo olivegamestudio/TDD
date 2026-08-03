@@ -57,6 +57,40 @@ public sealed class ServiceRegistrationTests
     }
 
     [Fact]
+    public void ResolvesTheCharactersTheGameCanBePlayedAs()
+    {
+        using ServiceProvider provider = BuildProvider();
+
+        Assert.IsType<BattleForceRoster>(provider.GetRequiredService<ICharacterRoster>());
+    }
+
+    [Fact]
+    public void TheShipIsNotRegistered_BecauseItBelongsToTheGameRatherThanTheProcess()
+    {
+        // A ship is transient: one per game, built from the character being played. Registered here
+        // it would be a singleton outliving the game it belongs to — and the handling it flew on
+        // could be registered to disagree with the hull the player owns, which is exactly the split
+        // this replaced.
+        using ServiceProvider provider = BuildProvider();
+
+        Assert.Null(provider.GetService<Ship>());
+        Assert.Null(provider.GetService<ShipMovement>());
+        Assert.Null(provider.GetService<ShipHandling>());
+    }
+
+    [Fact]
+    public void TheShipTheGameFlies_ComesFromTheCharacterTheSessionIsPlaying()
+    {
+        using ServiceProvider provider = BuildProvider();
+
+        IGameSession session = provider.GetRequiredService<IGameSession>();
+
+        Assert.Same(session.Character.Ship, session.Ship);
+        Assert.Same(session.Character.Template.Ship.Handling, session.Ship.Handling);
+        Assert.Same(DisgracedShip.Handling, session.Ship.Handling);
+    }
+
+    [Fact]
     public void SharesOneQuestSession_BetweenTheGameScreenAndAnythingElseThatNeedsIt()
     {
         using ServiceProvider provider = BuildProvider();

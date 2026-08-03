@@ -27,12 +27,15 @@ public class SaveRecoveryAdversarialTests
     {
         public Position PlayerStart => Start;
 
+        // a test world that names no places: whatever enters it enters where it starts
+        public Position Introduce(Ship ship, string location) => PlayerStart;
+
         public IReadOnlyList<QuestMarkers> QuestMarkers { get; } =
             [new QuestMarkers("quest-1", Start, End)];
     }
 
     static GameSession CreateSession(ISaveProgressService saves) =>
-        new(saves, new Campaign(), new World());
+        new(saves, new Campaign(), new TestRoster(), new World());
 
     /// <summary>
     /// A save service whose read can be locked and unlocked while the game is running, which is

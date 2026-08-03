@@ -45,4 +45,24 @@ public static class DisgracedShip
         Acceleration: 180,
         Drag: 0.9,
         TurnRate: 4.5);
+
+    /// <summary>
+    /// Gets the hull as content authors it: how it flies, what it takes to destroy, and what wear
+    /// it can stand.
+    /// </summary>
+    /// <remarks>
+    /// <b>The health and durability numbers are placeholders and are not tuned.</b> Nothing damages
+    /// a ship yet and nothing wears one out, so there is no play to tune them against; a hundred of
+    /// each is a round number that reads as a full pool rather than a balance decision anybody has
+    /// made. The handling beside them is not a placeholder — it is the tuning quest 1 was checked
+    /// against.
+    ///
+    /// Nothing is fitted. Which slots a hull has and what may go in them is still an open decision,
+    /// so a loadout authored now would be authored against a shape that does not exist.
+    /// </remarks>
+    public static ShipProfile Profile { get; } = new(
+        Handling,
+        Health: 100,
+        Durability: 100,
+        Loadout: []);
 }
