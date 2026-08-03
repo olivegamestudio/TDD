@@ -128,7 +128,14 @@ public sealed class StarField(ICamera camera) : IRenderable
 
         // Nothing is on screen at a zoom of nothing or a viewport of nothing, and both would put
         // the tile arithmetic below through a division that means nothing.
-        if (camera.PixelsPerUnit <= 0f || viewport.X <= 0f || viewport.Y <= 0f)
+        //
+        // Asked as "is this drawable" rather than as an ordered comparison against zero, because
+        // every ordered comparison against NaN is false: written the other way round, the one
+        // value this exists to stop is the one value it lets through. Camera2D now refuses such a
+        // zoom where it is written, which is the real fix — this stays because the field is drawn
+        // through an ICamera, so the guard is a statement about the interface rather than about
+        // the one implementation that keeps its contract.
+        if (!IsDrawableExtent(camera.PixelsPerUnit) || !IsDrawableExtent(viewport.X) || !IsDrawableExtent(viewport.Y))
         {
             return;
         }
@@ -271,6 +278,19 @@ public sealed class StarField(ICamera camera) : IRenderable
             return value ^ (value >> 13);
         }
     }
+
+    /// <summary>
+    /// Whether a measurement is one the field can actually be drawn across: a finite extent,
+    /// above zero.
+    /// </summary>
+    /// <remarks>
+    /// Stated as a positive question so that a value which is not a number answers "no". Testing
+    /// the negative instead — <c>value &lt;= 0f</c> — is what let <see cref="float.NaN"/> through,
+    /// because every ordered comparison against it is false.
+    /// </remarks>
+    /// <param name="value">The zoom or viewport extent to check.</param>
+    /// <returns><c>true</c> when the field can be drawn across it.</returns>
+    static bool IsDrawableExtent(float value) => float.IsFinite(value) && value > 0f;
 
     /// <summary>
     /// Reads a hash as a position within its tile: at least zero, and below one.

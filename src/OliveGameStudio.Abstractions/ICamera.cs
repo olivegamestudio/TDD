@@ -15,14 +15,30 @@ namespace OliveGameStudio;
 public interface ICamera
 {
     /// <summary>
-    /// The world position held at the centre of the viewport.
+    /// The world position held at the centre of the viewport. Both axes must be finite;
+    /// how far out the position is, is not bounded.
     /// </summary>
+    /// <remarks>
+    /// The finiteness is part of the contract rather than one implementation's caution, because
+    /// the target is subtracted from every world position that is drawn. A value that is not a
+    /// number therefore does not degrade the picture — it puts everything drawn through the camera
+    /// at a position that is nowhere, in full and without an error, and what the player sees is a
+    /// blank window. An implementation is expected to refuse it where it is assigned, so that the
+    /// failure names the frame that produced the number; a renderable cannot usefully check it,
+    /// because then every renderable ever written would have to, each in its own way.
+    /// </remarks>
     Vector2 Target { get; set; }
 
     /// <summary>
     /// How many screen pixels one world unit occupies. This is the zoom: raising it makes the
-    /// world bigger on screen without changing a single world coordinate.
+    /// world bigger on screen without changing a single world coordinate. It must be finite and
+    /// above zero.
     /// </summary>
+    /// <remarks>
+    /// Multiplied into every world offset, so a value that is not a number scatters the world in
+    /// exactly the way <see cref="Target"/> describes, and a zoom of zero collapses it to a point.
+    /// Refused where it is assigned for the same reason.
+    /// </remarks>
     float PixelsPerUnit { get; set; }
 
     /// <summary>

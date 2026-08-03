@@ -118,4 +118,43 @@ public sealed class SaveGameSerializerTests
         Assert.Empty(loaded.Quests);
         Assert.Equal(700, loaded.PlayerY);
     }
+
+    [Theory]
+    [InlineData("1e300", "0")]
+    [InlineData("0", "-1e300")]
+    [InlineData("1e300", "1e300")]
+    public void Deserialize_ReturnsNull_ForAPositionBeyondWhatCanBeDrawn(string x, string y)
+    {
+        // A perfectly good double: it parses, it round trips, the world model carries it. It stops
+        // being a position the moment the drawing side narrows it to a float, which is what
+        // GameScreen.PoseOf does on the way to the camera — and the camera refuses an infinity
+        // outright. Refused here, where the number arrives from a file, rather than from the frame
+        // loop where throwing is too late to be any use to anybody.
+        Assert.Null(SaveGameSerializer.Deserialize(
+            $$"""{ "PlayerX": {{x}}, "PlayerY": {{y}}, "Quests": [] }"""));
+    }
+
+    [Fact]
+    public void Deserialize_KeepsAPositionAtTheFarEdgeOfWhatCanBeDrawn()
+    {
+        // The bound is the range that can be drawn and deliberately not a world size — the world
+        // is unbounded and a long flight must still load. This pins the refusing half above from
+        // the other side, so that widening it needs an argument rather than an edit.
+        SaveGame? loaded = SaveGameSerializer.Deserialize(
+            $$"""{ "PlayerX": {{float.MaxValue:R}}, "PlayerY": 700, "Quests": [] }""");
+
+        Assert.NotNull(loaded);
+        Assert.Equal(700, loaded.PlayerY);
+    }
+
+    [Theory]
+    [InlineData("NaN")]
+    [InlineData("Infinity")]
+    public void Deserialize_ReturnsNull_ForAPositionThatIsNotANumber(string value)
+    {
+        // System.Text.Json reads these as string literals, and a save holding one is not a game
+        // that can be resumed at any position at all
+        Assert.Null(SaveGameSerializer.Deserialize(
+            $$"""{ "PlayerX": "{{value}}", "PlayerY": 700, "Quests": [] }"""));
+    }
 }

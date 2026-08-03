@@ -155,6 +155,33 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A camera target or zoom that is not a number is refused where it is set, instead of drawing the
+  whole world nowhere.** `Camera2D.Target` and `PixelsPerUnit` were plain settable values feeding
+  straight into `WorldToScreen`. A `NaN` or an infinity in either put *everything* drawn through the
+  camera — the star field and the ship both — at a position that is nowhere: drawn in full, with no
+  exception raised and nothing written anywhere, and what the player saw was a blank window. Both
+  now throw `ArgumentOutOfRangeException` at the point of assignment, so the failure names the frame
+  that produced the number rather than surfacing as an empty screen somewhere else entirely, and a
+  refused assignment leaves the camera on its last good value. `ICamera` states both rules, because
+  everything drawn in the world takes the interface rather than the class. There is deliberately no
+  bound on how far out the target is — the world is unbounded — and a very small zoom is still
+  allowed, since the star field's clipping when it is wound far down is a stated limit of the star
+  field rather than a mistake for the camera to veto. The star field's own guard against an
+  undrawable zoom became a finiteness check at the same time: it asked `pixelsPerUnit <= 0f`, and
+  every ordered comparison against `NaN` is false, so the one value it existed to stop was the one
+  value that walked past it. ([#57](https://github.com/olivegamestudio/TDD/issues/57))
+- **A saved position too far out to be drawn is reported as "no save" rather than resumed.**
+  `GameScreen.PoseOf` narrows the world's `double` coordinates to the `float` the drawing side
+  holds, so a coordinate past `float.MaxValue` becomes an infinity on the way to the camera. That
+  is a perfectly good `double` — `1e300` parses, round trips and carries intact quests beside it —
+  and it can only arrive fully formed from a file, since the ship cannot fly that far in any amount
+  of time. Before the camera guard above it was a blank screen; with the guard and nothing else it
+  would have been an exception once per frame out of the frame loop, which is a worse failure than
+  the one being fixed. `SaveGame.CanBeResumed` is now the one place the repository states how far
+  out a saved position may be, and `SaveGameSerializer` declines such a file exactly as it declines
+  one that will not parse — the player gets a new game, which is what a save this build cannot read
+  already gets. The bound is the drawable range and not a world size, so `float.MaxValue` still
+  resumes. ([#57](https://github.com/olivegamestudio/TDD/issues/57))
 - **`ShipControls` takes an axis it cannot read as hands off.** The constructor clamped with
   `Math.Clamp`, which does not hold for `NaN` — it returns it unchanged — so a driver reporting an
   axis it could not read put a `NaN` into the heading, then the velocity, then the position, and

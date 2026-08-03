@@ -496,7 +496,27 @@ public sealed class StarFieldTests
     {
         // nothing is on screen at a zoom of nothing, and working out which tiles to visit would
         // be a division that means nothing
-        Camera2D camera = new() { PixelsPerUnit = pixelsPerUnit };
+        UncheckedCamera camera = new() { PixelsPerUnit = pixelsPerUnit };
+        RecordingRenderer renderer = new();
+
+        new StarField(camera).Render(renderer);
+
+        Assert.Empty(renderer.Drawn);
+    }
+
+    [Theory]
+    [InlineData(float.NaN)]
+    [InlineData(float.PositiveInfinity)]
+    [InlineData(float.NegativeInfinity)]
+    public void Render_DrawsNothing_WhenTheZoomIsNotFinite(float pixelsPerUnit)
+    {
+        // The camera refuses these where they are written, so this is about the guard here being
+        // a true statement about any ICamera rather than about the one implementation that keeps
+        // the rule. It used to be an ordered comparison against zero — and every ordered
+        // comparison against NaN is false, so NaN was the one value that walked straight past the
+        // check written to stop exactly this, and the field was drawn at positions that are
+        // nowhere.
+        UncheckedCamera camera = new() { PixelsPerUnit = pixelsPerUnit };
         RecordingRenderer renderer = new();
 
         new StarField(camera).Render(renderer);

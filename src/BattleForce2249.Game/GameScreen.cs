@@ -117,7 +117,14 @@ public sealed class GameScreen(
     ///
     /// The narrowing to <see cref="float"/> is the world model keeping its precision while the
     /// drawing side takes what a graphics device can use. At the sizes a viewport spans, the
-    /// difference is far below a pixel.
+    /// difference is far below a pixel — but that is a statement about <em>precision</em>, and the
+    /// narrowing has a <em>range</em> limit too: a coordinate past <see cref="float.MaxValue"/>
+    /// becomes an infinity here, and <see cref="ICamera.Target"/> refuses one outright.
+    ///
+    /// This deliberately gains no guard of its own. It could only throw from the frame loop, which
+    /// is too late to help anybody, and the ship cannot fly that far in any amount of time — such
+    /// a number only ever arrives fully formed from a save file. It is refused there instead, by
+    /// <see cref="SaveGame.CanBeResumed"/>, which is where the range limit is written down.
     /// </remarks>
     static ShipPose PoseOf(Position position, double heading) =>
         new(new Vector2((float)position.X, (float)position.Y), (float)heading);
