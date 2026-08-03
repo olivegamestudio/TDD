@@ -9,6 +9,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`IUIController.HasFocus`** — the query input routing needs before it can decide who a frame's
+  input belongs to. The interface could set focus but not be asked about it, and a router cannot
+  remember what it last focused because `Add`, `Disable` and `Enable` all move focus on their own.
+  It reports whether anything is focused and never which button holds it: naming the button would
+  hand a consumer one belonging to a screen that is not current, and the routing decision does not
+  need it. A focused button that is disabled still counts as focus, since disabled is a statement
+  about pressing rather than about who is listening.
+  ([#113](https://github.com/olivegamestudio/TDD/issues/113))
+
 - **A keyboard and a gamepad at the controls.** The shipping game is flyable by a person rather
   than only by a test: quest 1 can be completed on W/S/A/D or the arrow keys, or on a gamepad's
   left stick. `ShipControls.FromKeys` translates held keys — opposite keys are summed, so they

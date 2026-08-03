@@ -15,10 +15,13 @@ namespace OliveGameStudio.Tests;
 /// </para>
 /// <para>
 /// These cases are deliberately written against the interface and observe only what the interface
-/// exposes. It has no <c>Focused</c>, no <c>Held</c> and no <c>IsEnabled</c>, so where focus ended
-/// up is read the way a consumer has to read it — by pressing and seeing which action fires. That
-/// is a weaker instrument than the concrete tests use, and it is the right one here: it fails if
-/// the promise the interface makes stops being true for the object handed to a screen.
+/// exposes. It has no <c>Focused</c>, no <c>Held</c> and no <c>IsEnabled</c>, so <em>which</em>
+/// button focus ended up on is read the way a consumer has to read it — by pressing and seeing
+/// which action fires. <see cref="IUIController.HasFocus"/> answers whether there is a focus at
+/// all and is exercised in <see cref="UIControllerHasFocusTests"/>; it deliberately does not name
+/// the button, so it is no help to the cases below. That is a weaker instrument than the concrete
+/// tests use, and it is the right one here: it fails if the promise the interface makes stops
+/// being true for the object handed to a screen.
 /// </para>
 /// </remarks>
 public sealed class UIControllerContractAdversarialTests
