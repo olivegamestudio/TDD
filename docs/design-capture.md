@@ -42,7 +42,18 @@
 - **[DECIDED]** **Everything is authored world data** — quest markers, save zones, resurrect points,
   vendors, NPCs, mining/material nodes, dungeon entrances/teleports, spawns.
 - **[DECIDED]** Data format is **TOML or JSON** (pick one), chosen to be both editable and streamable.
-- **[DECIDED]** Editing is a **hybrid** — place/move entities **in-game**, plus an **external toolbox**.
+- **[DECIDED]** Editing is a **hybrid**, and the split is by *what the job is*:
+  - **In-game — placement.** Drag-and-drop entities into the world, where you can see them in
+    context at the scale they will be played at.
+  - **External tooling — values.** Setting numbers, stats and properties, where a proper form beats
+    poking at things through a game window.
+- **[DECIDED]** **The editor is the priority.** Content authoring is the thing that blocks
+  everything else in the world model, so the editor leads rather than waits on the chunking scheme.
+- **[DECIDED] ImGui is not expected to be enough** for the external tool — it suits debug panels
+  rather than the kind of data editing this needs.
+- **[OPEN]** So *what* is the external tool built with? It has to edit the same authored data the
+  game streams, which points at either a small purpose-built desktop app or an existing editor
+  driven by a schema. Worth settling early, since the editor now leads.
 - **[OPEN]** The **chunking scheme** — *how* the world is partitioned into streamable chunks (fixed
   grid? chunk size? regions-made-of-chunks?). The core remaining question of #115.
 - **[OPEN]** TOML vs JSON (pick one); how the in-game editor and external toolbox **share/sync** the
@@ -605,15 +616,19 @@ Attributes / Introduce` = **0 files on main** → all NEW. Verdict per subsystem
 ## Consolidated open questions
 
 **Blocking — a decision is needed before the shape can be built.**
-1. **The world model** — how the world is partitioned into streamable chunks (fixed grid? chunk
+1. **The editor comes first.** **[DECIDED — priority]** Being able to *build content* is paramount:
+   the editor is the key to everything else in the world model, so it leads rather than follows the
+   chunking scheme. What is still open is its **shape** — see §3.
+2. **The world model** — how the world is partitioned into streamable chunks (fixed grid? chunk
    size? regions made of chunks?), and the **data format** (TOML or JSON, pick one). Everything
    authored — quest markers, save zones, resurrect points, vendors, NPCs, dungeon teleports — lands
-   in whatever this decides. (§3)
-2. **World editing** — how the in-game placement tool and the external toolbox share or sync the
-   same data, and who the audience is. Decided to be first-class; the shape is not. (§3)
-3. **Touch and focus-navigation UI coexisting** — one layout serving keyboard/gamepad focus *and*
-   direct-tap touch. §13 answers much of it (circular overlays, left stick = helm, right = fire);
-   what is unresolved is how the *same* UI serves both without a redesign. (§1)
+   in whatever this decides. Follows the editor. (§3)
+3. **Touch is a design-time constraint, not a later port.** **[DECIDED]** Every interface decision
+   is made having *already considered touch* — target sizes, reachability, and whether the
+   interaction works by tap and drag as well as by focus. The point is not to build touch now but to
+   never design something that would have to be torn up for it. §13 fixes the overlay (circular
+   controls, left = helm, right = fire); what remains is applying the constraint as each screen is
+   designed. (§1)
 
 **Content and tuning — needed eventually, blocking nothing.**
 4. The full **item category list** (§6) — weapon, shield, orb, ammo, material and consumable are
