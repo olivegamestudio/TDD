@@ -27,4 +27,18 @@ public readonly record struct Sprite(
     Vector2 Position,
     float Rotation,
     Vector2 Origin,
-    float Scale);
+    float Scale)
+{
+    /// <summary>
+    /// The colour the texture is drawn through — a tint, and how much of it shows. Opaque white
+    /// until something says otherwise, which draws the texture exactly as it was authored.
+    /// </summary>
+    /// <remarks>
+    /// It sits outside the positional parameters because that is what lets the default be white
+    /// rather than the zero a struct would otherwise begin at: a sprite that defaulted to
+    /// transparent black would draw nothing, and every caller that never asked for a colour would
+    /// have to say so. It is still part of the sprite's value — two sprites differing only in
+    /// colour are two different instructions.
+    /// </remarks>
+    public Colour Colour { get; init; } = Colour.White;
+}

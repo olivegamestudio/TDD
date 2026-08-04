@@ -406,6 +406,27 @@ bearing:
 - Anything drawn outside the camera is untouched. Menus are, and a HUD would be, so screen-aligned
   is what they stay without asking for it.
 
+**A sprite says what colour it is drawn in; the platform says what the device wants.** `Sprite`
+carries a `Colour` — four channels from 0 to 1 — and it is opaque white unless a caller says
+otherwise, so a drawable that has no opinion draws its texture exactly as it was authored. The
+colour is held *straight*: half-faded red is `(1, 0, 0, 0.5)`. `MonoGameRenderer` premultiplies it
+on the way to `SpriteBatch.Draw`, because `SpriteBatch` blends premultiplied by default and the
+content pipeline premultiplies the textures to match — handing a tint over straight would blend a
+half-faded sprite as a too-bright one. That conversion lives in the platform for the same reason
+the camera owns the world's axes: it is one statement in the class that knows which device it is,
+rather than a rule every caller has to remember.
+
+It sits outside `Sprite`'s positional parameters deliberately. A struct's fields begin at zero, and
+a colour parameter defaulting to zero is transparent black — every existing caller would draw
+nothing until it was told to draw white. As an `init` property with an initialiser the default is
+white and the value is still part of the sprite: two sprites differing only in colour are two
+different drawing instructions.
+
+A channel that is not a finite number is refused where the colour is built, on the same reasoning
+as the camera's guards above — it reaches the device as whatever the conversion produces and draws
+without raising anything. A channel *outside* 0 to 1 is not refused: the device clamps it, and
+there is no reading of an over-bright channel that quietly draws the wrong thing.
+
 **A turned viewport is bigger in the world than an upright one.** The screen is a rectangle, and in
 the world it is a *turned* rectangle whose corners reach further along the world's own axes than
 its edges do. `StarField` sows the upright box that contains the turned one, which is the smallest
