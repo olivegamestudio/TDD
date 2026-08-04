@@ -566,16 +566,34 @@ Character**.
   behind other quests / conditions.
 - **[DECIDED] Level / difficulty:** quests have a **level**; some are tougher (level-dependent), and
   this is **shown to the player** (an indicative difficulty marker, WoW-style).
-- **[DECIDED] Rewards:** every quest gives **XP + credits** at minimum; plus a **reward item** (fixed)
-  and/or a **random piece with a % chance** to drop. **Faction quests award reputation** with that
-  faction.
+- **[DECIDED] Rewards:** every quest gives **XP + credits** at minimum; plus a **reward item**
+  (fixed) and/or a **random piece with a % chance** to drop. **Faction quests award reputation**
+  with that faction.
+- **[DECIDED] The player gets every reward item — there is no pick-one.** A quest hands over all of
+  what it awards rather than offering a choice between them. Nothing is missed, nothing is regretted,
+  and the turn-in stays a moment of payoff rather than a menu.
+- **[NOTE]** The decision this removes has already been made somewhere better. Carrying capacity is
+  deliberately limited (§6), so the interesting question is not *which reward do I take* but **what
+  do I keep** — and that one is asked continuously, with everything the player owns in view, rather
+  than once at a turn-in with no idea what is coming next.
+- **[DECIDED] Belonging to the faction pays extra.** A quest for a faction the player stands with
+  awards **additional items on top** of its normal rewards. Standing therefore pays in goods as well
+  as in the repair discount (§6) — the same principle in a second place: reputation is worth having
+  because it keeps handing things back.
+- **[DECIDED] The world itself can award goods on a percentage chance**, not only quests. A drop is
+  a roll rather than a guarantee, so the same activity can pay differently twice and there is a
+  reason to do it again.
+- **[OPEN]** Whether the faction bonus scales with **standing tier** or is a flat "member or not".
+  Tiered rewards more the deeper the relationship, and reuses the thresholds the rep system already
+  needs; flat is simpler to author and to explain.
 - **[DECIDED] Scope:** **shared story quests** and **character-specific quests** (a quest carries a
   scope + a faction, per §5).
 - **[DECIDED] Mission log (UI):** view each quest's **details and requirements to complete**.
 - **[DECIDED] On-screen quest display (HUD):** an active-quest tracker on screen (objectives /
   progress). → feeds the **HUD** subsystem.
-- **[OPEN]** Reward choice (pick-one vs all); drop %s / reward tables; the full objective-type list;
-  branching & choices (the Diplomat's "tough decisions"); exact turn-in flow.
+- **[OPEN]** Drop %s / reward tables; the full objective-type list; branching & choices (the
+  Diplomat's "tough decisions"); exact turn-in flow. *(Reward choice is decided: the player gets
+  all of them.)*
 - **[vs main]** Engine has the Pilgrimage quest system + Quest 1 (proximity). New: varied objective
   types, givers/accept, chains, pre-reqs, levels, reward tables, faction rep, mission log + quest HUD.
 
