@@ -9,6 +9,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A sprite carries a colour, so a screen can fade or tint what it draws.** `Colour` is four
+  channels from 0 to 1 — red, green, blue, and how much of it shows — and `Sprite.Colour` is
+  opaque white until something says otherwise, which is what every existing caller keeps getting
+  without mentioning one. `MonoGameRenderer` draws with it in place of the hard-coded white it
+  used before.
+
+  The colour is held *straight*: "red, half faded" is `(1, 0, 0, 0.5)`, not the premultiplied
+  `(0.5, 0, 0, 0.5)`. `SpriteBatch` blends premultiplied by default and the content pipeline
+  premultiplies the textures to match, so the multiply happens on the way to the device, in the
+  one class that knows which device it is. A channel that is not a number is refused where the
+  colour is built, for the reason the camera refuses a target that is not one: it would reach the
+  device as whatever the conversion produced, draw in full without raising anything, and name
+  neither the sprite nor the frame that produced it.
+  ([#112](https://github.com/olivegamestudio/TDD/issues/112))
+
 - **A character owns the game; a ship is what they are currently sitting in.** `CharacterTemplate`
   and `Character` pair authored content with the instance that plays it, the same way
   `QuestDefinition` and `Quest` already do: a character holds `Progression` (experience, level,

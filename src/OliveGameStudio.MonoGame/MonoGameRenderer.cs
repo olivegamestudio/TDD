@@ -57,7 +57,7 @@ public sealed class MonoGameRenderer : IRenderer, IDisposable
             texture.Texture,
             new XnaVector2(sprite.Position.X, sprite.Position.Y),
             sourceRectangle: null,
-            XnaColor.White,
+            ToXna(sprite.Colour),
             sprite.Rotation,
             new XnaVector2(sprite.Origin.X, sprite.Origin.Y),
             sprite.Scale,
@@ -69,6 +69,25 @@ public sealed class MonoGameRenderer : IRenderer, IDisposable
     /// Closes the frame's batch, submitting everything drawn since <see cref="BeginFrame"/>.
     /// </summary>
     public void EndFrame() => _spriteBatch.End();
+
+    /// <summary>
+    /// The engine's colour as this device wants it: premultiplied.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="SpriteBatch.Begin"/> blends with <see cref="BlendState.AlphaBlend"/> unless told
+    /// otherwise, which since XNA 4 is <em>premultiplied</em> alpha, and the content pipeline
+    /// premultiplies the textures to match. A tint handed over straight would therefore be blended
+    /// as though it were already multiplied, and a half-faded sprite would come out too bright
+    /// rather than half faded. Multiplying here is what <c>Color.White * alpha</c> does in every
+    /// MonoGame sample, stated once in the one place the platform is known rather than left to
+    /// each caller to remember. <see cref="Colour"/> itself holds the colour as the caller means
+    /// it.
+    /// </remarks>
+    static XnaColor ToXna(Colour colour) => new(
+        colour.Red * colour.Alpha,
+        colour.Green * colour.Alpha,
+        colour.Blue * colour.Alpha,
+        colour.Alpha);
 
     /// <inheritdoc />
     public void Dispose() => _spriteBatch.Dispose();
