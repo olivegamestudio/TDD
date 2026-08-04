@@ -186,7 +186,17 @@ tuned later.)
   location**, **story-arc theme**.
 - **[DECIDED]** v1 develops **Disgraced only**; the other three are future templates.
 - **[DECIDED]** Disgraced starts **in the mines**.
-- **[OPEN]** Starting locations for Diplomat and Trader (Pirate = construction site; Disgraced = mines).
+- **[DECIDED, provisional] Starting locations — a start says where the character *stands*.** The two
+  already set follow that rule (Pirate at a construction site, with raw material to scavenge;
+  Disgraced down the mines, exiled to the bottom), so the other two do too:
+  - **Diplomat — somewhere institutional.** A council station, embassy dock or the diplomatic
+    quarter of the homeworld. Starting at the centre of power is what makes the arc's tough
+    decisions cost something.
+  - **Trader — somewhere commercial.** A market hub, trade docks or a freight waypoint between
+    territories. Starting where the money moves fits the ruthlessness.
+
+  Marked provisional: the *kind* of place is settled, the specific location is content to be named
+  when those characters are written.
 - **[OPEN]** Reconcile with Quest 1 ("the debris field is collapsing around you"): is the mine the
   thing collapsing into that debris field (same opening beat), or a separate location?
 - **[OPEN]** The concrete ship profiles (handling numbers, weapons, durability per character) — feel/
