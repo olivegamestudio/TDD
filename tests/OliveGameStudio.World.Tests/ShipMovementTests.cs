@@ -307,6 +307,52 @@ public sealed class ShipMovementTests
         Assert.Throws<ArgumentOutOfRangeException>(() => new ShipMovement(Handling with { TurnRate = -1 }));
     }
 
+    [Theory]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    [InlineData(double.NaN)]
+    public void RejectsAnAccelerationThatIsNotAFiniteNumber(double acceleration)
+    {
+        // infinite acceleration gives an infinite top speed: the ship leaves the world within a
+        // frame or two, and the position it leaves behind names neither the ship nor the frame
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new ShipMovement(Handling with { Acceleration = acceleration }));
+    }
+
+    [Theory]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    [InlineData(double.NaN)]
+    public void RejectsADragThatIsNotAFiniteNumber(double drag)
+    {
+        // infinite drag is the opposite failure to no drag at all: a top speed of zero, so full
+        // thrust moves the ship nowhere and the controls read as broken rather than as content
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ShipMovement(Handling with { Drag = drag }));
+    }
+
+    [Theory]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    [InlineData(double.NaN)]
+    public void RejectsATurnRateThatIsNotAFiniteNumber(double turnRate)
+    {
+        // an infinite turn rate wraps the heading to whatever the modulus of infinity leaves, and
+        // NaN spreads from the heading into every position the ship reports afterwards
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new ShipMovement(Handling with { TurnRate = turnRate }));
+    }
+
+    [Fact]
+    public void NamesTheHandlingValueItRefused()
+    {
+        // the ship is built from content: an exception that says only "handling" leaves whoever
+        // authored the profile reading three numbers to find out which one it meant
+        ArgumentOutOfRangeException refused = Assert.Throws<ArgumentOutOfRangeException>(
+            () => new ShipMovement(Handling with { Drag = double.PositiveInfinity }));
+
+        Assert.Equal("handling.Drag", refused.ParamName);
+    }
+
     [Fact]
     public void RejectsAFrameWithNoPlayerToMove()
     {
