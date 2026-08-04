@@ -55,9 +55,14 @@
   keeps the toolchain in .NET alongside the game, gives proper forms and data binding for the
   values-editing job ImGui was wrong for, and runs on whatever machine the authoring happens on
   rather than tying content work to Windows.
-- **[OPEN]** Whether the editor is a **separate solution** or a project inside this one. It must not
-  drag a UI framework into the engine or game assemblies, so it wants its own project at minimum —
-  the question is whether it also wants its own repository.
+- **[DECIDED] The editor lives in this repository, in its own project, abstracted from the game.**
+  One repo keeps the tool and the content it edits versioned together — an editor that can drift out
+  of step with the data format is a trap. But **Avalonia stays inside the editor project**: no UI
+  framework reaches `OliveGameStudio.*` or `BattleForce2249.*`.
+- **[IMPLICATION]** What the two sides share is the **world data model and its serialisation**, in a
+  project both reference — the game to *stream* it, the editor to *read and write* it. That shared
+  project is the contract, and it is the thing to design when the data format is chosen. The editor
+  depending on the game, or the game knowing an editor exists, would be the wrong way round.
 - **[OPEN]** The **chunking scheme** — *how* the world is partitioned into streamable chunks (fixed
   grid? chunk size? regions-made-of-chunks?). The core remaining question of #115.
 - **[OPEN]** TOML vs JSON (pick one); how the in-game editor and external toolbox **share/sync** the
