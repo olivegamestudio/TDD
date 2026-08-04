@@ -197,8 +197,16 @@ tuned later.)
 
   Marked provisional: the *kind* of place is settled, the specific location is content to be named
   when those characters are written.
-- **[OPEN]** Reconcile with Quest 1 ("the debris field is collapsing around you"): is the mine the
-  thing collapsing into that debris field (same opening beat), or a separate location?
+- **[DECIDED] The mine collapse *is* the debris field — one opening beat.** The Disgraced is working
+  the mines when they come down, and the wreckage is what Quest 1 flies out through. The existing
+  quest text needs no change: *"Get out. The debris field is collapsing around you."*
+- **[WHY]** It earns the opening. The Disgraced was exiled to the bottom, and then the bottom itself
+  collapses — the last thing they had is taken inside the first minute, which is the moment the
+  story starts from rather than a scene before it. It is also **one location to build instead of
+  two**, and it is what the PoC mockup already shows: a ship under thrust in a debris field with a
+  beacon to reach. The alternative — the mines as home and the debris field somewhere else — costs a
+  second location and a reason to travel between them, and buys nothing the first version does not
+  already have.
 - **[OPEN]** The concrete ship profiles (handling numbers, weapons, durability per character) — feel/
   content, tuned later.
 
