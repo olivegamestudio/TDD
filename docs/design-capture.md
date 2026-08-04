@@ -143,31 +143,45 @@ tuned later.)
   personality + story arc, **ship profile** (starting handling + starting loadout), start location,
   starting inventory.
 - **`Character`** (instance; **persistent**; saved): template, progression (XP, level, spend points,
-  gifts), credits, reputation (per group), quest/story progress, and the **current `Ship`**.
-  **Persists across ship changes.**
-- **`Ship`** (instance; **per-ship, transient**): `Handling`; **inventory** (owned items — see
-  below); **loadout** (equip slots — weapon(s) / shield / engine… — filled from the inventory);
-  **health pool + current health** (the ship's own — a new ship is a new pool); **shield** (from the
-  equipped shield item) + current shield; **durability**; drives `ShipMovement` (existing physics).
+  gifts), credits, reputation (per group), **possessions (the items owned)**, quest/story progress,
+  and the **current `Ship`**. **Persists across ship changes.**
+- **`Ship`** (instance; **per-ship, transient**): `Handling`; **carrying capacity** (built-in slots
+  + how many cargo bays it takes — see below); **loadout** (equip slots — weapon(s) / shield /
+  engine… — fitted from the character's possessions); **health pool + current health** (the ship's
+  own — a new ship is a new pool); **shield** (from the equipped shield item) + current shield;
+  **durability**; drives `ShipMovement` (existing physics).
 - **Gifts (pilot) can modify ship stats** — e.g. +hit points — so effective ship health = ship base
   + pilot gift bonuses.
 - **`Player`** (existing engine entity) = position in the world. `GameSession` owns `Character` +
   `Ship`; `world.Introduce(ship)` places it.
 
-Locked placement decisions: **inventory and loadout on the Ship**; **health is the ship's** (gifts
-boost it); **XP / credits / reputation / gifts persist on the Character**.
+Locked placement decisions: **capacity and loadout on the Ship**; **possessions on the Character**;
+**health is the ship's** (gifts boost it); **XP / credits / reputation / gifts persist on the
+Character**.
 
 - **[DECIDED]** A **ship is a transient instance**, **owned by the `GameSession`**, created per game
   from the character's ship handling. *(Fixes the wrong global `AddSingleton<ShipMovement>()`.)*
 - **[DECIDED]** A ship has: static **handling** (content: accel/drag/turn) + mutable **ship
-  attributes** (state) + **items**.
-- **[DECIDED]** **Inventory = items**, belonging to the **ship** (introduced with it). **Changing
-  ship transfers the items** — the hull is what you swap, not what you own. So capacity is a ship
-  property while the contents are effectively the player's: you can lose a ship without losing your
-  gear.
-- **[DECIDED] Base capacity is a hull stat** — each ship ships with its own slot count (e.g. a
-  starter hull at **16**, a later one at **24**). Capacity is therefore part of the ship profile a
-  character template maps to, and a reason to want a better hull beyond handling.
+  attributes** (state) + **the capacity to carry**.
+- **[DECIDED — clarified] "Inventory" was doing two jobs; they are separate things.**
+  - **How much you can carry is the ship's** — built-in slots plus the cargo bays it takes. A
+    fighter carries less than a hauler *because it is a fighter*.
+  - **What you own is the character's** — possessions are part of the persistent record, saved
+    alongside XP, credits and standing, and they **survive losing the hull**.
+
+  Everything decided below about capacity, bays, the sell-up and the refused swap is unchanged; what
+  changes is that nothing has to be *moved* on a ship change, because the possessions never lived on
+  the ship in the first place. Bays following the pilot becomes structurally true rather than a
+  special rule, and there is no transfer step to get wrong.
+- **[WHY]** This keeps **pillar 4 — "the world was here first"** intact. `DESIGN.md` names
+  possessions as part of the record that survives death and hull loss, and `Ship` is built fresh on
+  every start *and resume* then thrown away. A hold living on the ship would have to be captured
+  into the save and restored into the newly-built ship, and anything missed there discards the
+  player's goods silently — the exact failure the pillar calls out. Capacity is a *ship stat*, so it
+  is content and rebuilds harmlessly; possessions are a *record*, so they persist.
+- **[DECIDED] Built-in capacity is a ship stat** — each ship has its own slot count (e.g. a starter
+  at **16**, a later one at **24**). It is part of the ship profile a character template maps to,
+  and a reason to want a better ship beyond handling.
 - **[DECIDED] Capacity is also bought** — **additional cargo bays** are purchasable modules that
   **couple up to whatever ship you are flying**. They follow the pilot, not the hull, so a bay is
   bought once and kept: changing ship re-couples them rather than re-charging for them. This is a
@@ -227,11 +241,12 @@ boost it); **XP / credits / reputation / gifts persist on the Character**.
 - So a ship carries two capacity numbers, both content: its **built-in slots** and **how many bays
   it can take**. Total capacity = built-in slots + the slot counts of the bays fitted to it. Bays
   **re-fit to the new ship** on a change, up to however many that ship accepts.
-- **[DECIDED] Outgrowing a bay is a vendor swap, and the contents move with it.** With only two
-  bays, upgrading (say 4 slots → 12) when every bay is occupied means **the vendor takes the old bay
-  off you** and the **items transfer into the new one**. The player never has to unload a bay by
-  hand, and nothing is stranded — the same principle as a hull change, one level down: you swap the
-  container, you keep the contents.
+- **[DECIDED] Outgrowing a bay is a vendor swap.** With only two bays, upgrading (say 4 slots → 12)
+  when every bay is occupied means **the vendor takes the old bay off you** and fits the new one.
+  Because possessions belong to the character rather than the bay, **nothing has to be unpacked** —
+  a bay is capacity, not a container with things inside it. The player's goods are untouched; only
+  the ceiling moves. *(A swap that would drop capacity below what they are carrying is refused, as
+  below.)*
 - **[NOTE]** This is the **most-repeated economic transaction in the game** — capacity is
   credit-gated and grindable, so the swap happens throughout a run rather than once or twice. It
   deserves to be a smooth, one-step vendor interaction rather than a sell-then-buy the player
@@ -243,23 +258,23 @@ boost it); **XP / credits / reputation / gifts persist on the Character**.
   once. *(Bay sizes, prices and ships' built-in counts are content, tuned later.)*
 - **[DECIDED] Ship changes only ever go up** — nobody wants to go back to an older ship, so there is
   no downgrade path and the previous ship is crushed rather than kept.
-- **[DECIDED] If the items do not fit the new ship, the swap is refused.** Bay count being a role
-  stat means a newer, better ship can have a *smaller* hold — a fighter taking one bay holds less
-  than a hauler taking three — so a change can genuinely leave items with nowhere to go. The rule is
-  that the game **does not take the ship change**: the player must make room first, by selling,
-  using or discarding. Nothing is ever destroyed on their behalf and nothing is stranded in a buffer
-  they have to remember; the cost of a smaller ship is paid deliberately, before the swap, not
-  discovered afterwards.
-- **[NOTE]** This makes the swap a **checked transaction** — the fit is tested before anything
-  happens, and a refusal has to say *why* and *how much* has to go, or the player is left guessing
-  at a vendor. It also means the old ship is only crushed once the new one is confirmed to hold
-  everything.
+- **[DECIDED] If what the player is carrying exceeds the new ship's capacity, the swap is refused.**
+  Bay count being a role stat means a newer, better ship can carry *less* — a fighter taking one bay
+  carries less than a hauler taking three — so a change can genuinely leave the player holding more
+  than the new ship allows. The rule is that the game **does not take the ship change**: they must
+  make room first, by selling, using or discarding. Nothing is ever destroyed on their behalf and
+  nothing is stranded in a buffer they have to remember; the cost of a narrower ship is paid
+  deliberately, before the swap, not discovered afterwards.
+- **[NOTE]** This makes the swap a **checked transaction** — capacity is tested against what is
+  carried before anything happens, and a refusal has to say *why* and *how much* has to go, or the
+  player is left guessing at a vendor. It also means the old ship is only crushed once the new one
+  is confirmed to accommodate everything.
 - **[DECIDED] The player sells up, and that friction is the point.** Refusing the swap is not a
   safety net around an awkward edge — it is the mechanism that makes **changing ship a conscious
   change of direction**. Going from a cargo-heavy pilot to an uber fighting machine *should* cost
-  you the cargo life: you liquidate the hold, you shed the bays you can no longer fit, and you
-  commit. A ship is an **identity**, not a loadout choice, and the sell-up is what makes the player
-  weigh it rather than drift into it.
+  you the cargo life: you liquidate what you can no longer carry, you shed the bays that will not
+  fit, and you commit. A ship is an **identity**, not a loadout choice, and the sell-up is what
+  makes the player weigh it rather than drift into it.
 - **[DECIDED] A bay the new ship cannot take is sold up with everything else.** It follows from the
   same rule — the player clears what will not fit before the swap is allowed, bays included. No
   storage concept is needed, nothing sits owned-but-unfitted waiting to be remembered, and the cost
@@ -561,8 +576,10 @@ Attributes / Introduce` = **0 files on main** → all NEW. Verdict per subsystem
   partly decided (Disgraced/mines/roster); profile numbers open.
 - Ship aggregate (handling + attributes + items/durability) — partly decided; attribute/item detail
   open (#119/#120).
-- Item / inventory model — **inventory location decided** (on the `Ship`, transferred on ship
-  change; capacity bought as cargo bays); still gated on #119 remainder + capacity/overflow rules.
+- Item / inventory model — **placement decided**: **capacity** is the `Ship`'s (built-in slots +
+  cargo bays it takes), **possessions** are the `Character`'s (persistent, saved). Matches what is
+  already built on `main`; what is new is capacity, bays and the checked ship swap. Item category
+  list still open.
 - Player attributes — gated (#120).
 - World: areas/streaming/dungeons/editing + `IWorld.Introduce` + save zones + resurrect points —
   `Introduce`/placement/save-zones/resurrect **decided**; area/streaming/editing model open (#115/#116).
@@ -593,7 +610,8 @@ Attributes / Introduce` = **0 files on main** → all NEW. Verdict per subsystem
 5. Touch + focus UI coexistence.
 6. Item model detail (the full category list). *(Repair, the reputation discount and its floor, the
    cargo/bay economy and the vendor model are all settled — see §6.)*
-   *(Settled: durability-zero disables until repaired · inventory sits on the ship and transfers ·
+   *(Settled: durability-zero disables until repaired · capacity is the ship's, possessions are the
+   character's ·
    capacity is slot-based, per-bay, capped, and credit-gated · bay count is a per-ship role stat ·
    the vendor bay-swap, credited at sale value · buy price > sale price on everything, ships and
    bays included · scrapping a ship pays credits · paid per-vendor repair · a swap that does not fit
