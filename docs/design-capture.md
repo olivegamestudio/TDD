@@ -603,23 +603,33 @@ Attributes / Introduce` = **0 files on main** → all NEW. Verdict per subsystem
   also what makes the "feel" pass tractable. Every feature issue names the stats type it introduces.
 
 ## Consolidated open questions
-1. Camera: world-rotates-around-ship vs independent orientation.
-2. Area model + dungeon instancing; streaming granularity.
-3. World editing: tool, data format, audience.
-4. Control choice: session-locked vs switchable; device-only vs UI-paradigm.
-5. Touch + focus UI coexistence.
-6. Item model detail (the full category list). *(Repair, the reputation discount and its floor, the
-   cargo/bay economy and the vendor model are all settled — see §6.)*
-   *(Settled: durability-zero disables until repaired · capacity is the ship's, possessions are the
-   character's ·
-   capacity is slot-based, per-bay, capped, and credit-gated · bay count is a per-ship role stat ·
-   the vendor bay-swap, credited at sale value · buy price > sale price on everything, ships and
-   bays included · scrapping a ship pays credits · paid per-vendor repair · a swap that does not fit
-   is refused, the player sells up · ships are a ladder of commitments, not a garage, so §10's
-   single-`Ship` seam stands.)*
-7. Player attribute list.
-8. Resurrect points vs save zones.
-9. Placement authority in `Introduce`.
+
+**Blocking — a decision is needed before the shape can be built.**
+1. **The world model** — how the world is partitioned into streamable chunks (fixed grid? chunk
+   size? regions made of chunks?), and the **data format** (TOML or JSON, pick one). Everything
+   authored — quest markers, save zones, resurrect points, vendors, NPCs, dungeon teleports — lands
+   in whatever this decides. (§3)
+2. **World editing** — how the in-game placement tool and the external toolbox share or sync the
+   same data, and who the audience is. Decided to be first-class; the shape is not. (§3)
+3. **Touch and focus-navigation UI coexisting** — one layout serving keyboard/gamepad focus *and*
+   direct-tap touch. §13 answers much of it (circular overlays, left stick = helm, right = fire);
+   what is unresolved is how the *same* UI serves both without a redesign. (§1)
+
+**Content and tuning — needed eventually, blocking nothing.**
+4. The full **item category list** (§6) — weapon, shield, orb, ammo, material and consumable are
+   implied by decisions already made; the authoritative list is not written down.
+5. **Player attribute tuning** (§6) — out-of-combat regen delay and rates, what awards XP and the
+   per-level curve, the gift catalogue and structure (board vs flat list), whether respec is
+   allowed, the faction list and reputation thresholds.
+6. **Economy numbers** (§6) — ship built-in slot counts and bay counts per ship, bay sizes and
+   prices, the repair discount percentages and its floor, vendor buy/sell modifiers.
+7. **Character content** (§5) — starting locations for Diplomat and Trader, the concrete ship
+   profiles per character, and reconciling the Disgraced's mine start with Quest 1's debris field.
+
+*(Struck off as decided in the body: camera rotation — world rotates around the ship, shipped in
+#127 · control choice — locked to the device that presses Start, shipped in #126 · resurrect points
+are separate from save zones · `Introduce` is the world's placement authority · the whole cargo,
+bay, vendor and repair economy — see §6.)*
 
 ## Parked (deliberately deferred)
 - Combat detail. · Quests content (character-specific vs shared authoring). · "Feel" (handling
