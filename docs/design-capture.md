@@ -296,12 +296,13 @@ boost it); **XP / credits / reputation / gifts persist on the Character**.
   **a cheap stranger or a well-disposed ally**.
 - So a repair bill is **vendor base rate × standing**, both authored: the rate is the vendor's
   character (§ Economy), the modifier is what the player has earned with their faction.
-- **[OPEN] The discount needs a floor.** Repair is the death penalty's teeth — degradation only
-  stings because putting it right costs money. An unbounded discount therefore dissolves the penalty
-  exactly when the player is deep in faction standing and doing the hardest content, which is when
-  it should bite most. A capped best-case (a meaningful discount, not free repair) keeps the reward
-  felt without hollowing out what it is discounting. The number is tuning; that there **is** a floor
-  is a design decision.
+- **[DECIDED] The discount is a percentage, and never the whole bill.** Standing takes a slice off
+  the cost — a real saving the player notices — but **repair always costs something**, however well
+  regarded they are. That floor is deliberate: repair is the death penalty's teeth, and degradation
+  only stings because putting it right costs money. Free repair at high standing would dissolve the
+  penalty exactly when the player is deep in faction rep and doing the hardest content, which is
+  when it should bite hardest. *(The actual percentages are tuning; that it never reaches 100% is
+  the design decision.)*
 - **[OPEN]** The full item category list.
 
 ### Economy & acquisition **[in progress]**
@@ -590,8 +591,8 @@ Attributes / Introduce` = **0 files on main** → all NEW. Verdict per subsystem
 3. World editing: tool, data format, audience.
 4. Control choice: session-locked vs switchable; device-only vs UI-paradigm.
 5. Touch + focus UI coexistence.
-6. Item model detail (the full category list); the floor on the reputation repair discount, so the
-   death penalty still bites at high standing.
+6. Item model detail (the full category list). *(Repair, the reputation discount and its floor, the
+   cargo/bay economy and the vendor model are all settled — see §6.)*
    *(Settled: durability-zero disables until repaired · inventory sits on the ship and transfers ·
    capacity is slot-based, per-bay, capped, and credit-gated · bay count is a per-ship role stat ·
    the vendor bay-swap, credited at sale value · buy price > sale price on everything, ships and
