@@ -51,9 +51,13 @@
   everything else in the world model, so the editor leads rather than waits on the chunking scheme.
 - **[DECIDED] ImGui is not expected to be enough** for the external tool — it suits debug panels
   rather than the kind of data editing this needs.
-- **[OPEN]** So *what* is the external tool built with? It has to edit the same authored data the
-  game streams, which points at either a small purpose-built desktop app or an existing editor
-  driven by a schema. Worth settling early, since the editor now leads.
+- **[DECIDED, provisional] Avalonia** for the external tool — the front runner from the PoC. It
+  keeps the toolchain in .NET alongside the game, gives proper forms and data binding for the
+  values-editing job ImGui was wrong for, and runs on whatever machine the authoring happens on
+  rather than tying content work to Windows.
+- **[OPEN]** Whether the editor is a **separate solution** or a project inside this one. It must not
+  drag a UI framework into the engine or game assemblies, so it wants its own project at minimum —
+  the question is whether it also wants its own repository.
 - **[OPEN]** The **chunking scheme** — *how* the world is partitioned into streamable chunks (fixed
   grid? chunk size? regions-made-of-chunks?). The core remaining question of #115.
 - **[OPEN]** TOML vs JSON (pick one); how the in-game editor and external toolbox **share/sync** the
