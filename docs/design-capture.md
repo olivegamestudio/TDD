@@ -143,25 +143,64 @@ tuned later.)
   personality + story arc, **ship profile** (starting handling + starting loadout), start location,
   starting inventory.
 - **`Character`** (instance; **persistent**; saved): template, progression (XP, level, spend points,
-  gifts), credits, reputation (per group), **inventory (owned items)**, quest/story progress, and the
-  **current `Ship`**. **Persists across ship changes.**
-- **`Ship`** (instance; **per-ship, transient**): `Handling`; **loadout** (equip slots — weapon(s) /
-  shield / engine… — filled from the character's inventory); **health pool + current health** (the
-  ship's own — a new ship is a new pool); **shield** (from the equipped shield item) + current shield;
-  **durability**; drives `ShipMovement` (existing physics).
+  gifts), credits, reputation (per group), quest/story progress, and the **current `Ship`**.
+  **Persists across ship changes.**
+- **`Ship`** (instance; **per-ship, transient**): `Handling`; **inventory** (owned items — see
+  below); **loadout** (equip slots — weapon(s) / shield / engine… — filled from the inventory);
+  **health pool + current health** (the ship's own — a new ship is a new pool); **shield** (from the
+  equipped shield item) + current shield; **durability**; drives `ShipMovement` (existing physics).
 - **Gifts (pilot) can modify ship stats** — e.g. +hit points — so effective ship health = ship base
   + pilot gift bonuses.
 - **`Player`** (existing engine entity) = position in the world. `GameSession` owns `Character` +
   `Ship`; `world.Introduce(ship)` places it.
 
-Locked placement decisions: **inventory on the Character**, **loadout on the Ship**; **health is the
-ship's** (gifts boost it); **XP / credits / reputation / gifts / inventory persist on the Character**.
+Locked placement decisions: **inventory and loadout on the Ship**; **health is the ship's** (gifts
+boost it); **XP / credits / reputation / gifts persist on the Character**.
 
 - **[DECIDED]** A **ship is a transient instance**, **owned by the `GameSession`**, created per game
   from the character's ship handling. *(Fixes the wrong global `AddSingleton<ShipMovement>()`.)*
 - **[DECIDED]** A ship has: static **handling** (content: accel/drag/turn) + mutable **ship
   attributes** (state) + **items**.
-- **[DECIDED]** **Inventory = items**, belonging to the ship (introduced with it).
+- **[DECIDED]** **Inventory = items**, belonging to the **ship** (introduced with it). **Changing
+  ship transfers the items** — the hull is what you swap, not what you own. So capacity is a ship
+  property while the contents are effectively the player's: you can lose a ship without losing your
+  gear.
+- **[DECIDED] Base capacity is a hull stat** — each ship ships with its own slot count (e.g. a
+  starter hull at **16**, a later one at **24**). Capacity is therefore part of the ship profile a
+  character template maps to, and a reason to want a better hull beyond handling.
+- **[DECIDED] Capacity is also bought** — **additional cargo bays** are purchasable modules that
+  **couple up to whatever ship you are flying**. They follow the pilot, not the hull, so a bay is
+  bought once and kept: changing ship re-couples them rather than re-charging for them. This is a
+  credits sink alongside repair, and an acquisition path in its own right.
+- **[DECIDED] Each bay carries its own slot count** — a bay is a piece of content with a **stats
+  type** (per the OO stats rule), not a fixed `+N` the inventory hard-codes. Effective capacity is
+  the hull's base plus the **sum of the coupled bays' slot counts**, so new bays can be authored
+  without touching the inventory model.
+- **[DECIDED] Carrying capacity is deliberately limited, and it is capped.** Inventory pressure is a
+  **designed constraint**, not an artefact of the numbers — the player is meant to keep choosing
+  what to keep, sell or leave behind, and that choice must still bite in the late game. So **slots
+  do not grow without bound**: there is a largest bay the game sells, and therefore a **maximum
+  total capacity** a fully-kitted ship can reach.
+- **[DECIDED] Within that ceiling, cost is what gates you.** Bays are sold in a bounded range of
+  sizes (4 and 12 slots are indicative points on it) with **price scaling with size**, so a small
+  bay is an early attainable purchase and the largest is a genuine save-up goal. Capacity growth
+  comes from **buying bigger bays**, not more of them — and it **stops** at the top of the range
+  rather than tracking the player's wealth upward for ever. Wealth buys you to the ceiling faster;
+  it does not raise it.
+- **[DECIDED] Capacity is gated by credits alone — not by level, hull or quest progress.** A player
+  who chooses to **grind** can buy a bigger bay early and carry more sooner; that is a legitimate
+  route, and the effort is the price. This is what makes the ceiling load-bearing rather than
+  decorative: since nothing but money stands between the player and the largest bay, the **cap** is
+  the only thing keeping the constraint real. The two decisions hold each other up — grinding is
+  safe to allow *because* capacity tops out.
+- **[DECIDED] Capacity is counted in slots, never weight** — there is **no encumbrance system**.
+  A slot is the only unit; what an item weighs is not modelled. This keeps "have I got room?" a
+  question the player answers by looking, and keeps a bay's value legible at the point of sale.
+- **[DECIDED] One ship at a time — the old hull is scrapped on change.** There is no hangar, no
+  roster and no second ship to go back to; the previous ship is binned and crushed. This is what
+  makes `Ship` a transient instance the `GameSession` owns (§10) rather than a collection the
+  character keeps, and it is why the transfer rules above have to be total — nothing left behind is
+  recoverable later.
 - **[DECIDED]** **Items degrade** (conventional durability): **use** wears them gradually; **death**
   is the big hit (the primary death penalty). Durability is saved state.
 - **[DECIDED]** When durability bottoms out, the item **stops working until repaired** — disabled,
@@ -172,26 +211,152 @@ ship's** (gifts boost it); **XP / credits / reputation / gifts / inventory persi
 - **[DECIDED] Loadout (v1, fixed):** **4 weapon slots** + **2 shield slots** + **2 "additional"
   slots** (orbs / defensive items) — all **empty at new-game start**. A collected item **auto-slots**
   into a free matching slot on pickup; otherwise the player **drag-and-drops** it in.
-- **[FUTURE]** Slot count may **vary by ship** — *not at the start*; v1 ships use the fixed layout above.
+- **[FUTURE]** **Loadout** slot count may **vary by ship** — *not at the start*; v1 ships use the
+  fixed layout above. (Distinct from **inventory** capacity, which does vary by hull from day one —
+  its built-in slot count and how many bays it takes are both ship stats.)
 - **[DECIDED] Inventory:** **slot-based**. Items **stack per slot up to a per-item-type max** — some
   types stack to **99**, some are **1 per slot**; it depends on the item type.
 - **[NOTE]** Drag-and-drop is one interaction that serves **both mouse and touch** — helps the
   "mobile without a UI redesign" goal.
-- **[OPEN]** Number of inventory slots; the full item category list; and **repair** (shops? save
-  zones?).
+- **[DECIDED] How many bays a ship can take is a per-ship stat — and it expresses the ship's
+  character, not its rank.** The ship you start in takes **two**. A **fighter might take only one**
+  because it is a fighter; a hauler built for the job takes more. So the number is a **role
+  differentiator**, the counterpart to handling: a nimble ship trades cargo away, a heavy one trades
+  agility away. It is deliberately **not** a reward for progressing — a later, better fighter can
+  still take one.
+- So a ship carries two capacity numbers, both content: its **built-in slots** and **how many bays
+  it can take**. Total capacity = built-in slots + the slot counts of the bays fitted to it. Bays
+  **re-fit to the new ship** on a change, up to however many that ship accepts.
+- **[DECIDED] Outgrowing a bay is a vendor swap, and the contents move with it.** With only two
+  bays, upgrading (say 4 slots → 12) when every bay is occupied means **the vendor takes the old bay
+  off you** and the **items transfer into the new one**. The player never has to unload a bay by
+  hand, and nothing is stranded — the same principle as a hull change, one level down: you swap the
+  container, you keep the contents.
+- **[NOTE]** This is the **most-repeated economic transaction in the game** — capacity is
+  credit-gated and grindable, so the swap happens throughout a run rather than once or twice. It
+  deserves to be a smooth, one-step vendor interaction rather than a sell-then-buy the player
+  assembles themselves.
+- **[DECIDED] The old bay is credited back at its sale value.** Items have a buy price and a lower
+  sale price (see Economy below), and bays are no exception — so trading a 4-slot up to a 12-slot
+  part-funds the purchase without refunding it. The cheap early bay is therefore a sensible buy
+  rather than a trap, while the spread means laddering up costs more than waiting and buying big
+  once. *(Bay sizes, prices and ships' built-in counts are content, tuned later.)*
+- **[DECIDED] Ship changes only ever go up** — nobody wants to go back to an older ship, so there is
+  no downgrade path and the previous ship is crushed rather than kept.
+- **[DECIDED] If the items do not fit the new ship, the swap is refused.** Bay count being a role
+  stat means a newer, better ship can have a *smaller* hold — a fighter taking one bay holds less
+  than a hauler taking three — so a change can genuinely leave items with nowhere to go. The rule is
+  that the game **does not take the ship change**: the player must make room first, by selling,
+  using or discarding. Nothing is ever destroyed on their behalf and nothing is stranded in a buffer
+  they have to remember; the cost of a smaller ship is paid deliberately, before the swap, not
+  discovered afterwards.
+- **[NOTE]** This makes the swap a **checked transaction** — the fit is tested before anything
+  happens, and a refusal has to say *why* and *how much* has to go, or the player is left guessing
+  at a vendor. It also means the old ship is only crushed once the new one is confirmed to hold
+  everything.
+- **[DECIDED] The player sells up, and that friction is the point.** Refusing the swap is not a
+  safety net around an awkward edge — it is the mechanism that makes **changing ship a conscious
+  change of direction**. Going from a cargo-heavy pilot to an uber fighting machine *should* cost
+  you the cargo life: you liquidate the hold, you shed the bays you can no longer fit, and you
+  commit. A ship is an **identity**, not a loadout choice, and the sell-up is what makes the player
+  weigh it rather than drift into it.
+- **[DECIDED] A bay the new ship cannot take is sold up with everything else.** It follows from the
+  same rule — the player clears what will not fit before the swap is allowed, bays included. No
+  storage concept is needed, nothing sits owned-but-unfitted waiting to be remembered, and the cost
+  of narrowing your ship is paid in full and visibly at the moment you choose it.
+- **[DECIDED] Therefore: a ladder of commitments, not a garage.** Ships are *kinds* that differ by
+  role, but the player still holds exactly one and pays a real price to change it — so there is no
+  hangar, no swapping ship for the job, and no going back without paying again. This is what keeps
+  **`Ship` a single transient instance owned by the `GameSession`** (§10) rather than a collection,
+  and it is a deliberate answer to the pull the fighter/hauler split created.
+- **[OPEN] Does role-differentiated shipping want a hangar after all?** If ships are *kinds* — a
+  fighter, a hauler — rather than rungs, the player will want the right ship for the job and to
+  switch back, which is exactly what "one ship at a time, the old one is crushed" forbids. Those two
+  decisions are pulling in opposite directions. Either ships stay a strict ladder that happens to
+  vary in cargo (and the fighter/hauler framing is flavour, not choice), or ships become a garage
+  and `Ship` stops being a single transient instance (§10). Worth settling before either is built
+  on. *(See also the §10 ownership seam, which assumes exactly one ship.)*
+- **[DECIDED] Scrapping the old ship pays out in credits.** Crushing it is a sale, not a disposal —
+  the old ship comes back as money toward the new one. This is the same buy-high/sell-low rule
+  everything else follows rather than a special case: a ship carries a sale value below its buy
+  price, so a change of ship recovers part of what was sunk into the last one and never all of it.
+- **[NOTE]** That makes the whole ship change **one transaction at a vendor**: clear what will not
+  fit (sold at sale value), scrap the old ship (credits in), buy the new one. The player sees a
+  single running total for the direction they are choosing, which is the moment the commitment
+  decision is actually made.
+- **[DECIDED] Repair costs credits, and the price varies per vendor.** Repair is a vendor service,
+  not a free effect of resting — so the death penalty has a real economic cost and credits have a
+  reliable sink. Because the price is **per vendor**, where you repair is a decision: a vendor
+  carries a **repair rate** as part of its stats, and the player can be out of pocket for
+  convenience. It also gives vendors a role beyond selling deliberately-mediocre gear.
+- **[DECIDED] Reputation discounts repair — the better your standing with a faction, the cheaper
+  their vendors repair.** Standing has to *pay*, and repair is the ideal place for it: the player
+  feels it **every time they die**, which is far more often than a reputation reward unlocks. It
+  also gives the per-vendor rate a second axis and creates a real choice at the point of use —
+  **a cheap stranger or a well-disposed ally**.
+- So a repair bill is **vendor base rate × standing**, both authored: the rate is the vendor's
+  character (§ Economy), the modifier is what the player has earned with their faction.
+- **[OPEN] The discount needs a floor.** Repair is the death penalty's teeth — degradation only
+  stings because putting it right costs money. An unbounded discount therefore dissolves the penalty
+  exactly when the player is deep in faction standing and doing the hardest content, which is when
+  it should bite most. A capped best-case (a meaningful discount, not free repair) keeps the reward
+  felt without hollowing out what it is discounting. The number is tuning; that there **is** a floor
+  is a design decision.
+- **[OPEN]** The full item category list.
 
 ### Economy & acquisition **[in progress]**
 - **[DECIDED] Credits/currency** exists.
-- **[DECIDED] Vendors** sell items for credits, but vendor gear is **deliberately mediocre**
-  (WoW-style — not best-in-slot; the good stuff comes from elsewhere).
+- **[DECIDED] Vendors** sell items for credits, and **most** vendor gear is **deliberately mediocre**
+  (WoW-style — not best-in-slot; the good stuff comes from elsewhere). A **rare few** vendors are
+  genuinely good — see the specialism decisions below.
 - **[DECIDED] Crafting is important** — a primary route to good gear.
 - Acquisition paths: **quests** (rewards) · **vendors** (credits, mediocre) · **crafting**
   (important) · collectibles.
 - **[NOTE]** The Disgraced starts **in the mines** — a natural materials/mining source feeding
   crafting; worth tying the opening to the economy.
+- **[DECIDED] Every item has a buy price and a sale price, and the sale price is lower.** The player
+  can always turn goods back into credits, but never at what they paid — the vendor keeps a spread.
+  This applies to **everything sellable, cargo bays included**, so the surrendered bay in a
+  bay-for-bigger-bay swap credits back at its sale value rather than vanishing or refunding in full.
+- **[NOTE]** The spread is doing real work beyond flavour. It makes **churn cost something**, so
+  buying and re-selling is not a free way to shuffle inventory; it stops vendors being a lossless
+  parking space for items the player cannot carry; and it gives the **sell-up on a ship change** a
+  genuine price, which is exactly what that decision wants — changing direction should hurt a
+  little.
+- **[DECIDED] Vendors specialise, and their prices say so.** Pricing varies **per vendor and per
+  category**, not as one flat margin: a weapons expert gives you good prices on ships and weapons
+  because that is their trade. Finding the right vendor for what you are buying or selling is
+  therefore **knowledge the player accumulates about the world**, and a reason to remember where
+  people are rather than using whoever is nearest.
+- **[DECIDED] Better stock costs more.** A vendor may be dearer precisely *because* what they carry
+  is good, so price is a signal about quality rather than a flat tax. The player trades off **cheap
+  and ordinary against expensive and worth it**, which is a real decision rather than an arithmetic
+  one.
+- So a **vendor carries its own stats type** (per the OO stats rule): a **repair rate**, **per-
+  category buy/sell modifiers**, and a **stock quality level**. Vendor pricing is content, authored
+  per vendor, not a global economy constant.
+- **[DECIDED] Most vendors are bog standard; a few are genuinely good.** Mediocre stock is the
+  **norm**, not a ceiling — the ordinary vendor sells ordinary things, and that is what keeps quests
+  and crafting the main routes to good gear. But **good vendors exist**, and they are rare enough
+  that finding one matters. It is **rarity** doing the balancing rather than a blanket quality cap,
+  which is the better lever: it leaves room for a genuinely exciting shop without turning shopping
+  into the answer to everything.
+- **[NOTE]** This makes a good vendor a **destination** — somewhere the player remembers, travels
+  to, and saves credits for. It compounds with per-vendor specialism: knowing *who* is worth the
+  trip is world knowledge the player earns, and the sort of thing they tell other players about.
+- **[DECIDED] Good vendors are placed, not permissioned.** They are gated by **where they are**
+  rather than by rank, reputation or quest state: **some sit off the beaten track**, in special
+  places that reward going and looking, and **some are in city areas — but sparse**, so a city is
+  not a one-stop shop you can simply browse. Finding them is exploration, not permission.
+- **[NOTE]** Because nothing bars the door, a player can **find a great vendor long before they can
+  afford it** — and that is the point. The gate is money, exactly as it is for cargo bays, so a good
+  shop discovered early becomes something to come back for. It is aspiration rather than a locked
+  door, and it gives exploration a payoff that lasts beyond the moment of finding it.
+- Vendors are **authored world data** like everything else placed in the world (§3), so their
+  location is a content decision made alongside quest markers, save zones and NPCs.
 - **[OPEN]** Crafting model — recipes, materials/resources, stations/skill. **New subsystem to
   design.**
-- **[OPEN]** How credits are earned; whether repair costs credits.
+- **[OPEN]** How credits are earned. *(Repair costing credits is decided — see §6 items.)*
 ### Player attributes **[in progress]**
 - **[DECIDED] Health** — the vitality of the player's ship/pilot.
   - **Shield first, then health:** if a shield is fitted, incoming damage depletes the **shield**,
@@ -395,7 +560,8 @@ Attributes / Introduce` = **0 files on main** → all NEW. Verdict per subsystem
   partly decided (Disgraced/mines/roster); profile numbers open.
 - Ship aggregate (handling + attributes + items/durability) — partly decided; attribute/item detail
   open (#119/#120).
-- Item / inventory model — gated (#119 remainder + inventory location).
+- Item / inventory model — **inventory location decided** (on the `Ship`, transferred on ship
+  change; capacity bought as cargo bays); still gated on #119 remainder + capacity/overflow rules.
 - Player attributes — gated (#120).
 - World: areas/streaming/dungeons/editing + `IWorld.Introduce` + save zones + resurrect points —
   `Introduce`/placement/save-zones/resurrect **decided**; area/streaming/editing model open (#115/#116).
@@ -424,7 +590,14 @@ Attributes / Introduce` = **0 files on main** → all NEW. Verdict per subsystem
 3. World editing: tool, data format, audience.
 4. Control choice: session-locked vs switchable; device-only vs UI-paradigm.
 5. Touch + focus UI coexistence.
-6. Item durability-zero behaviour; item model detail; repair.
+6. Item model detail (the full category list); the floor on the reputation repair discount, so the
+   death penalty still bites at high standing.
+   *(Settled: durability-zero disables until repaired · inventory sits on the ship and transfers ·
+   capacity is slot-based, per-bay, capped, and credit-gated · bay count is a per-ship role stat ·
+   the vendor bay-swap, credited at sale value · buy price > sale price on everything, ships and
+   bays included · scrapping a ship pays credits · paid per-vendor repair · a swap that does not fit
+   is refused, the player sells up · ships are a ladder of commitments, not a garage, so §10's
+   single-`Ship` seam stands.)*
 7. Player attribute list.
 8. Resurrect points vs save zones.
 9. Placement authority in `Introduce`.
