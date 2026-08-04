@@ -97,8 +97,28 @@ public sealed class Character
     }
 
     /// <summary>
-    /// Adds to the character's money.
+    /// Adds to the character's money, holding it at the top of the range rather than letting it
+    /// wrap past.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// An earn that would carry the balance past <see cref="int.MaxValue"/> stops there. Left to
+    /// wrap, it comes back negative — which is the one state <see cref="Spend"/> exists to prevent,
+    /// arrived at silently through the door marked "earning". Nothing throws where it happens, and
+    /// the player only finds out later, at a purchase: <see cref="Spend"/> reads the negative
+    /// balance as the ceiling, so every amount is more than the character has and nothing can ever
+    /// be bought again. A payment cannot be allowed to be what takes spending away.
+    /// </para>
+    /// <para>
+    /// Clamped rather than refused, for the same reason a standing is — see
+    /// <see cref="Reputation.Adjust"/>. The caller has made no mistake: a reward of the usual size
+    /// landing on a balance that happens to be at the end of the range is an ordinary call, and
+    /// throwing would take the game down for a job the player had just been paid for. Holding costs
+    /// the difference between two balances that are both already richer than the model can express,
+    /// and keeps the guarantee that matters — earning can never leave a character poorer than it
+    /// found them, and never in debt.
+    /// </para>
+    /// </remarks>
     /// <param name="credits">How much to add. Zero is allowed and does nothing.</param>
     /// <exception cref="ArgumentOutOfRangeException">
     /// The amount is negative. Earning a negative amount is spending, and the two need telling apart
@@ -108,7 +128,12 @@ public sealed class Character
     {
         ArgumentOutOfRangeException.ThrowIfNegative(credits);
 
-        Credits += credits;
+        // widened before the addition rather than after it: the sum of two int values always fits in
+        // a long, so there is no wrap to detect afterwards — by then the evidence is gone. Only the
+        // top end can be reached, because neither the balance nor the amount is ever negative.
+        long earned = (long)Credits + credits;
+
+        Credits = (int)Math.Min(earned, int.MaxValue);
     }
 
     /// <summary>

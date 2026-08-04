@@ -140,6 +140,47 @@ public sealed class CharacterTests
     }
 
     [Fact]
+    public void Earning_CannotPutTheCharacterIntoDebtThroughOverflow()
+    {
+        // debt is the state Spend exists to prevent, and a wrap past int.MaxValue creates it
+        // silently — no exception where it happens, and nothing to spend ever again, because Spend
+        // reads the negative balance as the ceiling
+        Character character = CharacterWith();
+        character.Earn(int.MaxValue);
+
+        character.Earn(1);
+
+        Assert.Equal(int.MaxValue, character.Credits);
+    }
+
+    [Fact]
+    public void OneEarnPastTheTop_IsHeldAtTheTopRatherThanWrapping()
+    {
+        // the whole earn is clamped, not the last of it: a single payment larger than the room left
+        // is the same failure as two that add up to more than it
+        Character character = CharacterWith();
+        character.Earn(1);
+
+        character.Earn(int.MaxValue);
+
+        Assert.Equal(int.MaxValue, character.Credits);
+    }
+
+    [Fact]
+    public void CreditsHeldAtTheTop_CanStillBeSpent()
+    {
+        // holding at the ceiling is a ceiling, not a lock: the balance the issue reports as
+        // permanently unspendable spends normally
+        Character character = CharacterWith();
+        character.Earn(int.MaxValue);
+        character.Earn(1);
+
+        character.Spend(120);
+
+        Assert.Equal(int.MaxValue - 120, character.Credits);
+    }
+
+    [Fact]
     public void EarningOrSpendingANegativeAmount_IsRefused()
     {
         Character character = CharacterWith();
