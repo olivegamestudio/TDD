@@ -191,6 +191,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Earning experience or a level can no longer wipe out the progress it was meant to add.**
+  `Progression.Gain` and `Progression.Advance` accumulated in ordinary unchecked `int` arithmetic,
+  so `Experience`, `SpendPoints` and `Level` each wrapped negative once their totals carried past
+  `int.MaxValue`. This is the same defect `Character.Earn` and `Reputation.Adjust` already carried,
+  in the third place progress is added up, and it lands hardest on `SpendPoints`: `Spend` refuses
+  any amount greater than the points held, so against a wrapped negative total *every* later spend
+  is refused, and the doc comment's promise that a character cannot be left owing points was broken
+  by the door marked "levelling up". `Experience` wrapping negative says a character has earned less
+  than nothing, which no reporting code can read.
+
+  All three totals are now added in `long` and held at `int.MaxValue`, written the same way
+  `Character.Earn` writes it — widened before the addition rather than after, because after the wrap
+  the evidence is gone. Only the top end is guarded, because neither a total nor an amount is ever
+  negative, and both methods still refuse a negative amount outright. Held rather than refused for
+  the reason credits are: the caller has made no mistake, and throwing would take the game down for
+  a reward the player had just earned. It is a ceiling and not a latch — points held at the top
+  spend normally. ([#153](https://github.com/olivegamestudio/TDD/issues/153))
+
 - **Being paid can no longer put a character into debt and lock them out of spending for good.**
   `Character.Earn` added the payment to the balance in ordinary unchecked `int` arithmetic, so
   credits carried past `int.MaxValue` wrapped negative — the one state `Spend` exists to prevent,
