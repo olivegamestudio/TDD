@@ -136,6 +136,16 @@ somewhere nobody chose.
 It *answers* rather than places because position still lives on `Player`. When a ship carries its
 own position this becomes a placement and the answer goes away.
 
+**A standing stops at the end of its range rather than wrapping past it.** `Reputation.Adjust`
+makes the move in `long` and clamps it to the `int` range, so a positive delta can never leave a
+group less friendly than it found them and a negative one can never leave them more. The sign is
+the relationship, so a wrap is not a number slightly out — it is the other faction. It clamps
+rather than refusing because the caller has made no mistake: an award of the usual size landing on
+a standing already at the end is an ordinary call, and throwing would take the game down for a
+quest the player had just succeeded at. That is the opposite answer to the content guards elsewhere
+here, and deliberately — those refuse a number that was wrong when it was authored, this one
+absorbs an arithmetic edge reached by playing.
+
 **What this deliberately does not do.**
 
 - **Nothing here is saved.** `SaveGame` still carries position and quest state only. Widening it
