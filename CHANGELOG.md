@@ -191,6 +191,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A quest trigger can no longer be declared with an infinite radius, which fired it from
+  everywhere.** `QuestTrigger`'s constructor guarded against a negative distance —
+  `ArgumentOutOfRangeException.ThrowIfNegative` — for the stated reason that nothing could satisfy
+  it, so the trigger would silently never fire. `double.PositiveInfinity` is not negative, so it
+  walked past that guard into the opposite failure: the presentation applies the rule as
+  `measured <= Distance`, every finite measurement is at most infinity, and the quest therefore
+  started or completed the instant the player existed, wherever they were. Distance is now required
+  to be finite, checked before the negative guard so that negative infinity and `NaN` are named by
+  the rule they actually break. `NaN` was already refused, but only because the sign bit of
+  `double.NaN` happens to be set — incidental behaviour to be resting the one value that makes
+  every comparison against it false on. There is still deliberately no upper bound on a finite
+  distance: the world is unbounded, so a large radius is a decision the content is allowed to make,
+  and only a value that is not a distance at all is refused.
+  ([#124](https://github.com/olivegamestudio/TDD/issues/124))
+
 - **Progress is no longer silently lost to two saves being written at once.** `GameSession` marks a
   new game ready to play before it awaits its first save — deliberately, so loading stays off the
   frame loop — and the first frame puts the player inside quest 1's start trigger, which writes the
