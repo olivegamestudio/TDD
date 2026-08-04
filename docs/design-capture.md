@@ -71,8 +71,22 @@
   project both reference — the game to *stream* it, the editor to *read and write* it. That shared
   project is the contract, and it is the thing to design when the data format is chosen. The editor
   depending on the game, or the game knowing an editor exists, would be the wrong way round.
-- **[OPEN]** The **chunking scheme** — *how* the world is partitioned into streamable chunks (fixed
-  grid? chunk size? regions-made-of-chunks?). The core remaining question of #115.
+- **[DECIDED] The world is partitioned into hand-drawn regions**, each its own size and shape,
+  rather than a fixed grid. The world is handcrafted, so its seams follow the places that were
+  authored — the mines, a city, a debris field — instead of an arbitrary lattice laid over them. A
+  region is a *place*, and that is what the designer already thinks in.
+- **[IMPLICATION]** This puts real weight on the editor: it has to let you **draw and reshape region
+  boundaries**, not just drop entities into them. Since the editor is already the priority, that is
+  the first thing it needs to do rather than a later addition.
+- **[IMPLICATION]** Proximity loading gets harder than arithmetic. With a grid, "which piece am I
+  in" is a division; with arbitrary shapes it is a **spatial test against every nearby region**, and
+  the load radius has to be checked against shapes rather than cells. Worth an index of some kind
+  once there are many regions.
+- **[OPEN]** **How big is a region allowed to be, and can they overlap?** Sizes now vary by hand, so
+  a large region is a long load while a small one is cheap — the streaming cost becomes an authoring
+  decision, which needs a stated budget or the world will stutter in the places someone drew
+  generously. Overlap needs a rule too: either regions may not overlap, or the player is in several
+  at once and something decides which wins.
 - **[OPEN]** TOML vs JSON (pick one); how the in-game editor and external toolbox **share/sync** the
   same data; load-radius & chunk-size tuning; whether the origin region unloads on a dungeon teleport.
 - **[vs main]** `BattleForceWorld` is one in-memory bag of quest markers — no streaming, areas,
@@ -636,10 +650,9 @@ Attributes / Introduce` = **0 files on main** → all NEW. Verdict per subsystem
 1. **The editor comes first.** **[DECIDED — priority]** Being able to *build content* is paramount:
    the editor is the key to everything else in the world model, so it leads rather than follows the
    chunking scheme. What is still open is its **shape** — see §3.
-2. **The world model** — how the world is partitioned into streamable chunks (fixed grid? chunk
-   size? regions made of chunks?). *(Data format is decided: **JSON**.)* Everything
-   authored — quest markers, save zones, resurrect points, vendors, NPCs, dungeon teleports — lands
-   in whatever this decides. Follows the editor. (§3)
+2. **Region sizing and overlap** — how large a hand-drawn region may be before it stutters on load,
+   and whether regions may overlap. *(Partitioning is decided: **hand-drawn regions**, not a grid.
+   Data format is decided: **JSON**.)* (§3)
 3. **Touch is a design-time constraint, not a later port.** **[DECIDED]** Every interface decision
    is made having *already considered touch* — target sizes, reachability, and whether the
    interaction works by tap and drag as well as by focus. The point is not to build touch now but to
