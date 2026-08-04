@@ -90,6 +90,49 @@ public sealed class ProgressionTests
     }
 
     [Fact]
+    public void EarningPastTheCeiling_HoldsAtTheCeilingRatherThanWrappingNegative()
+    {
+        // a character who has earned everything has not earned less than nothing: wrapping would
+        // hand the record back a number no reporting code can read
+        Progression progression = new();
+        progression.Gain(int.MaxValue);
+
+        progression.Gain(1);
+
+        Assert.Equal(int.MaxValue, progression.Experience);
+    }
+
+    [Fact]
+    public void AdvancingPastThePointCeiling_HoldsAtTheCeilingRatherThanWrappingNegative()
+    {
+        // wrapping would leave the character owing points — the state Spend exists to refuse
+        Progression progression = new();
+        progression.Advance(int.MaxValue);
+
+        progression.Advance(1);
+
+        Assert.Equal(int.MaxValue, progression.SpendPoints);
+    }
+
+    [Fact]
+    public void PointsHeldAtTheCeiling_CanStillBeSpent()
+    {
+        // the ceiling is a ceiling, not a lock: a wrapped negative total would have made every
+        // future Spend throw, because the negative reads as the amount held
+        Progression progression = new();
+        progression.Advance(int.MaxValue);
+        progression.Advance(1);
+
+        progression.Spend(2);
+
+        Assert.Equal(int.MaxValue - 2, progression.SpendPoints);
+    }
+
+    // Level's own ceiling is guarded by the same rule, but has no test here: the only way to raise
+    // a level is to ask for one, so reaching int.MaxValue means int.MaxValue calls to Advance. A
+    // test that takes minutes to prove a line of arithmetic is not worth the suite's time.
+
+    [Fact]
     public void Grant_GivesAGiftTheCharacterDidNotHave()
     {
         Progression progression = new();

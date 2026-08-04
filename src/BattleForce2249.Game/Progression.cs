@@ -46,6 +46,10 @@ public sealed class Progression
     /// Earns experience.
     /// </summary>
     /// <param name="experience">How much to earn. Zero is allowed and does nothing.</param>
+    /// <remarks>
+    /// Earning more than <see cref="int.MaxValue"/> holds at <see cref="int.MaxValue"/>. See
+    /// <see cref="Advance"/> for why the ceiling is held rather than thrown at.
+    /// </remarks>
     /// <exception cref="ArgumentOutOfRangeException">
     /// The amount is negative. Experience is not taken back — a system that means to penalise the
     /// player should say so rather than reach through here, because the two need telling apart the
@@ -55,20 +59,29 @@ public sealed class Progression
     {
         ArgumentOutOfRangeException.ThrowIfNegative(experience);
 
-        Experience += experience;
+        Experience = Add(Experience, experience);
     }
 
     /// <summary>
     /// Takes the character up a level and hands them the points it is worth.
     /// </summary>
     /// <param name="spendPoints">How many points the level grants.</param>
+    /// <remarks>
+    /// Both the level and the points held stop at <see cref="int.MaxValue"/> rather than wrapping.
+    /// A character who has earned everything has not earned less than nothing, and a wrapped
+    /// <see cref="SpendPoints"/> would be exactly the owing-points state <see cref="Spend"/> exists
+    /// to refuse — it would read as the ceiling on spending and reject every later
+    /// <see cref="Spend"/> call. The ceiling is held rather than thrown at because this is a
+    /// reward: a character earning too much is not a caller doing something wrong, and pillar 4
+    /// asks that the record survive rather than be lost to an exception nobody handles.
+    /// </remarks>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="spendPoints"/> is negative.</exception>
     public void Advance(int spendPoints)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(spendPoints);
 
-        Level++;
-        SpendPoints += spendPoints;
+        Level = Add(Level, 1);
+        SpendPoints = Add(SpendPoints, spendPoints);
     }
 
     /// <summary>
@@ -112,5 +125,28 @@ public sealed class Progression
         ArgumentException.ThrowIfNullOrWhiteSpace(giftId);
 
         return _gifts.Contains(giftId);
+    }
+
+    /// <summary>
+    /// Adds to a running total, holding at <see cref="int.MaxValue"/> rather than wrapping past it.
+    /// </summary>
+    /// <remarks>
+    /// C# arithmetic is unchecked by default, so a total that passes <see cref="int.MaxValue"/>
+    /// silently becomes a large negative number. Every total on this type counts something a
+    /// character has earned, and none of them can be negative without meaning something no reader
+    /// can interpret — so the addition is done here, once, where the ceiling is stated. This is
+    /// the same rule <see cref="Character.Earn"/> already applies to credits, written the same way.
+    /// </remarks>
+    /// <param name="total">The running total, which is never negative.</param>
+    /// <param name="amount">How much to add, which is never negative.</param>
+    /// <returns>The sum, or <see cref="int.MaxValue"/> if the sum would pass it.</returns>
+    static int Add(int total, int amount)
+    {
+        // widened before the addition rather than after it: the sum of two int values always fits in
+        // a long, so there is no wrap to detect afterwards — by then the evidence is gone. Only the
+        // top end can be reached, because neither the total nor the amount is ever negative.
+        long sum = (long)total + amount;
+
+        return (int)Math.Min(sum, int.MaxValue);
     }
 }
