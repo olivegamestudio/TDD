@@ -83,6 +83,53 @@ public sealed class ReputationTests
         Assert.Equal(0, reputation.With("Miners"));
     }
 
+    [Fact]
+    public void EarningFavour_CannotTurnAGroupHostileThroughOverflow()
+    {
+        // the sign is the relationship. A standing that wrapped past int.MaxValue would come back
+        // maximally hostile, which is a whole game's favour reversed by one award.
+        Reputation reputation = new();
+        reputation.Adjust(Miners, int.MaxValue);
+
+        Assert.Equal(int.MaxValue, reputation.Adjust(Miners, 1));
+
+        Assert.Equal(int.MaxValue, reputation.With(Miners));
+    }
+
+    [Fact]
+    public void LosingFavour_CannotTurnAGroupFriendlyThroughUnderflow()
+    {
+        Reputation reputation = new();
+        reputation.Adjust(Miners, int.MinValue);
+
+        Assert.Equal(int.MinValue, reputation.Adjust(Miners, -1));
+
+        Assert.Equal(int.MinValue, reputation.With(Miners));
+    }
+
+    [Fact]
+    public void OneAdjustmentPastTheEnd_IsHeldAtTheEndRatherThanWrapping()
+    {
+        // the whole move is clamped, not the last step of it: a single award larger than the range
+        // is the same failure as two that add up to more than it
+        Reputation reputation = new();
+        reputation.Adjust(Miners, 1);
+
+        Assert.Equal(int.MaxValue, reputation.Adjust(Miners, int.MaxValue));
+    }
+
+    [Fact]
+    public void AStandingHeldAtTheEnd_StillMovesBackTheOtherWay()
+    {
+        // clamping is a ceiling, not a latch. A group the character has maxed out can still fall
+        // out with them.
+        Reputation reputation = new();
+        reputation.Adjust(Miners, int.MaxValue);
+        reputation.Adjust(Miners, 1);
+
+        Assert.Equal(int.MaxValue - 10, reputation.Adjust(Miners, -10));
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("   ")]

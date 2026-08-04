@@ -191,6 +191,25 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Earning favour with a group can no longer turn it hostile.** `Reputation.Adjust` added the
+  delta to the standing in ordinary unchecked `int` arithmetic, so a standing carried past
+  `int.MaxValue` wrapped to `int.MinValue`. The sign of a standing *is* the relationship — negative
+  is hostile, positive is friendly — so that is not a number coming out slightly wrong; it is a
+  group the character has spent a whole game earning favour with turning maximally hostile on one
+  reward, raising nothing and naming nothing, with every later award afterwards working back
+  through the wrap rather than towards what the caller asked for. The move is now made in `long`
+  and clamped to the `int` range, so a standing stops at the end rather than passing it: a positive
+  delta can never leave a group less friendly than it found them, and a negative one can never leave
+  them more.
+
+  Clamped rather than refused, unlike the content guards below, because the caller has made no
+  mistake — an award of the usual size lands on a standing that happens to be at the end of the
+  range, and throwing would take the game down for a quest the player had just succeeded at. What
+  it costs is the difference between two standings that are both already as friendly as the model
+  can express. It is a ceiling and not a latch: a group held at the maximum still falls out with the
+  character normally.
+  ([#151](https://github.com/olivegamestudio/TDD/issues/151))
+
 - **A ship can no longer be built with handling that is not a number, which flew it out of the
   world or nowhere at all.** `ShipMovement`'s constructor guarded acceleration and drag with
   `ThrowIfNegativeOrZero` and the turn rate with `ThrowIfNegative`, for the stated reason that a

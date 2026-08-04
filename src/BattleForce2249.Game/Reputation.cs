@@ -39,8 +39,26 @@ public sealed class Reputation
     }
 
     /// <summary>
-    /// Moves a group's standing.
+    /// Moves a group's standing, holding it at the end of the range rather than letting it wrap
+    /// past.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A move that would carry the standing past <see cref="int.MaxValue"/> or
+    /// <see cref="int.MinValue"/> stops there. Left to wrap, earning favour with a group already at
+    /// the top would come back as <see cref="int.MinValue"/> — a whole game's standing reversed to
+    /// maximally hostile by one award, raising nothing and naming nothing. The sign carries the
+    /// relationship, so that is not a number being slightly wrong; it is the wrong faction.
+    /// </para>
+    /// <para>
+    /// Clamped rather than refused, because the caller has not made a mistake: a reward of the
+    /// usual size applied to a standing that happens to be at the end of the range is an ordinary
+    /// call, and throwing would take the game down for a quest the player just succeeded at. Saying
+    /// "no further" costs the difference between two standings that are both already as friendly as
+    /// the model can express, and keeps the guarantee that matters — a positive delta can never
+    /// leave a group less friendly than it found them, and a negative one can never leave them more.
+    /// </para>
+    /// </remarks>
     /// <param name="group">The group's identifier.</param>
     /// <param name="delta">How far to move it. Positive earns favour, negative loses it.</param>
     /// <returns>The standing after the move.</returns>
@@ -49,7 +67,10 @@ public sealed class Reputation
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(group);
 
-        int standing = With(group) + delta;
+        // Widened before the addition rather than after it: the sum of two int values always fits
+        // in a long, so there is no wrap to detect afterwards — by then the evidence is gone.
+        long moved = (long)With(group) + delta;
+        int standing = (int)Math.Clamp(moved, int.MinValue, int.MaxValue);
         _standings[group] = standing;
 
         return standing;
