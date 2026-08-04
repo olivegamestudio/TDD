@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace OliveGameStudio;
 
 /// <summary>
@@ -23,17 +25,54 @@ public sealed class ShipMovement
     /// <param name="handling">The ship's acceleration, drag and turn rate.</param>
     /// <exception cref="ArgumentOutOfRangeException">
     /// The handling could not be flown: a ship with no acceleration never moves, and one with no
-    /// drag never stops accelerating and has no top speed. Both are content mistakes that would
-    /// otherwise only show up as a ship that feels wrong.
+    /// drag never stops accelerating and has no top speed. A value that is not a finite number is
+    /// refused for the same reason and named the same way — infinite acceleration makes
+    /// <see cref="ShipHandling.MaximumSpeed"/> infinite and the ship leaves the world in a frame or
+    /// two, infinite drag makes it zero so full thrust moves the ship nowhere, and an infinite turn
+    /// rate leaves the heading at whatever wrapping infinity happens to produce. All are content
+    /// mistakes that would otherwise only show up as a ship that feels wrong, at a distance from
+    /// the numbers that caused it.
     /// </exception>
     public ShipMovement(ShipHandling handling)
     {
         ArgumentNullException.ThrowIfNull(handling);
+
+        // Ordered before the sign guards so that negative infinity and NaN are named by the rule
+        // they actually break. Both already fail the guards below, but NaN only because the sign
+        // bit of double.NaN happens to be set — incidental behaviour to lean on for the one value
+        // that would otherwise spread from the heading into every position the ship reports.
+        ThrowIfNotFinite(handling.Acceleration);
+        ThrowIfNotFinite(handling.Drag);
+        ThrowIfNotFinite(handling.TurnRate);
+
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(handling.Acceleration);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(handling.Drag);
         ArgumentOutOfRangeException.ThrowIfNegative(handling.TurnRate);
 
         _handling = handling;
+    }
+
+    /// <summary>
+    /// Refuses a handling value that is not a finite number, naming the value rather than the
+    /// handling it came from.
+    /// </summary>
+    /// <remarks>
+    /// The caller expression is captured so the exception says <c>handling.Drag</c> rather than
+    /// <c>handling</c>, matching what the framework's own guards report for the same argument. A
+    /// ship is built from authored content, and an exception naming only the record leaves whoever
+    /// wrote the profile reading three numbers to work out which one was meant.
+    /// </remarks>
+    static void ThrowIfNotFinite(
+        double value,
+        [CallerArgumentExpression(nameof(value))] string? paramName = null)
+    {
+        if (!double.IsFinite(value))
+        {
+            throw new ArgumentOutOfRangeException(
+                paramName,
+                value,
+                "A ship's handling must be flown with finite numbers.");
+        }
     }
 
     /// <summary>

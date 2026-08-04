@@ -9,14 +9,20 @@ namespace OliveGameStudio;
 /// </remarks>
 /// <param name="Acceleration">
 /// How hard the ship accelerates at full thrust, in world units per second per second. Must be
-/// greater than zero.
+/// greater than zero, and finite: an infinite acceleration gives an infinite
+/// <see cref="MaximumSpeed"/>, and the ship leaves the world within a frame or two.
 /// </param>
 /// <param name="Drag">
 /// How much of its velocity the ship sheds per second, as a rate rather than a proportion —
 /// velocity decays by <c>e^(-Drag)</c> over a second of coasting. Must be greater than zero:
-/// without drag the ship would accelerate forever and never settle at a top speed.
+/// without drag the ship would accelerate forever and never settle at a top speed. Must also be
+/// finite, which is the same failure from the other end — infinite drag makes
+/// <see cref="MaximumSpeed"/> zero, so full thrust moves the ship nowhere at all.
 /// </param>
-/// <param name="TurnRate">How fast the ship turns at full helm, in radians per second.</param>
+/// <param name="TurnRate">
+/// How fast the ship turns at full helm, in radians per second. Must not be negative, and must be
+/// finite.
+/// </param>
 public sealed record ShipHandling(double Acceleration, double Drag, double TurnRate)
 {
     /// <summary>

@@ -191,6 +191,26 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A ship can no longer be built with handling that is not a number, which flew it out of the
+  world or nowhere at all.** `ShipMovement`'s constructor guarded acceleration and drag with
+  `ThrowIfNegativeOrZero` and the turn rate with `ThrowIfNegative`, for the stated reason that a
+  ship with no acceleration never moves and one with no drag never stops accelerating.
+  `double.PositiveInfinity` is neither negative nor zero, so it walked past all three guards into
+  degenerate physics that named nothing: infinite acceleration makes `MaximumSpeed` infinite and
+  the ship's position runs off to infinity within a frame or two, taking the player with it;
+  infinite drag makes `MaximumSpeed` zero, so full thrust moves the ship nowhere and the controls
+  read as broken; an infinite turn rate leaves the heading at whatever wrapping infinity happens to
+  produce. Each of the three values is now required to be finite, checked before the sign guards so
+  that negative infinity and `NaN` are named by the rule they actually break — `NaN` was already
+  refused, but only because the sign bit of `double.NaN` happens to be set, which is incidental
+  behaviour to be resting on for the one value that would otherwise spread from the heading into
+  every position the ship reports afterwards. The refusal names the value rather than the record it
+  came from — `handling.Drag`, not `handling` — because a ship is built from authored content, and
+  naming only the record leaves whoever wrote the profile reading three numbers to find the one
+  that was meant. There is no upper bound on a finite value: how fast a ship goes is content's
+  decision, and only a number that is not a handling value at all is refused.
+  ([#125](https://github.com/olivegamestudio/TDD/issues/125))
+
 - **A quest trigger can no longer be declared with an infinite radius, which fired it from
   everywhere.** `QuestTrigger`'s constructor guarded against a negative distance —
   `ArgumentOutOfRangeException.ThrowIfNegative` — for the stated reason that nothing could satisfy
