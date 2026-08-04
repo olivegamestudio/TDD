@@ -146,6 +146,16 @@ quest the player had just succeeded at. That is the opposite answer to the conte
 here, and deliberately — those refuse a number that was wrong when it was authored, this one
 absorbs an arithmetic edge reached by playing.
 
+**A balance stops at the top of its range for the same reason, and it is the same shape.**
+`Character.Earn` makes the addition in `long` and holds the result at `int.MaxValue`, so earning can
+never leave a character poorer than it found them. Wrapped, it left them in *debt* — the one state
+`Spend` exists to prevent, reached silently through the door marked "earning", with nothing thrown
+where it happened. The cost landed later and permanently: `Spend` refuses anything greater than the
+balance, so against a negative one every purchase is unaffordable and the character can never buy
+anything again. Only the top end is guarded, because neither the balance nor the amount earned is
+ever negative — `Earn` still refuses a negative amount outright, since earning a negative amount is
+spending and the two have to be told apart wherever anything reports what a job paid.
+
 **What this deliberately does not do.**
 
 - **Nothing here is saved.** `SaveGame` still carries position and quest state only. Widening it

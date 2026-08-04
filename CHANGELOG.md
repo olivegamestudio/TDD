@@ -191,6 +191,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Being paid can no longer put a character into debt and lock them out of spending for good.**
+  `Character.Earn` added the payment to the balance in ordinary unchecked `int` arithmetic, so
+  credits carried past `int.MaxValue` wrapped negative — the one state `Spend` exists to prevent,
+  arrived at silently through the door marked "earning", with nothing thrown where it happened. The
+  player found out later and could not recover: `Spend` refuses any amount greater than the balance,
+  so against a negative one *every* purchase is unaffordable, and a payment had taken spending away
+  permanently. The addition is now made in `long` and held at `int.MaxValue`, so earning can never
+  leave a character poorer than it found them and never in debt. Only the top end is guarded,
+  because neither the balance nor the amount earned is ever negative, and `Earn` still refuses a
+  negative amount outright.
+
+  Held rather than refused, for the reason a standing is: the caller has made no mistake, a reward
+  of the usual size lands on a balance that happens to be at the end of the range, and throwing
+  would take the game down for a job the player had just been paid for. It is a ceiling and not a
+  latch — a balance held at the top spends normally.
+  ([#152](https://github.com/olivegamestudio/TDD/issues/152))
+
 - **Earning favour with a group can no longer turn it hostile.** `Reputation.Adjust` added the
   delta to the standing in ordinary unchecked `int` arithmetic, so a standing carried past
   `int.MaxValue` wrapped to `int.MinValue`. The sign of a standing *is* the relationship — negative
