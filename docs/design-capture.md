@@ -41,7 +41,15 @@
   not a separate scene.
 - **[DECIDED]** **Everything is authored world data** — quest markers, save zones, resurrect points,
   vendors, NPCs, mining/material nodes, dungeon entrances/teleports, spawns.
-- **[DECIDED]** Data format is **TOML or JSON** (pick one), chosen to be both editable and streamable.
+- **[DECIDED] Data format is JSON.** TOML reads better by hand, but **nothing authors this by
+  hand** — placement is in-game and values go through the external editor, so hand-readability is a
+  debugging and code-review concern rather than a workflow one. JSON is already the repository's
+  format (localisation files, the save game), so it adds no second format and no third-party
+  dependency, and `System.Text.Json` is built in, fast and source-generatable — which matters when
+  chunks are streamed on proximity.
+- **[NOTE]** What this gives up is **comments**, which JSON has no form for. If authored data ever
+  wants a note attached — *"this marker is deliberately generous"* — it goes in as a **field the
+  editor writes**, not as a comment in the file.
 - **[DECIDED]** Editing is a **hybrid**, and the split is by *what the job is*:
   - **In-game — placement.** Drag-and-drop entities into the world, where you can see them in
     context at the scale they will be played at.
@@ -629,7 +637,7 @@ Attributes / Introduce` = **0 files on main** → all NEW. Verdict per subsystem
    the editor is the key to everything else in the world model, so it leads rather than follows the
    chunking scheme. What is still open is its **shape** — see §3.
 2. **The world model** — how the world is partitioned into streamable chunks (fixed grid? chunk
-   size? regions made of chunks?), and the **data format** (TOML or JSON, pick one). Everything
+   size? regions made of chunks?). *(Data format is decided: **JSON**.)* Everything
    authored — quest markers, save zones, resurrect points, vendors, NPCs, dungeon teleports — lands
    in whatever this decides. Follows the editor. (§3)
 3. **Touch is a design-time constraint, not a later port.** **[DECIDED]** Every interface decision
