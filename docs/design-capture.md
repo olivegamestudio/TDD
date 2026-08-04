@@ -82,11 +82,25 @@
   in" is a division; with arbitrary shapes it is a **spatial test against every nearby region**, and
   the load radius has to be checked against shapes rather than cells. Worth an index of some kind
   once there are many regions.
-- **[OPEN]** **How big is a region allowed to be, and can they overlap?** Sizes now vary by hand, so
-  a large region is a long load while a small one is cheap — the streaming cost becomes an authoring
-  decision, which needs a stated budget or the world will stutter in the places someone drew
-  generously. Overlap needs a rule too: either regions may not overlap, or the player is in several
-  at once and something decides which wins.
+- **[DECIDED] Distance triggers the load; the region is what loads.** The two are separate questions
+  and get separate answers. A **load radius** around the ship is the trigger, so warning comes
+  smoothly and early as the player approaches; the **region** is the unit that then starts loading,
+  so content arrives in a package that was authored as one place. This is the hybrid already implied
+  above, stated plainly because "distance-based or region-based" is a false choice — it is both, at
+  different jobs.
+- **[DECIDED, direction] Whether a region loads whole or progressively is deferred — but the data
+  must not assume whole.** With regions hand-drawn and varying in size, loading a large one in a
+  single pass is a stall even if the player only clipped its edge. Loading it **progressively**,
+  nearest content first, removes any cap on how big a region may be, at the cost of more machinery.
+  That choice can be made later **provided entities carry their own positions within the region** —
+  which they do — so nothing in the format forecloses it. Whole-region loading is the simpler
+  starting point; progressive is where it goes if regions get big.
+- **[OPEN]** **How big may a region be, and can regions overlap?** Sizes vary by hand now, so a large
+  region is a long load and a small one is cheap — streaming cost has become an **authoring
+  decision**, and it needs a stated budget or the world will stutter wherever someone drew
+  generously. *(Progressive loading would lift the size cap; until then a budget is the only thing
+  holding it.)* Overlap needs a rule too: either regions may not overlap, or the player is in
+  several at once and something decides which wins.
 - **[OPEN]** TOML vs JSON (pick one); how the in-game editor and external toolbox **share/sync** the
   same data; load-radius & chunk-size tuning; whether the origin region unloads on a dungeon teleport.
 - **[vs main]** `BattleForceWorld` is one in-memory bag of quest markers — no streaming, areas,
