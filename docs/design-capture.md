@@ -521,6 +521,11 @@ Character**.
   **absorption** (soaks damage; the shield layer that depletes before health) and **reflecting**
   (bounces damage back at the attacker). The player fills the 2 slots freely: **two of a kind doubles
   the effect** (double absorption, or double reflect), or **mix them for a combo**.
+  *(Built in #135 as `ShieldStats` / `Shielding` / `Ship.TakeDamage`. Two details the model had to
+  answer to work at all, neither of them decided here: a reflected share **never lands**, so it
+  costs neither the shield layer nor the hull; and a pair reflecting **more than the whole hit is
+  held at the whole hit**, which makes total immunity reachable from two shields. Both are open to
+  being overruled — see the reflect detail still listed as **[OPEN]** below.)*
 - **[DECIDED] Orb / "additional" slots (2):** an **orb is an auto-controlled companion object** that
   acts on its own — e.g. one that **circles the ship** (orbiting defence), a **spiky object that
   tracks** enemies (autonomous attacker), a **ball**. Data-driven behaviours; **no manual fire

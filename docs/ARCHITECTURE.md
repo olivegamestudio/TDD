@@ -28,7 +28,7 @@ to know about ships, quests or credits is on the wrong side of this line.
 | `OliveGameStudio.FrameRate` | Frame time filtering, so a paused or slowed game holds still while frames keep arriving. |
 | `OliveGameStudio.Input` | `InputRouter` — where a frame of input goes, and which device the game is being played on. |
 | `OliveGameStudio.Progress` | `LocalSaveProgressService`, persisting save text to a file. |
-| `OliveGameStudio.World` | `Position`, `Player`. The spatial model, plus the ship's physics and `IShipInput` — what an input means, never which device produced it. Also `Ship`, `ShipProfile`, `Meter`, `Item` and `Inventory`: a hull, the condition it is in, and the things that can be held. |
+| `OliveGameStudio.World` | `Position`, `Player`. The spatial model, plus the ship's physics and `IShipInput` — what an input means, never which device produced it. Also `Ship`, `ShipProfile`, `Meter`, `Item` and `Inventory`: a hull, the condition it is in, and the things that can be held. And what a hit costs it: `ShieldType`, `ShieldStats`, `Shielding`, `DamageOutcome`. |
 | `OliveGameStudio.Rendering` | `Camera2D` — the world-to-screen transform, and the only place the world's axes and the screen's are reconciled. |
 | `OliveGameStudio.Localisation` | `ITextProvider`, `JsonTextProvider`, `MissingTextException`. |
 | `Pilgrimage` | The quest system. No project references at all, by design. |
@@ -110,7 +110,7 @@ ship.
 | Content (authored, never changes) | Instance (played, changes) |
 | --- | --- |
 | `CharacterTemplate` — id, translated name, hull, start location, starting inventory | `Character` — template, `Progression`, credits, `Reputation`, `Inventory`, `QuestLog`, current `Ship` |
-| `ShipProfile` — handling, health, durability, loadout | `Ship` — `Handling`, `Loadout`, `Health`, `Shield`, `Durability`, `Movement` |
+| `ShipProfile` — handling, health, durability, loadout | `Ship` — `Handling`, `Loadout`, `Shielding`, `Health`, `Shield`, `Durability`, `Movement` |
 
 `ICharacterRoster` / `BattleForceRoster` is the seam the game supplies characters through, exactly
 as `ICampaign` supplies quests: the roster is a singleton and builds its templates on each read,
@@ -123,6 +123,30 @@ what `AddSingleton(DisgracedShip.Handling)` and `AddSingleton<ShipMovement>()` w
 and the owned ship could be given two different sets of numbers, and nothing would say so. It also
 removes a reset: entering the game screen used to call `ShipMovement.Reset()` so a resumed game
 began stationary, and now a new game simply builds a new ship, which has never been anywhere.
+
+**Shield slots add up, and that is the whole stacking rule.** A ship carries `Shielding` — up to
+`Shielding.Slots` (two) `ShieldStats`, each authored as one of the two things a shield can do:
+`ShieldStats.Absorbing` contributes to the layer that depletes before health, `ShieldStats.Reflecting`
+bounces its share of a hit back at whatever fired it. `Shielding` sums both, so two of a kind double
+one effect and a mix gives both at single strength without either being written down as a case. A
+rule phrased as "double when they match" would have to answer what happens when two shields nearly
+match; adding never has to. A pair reflecting more than the whole hit is held at the whole hit rather
+than refused — each shield was authored on its own and neither is a mistake, and damage travelling
+back out larger than it came in is.
+
+`Ship.TakeDamage` is where that becomes a cost: the reflected share comes off the hit before
+anything sees it, what is left meets the shield layer, and only what the layer cannot hold reaches
+health. `DamageOutcome` reports the three parts, which always add back up to the hit that arrived.
+It *reports* what was reflected rather than applying it — the model declares the rule and the
+presentation applies it, and a ship knowing how much damage it turned around is a different claim
+from a ship knowing what shot at it.
+
+Shields are fitted as stats rather than as items on purpose. `Item` is still an identifier and
+nothing maps one to the numbers it is worth, so fitting by stats is what lets the shields work
+without inventing the item model early; when that arrives, reading a shield item's stats is what
+`Fit` is handed. `Shielding.Slots` is a constant for the same kind of reason — v1 hulls all carry
+the same layout, and when a hull is allowed to vary it the number moves to the hull without changing
+what filling the slots means.
 
 **The world is the placement authority.** `IWorld.Introduce(ship, location)` brings a ship into the
 world at a *named place* and answers where that put it; `BattleForceWorld` resolves `Mines` to the
@@ -706,10 +730,13 @@ says nothing gets — a default so a game composes flyable, not a measurement of
   writes position and quest state only, so none of it survives closing the game. Widening the save
   shape changes what older saves can be read back into, so it is its own decision. See pillar 4 in
   `docs/DESIGN.md`.
-- **Nothing fills the ship's condition in, and nothing empties it.** `Ship` has health, shield and
-  durability; no combat damages them, no wear reduces them, and no equipped item supplies a shield,
-  so every ship's shield maximum is zero. What happens when a meter reaches zero is undecided, and
-  the item half of that question is open.
+- **Nothing shoots at the ship, and nothing wears it out.** `Ship.TakeDamage` is the rule for what a
+  hit costs and `Fit` is how shields get there, but no weapon, enemy or hazard calls either, and
+  nothing reduces durability at all. What happens when a meter reaches zero is still undecided, and
+  so is the item half: `Item` is an identifier, so nothing turns a collected shield into the
+  `ShieldStats` `Fit` is handed, and no content authors a shield to collect. The Disgraced therefore
+  still flies with empty shield slots — which is what the design asks for at the start of the story,
+  but it is arrived at by there being no shields rather than by a decision.
 - **Nothing selects a character.** `ICharacterRoster.Starting` is what a new game plays as, and
   `Templates` holds one entry. Choosing between them is a screen nobody has asked for yet.
 - `SaveGameSerializerTests.Deserialize_KeepsAPositionAtTheFarEdgeOfWhatCanBeDrawn` formats

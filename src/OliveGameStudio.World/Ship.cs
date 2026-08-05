@@ -38,10 +38,11 @@ public sealed class Ship
         Health = new Meter(profile.Health);
         Durability = new Meter(profile.Durability);
 
-        // Nothing fitted supplies a shield yet, so every ship starts with none rather than with a
-        // shield the content never gave it. A ship with no shield and a ship whose shield is down
-        // read the same here on purpose: both are one hit from the hull.
-        Shield = new Meter(0);
+        // A new hull comes out of the yard with empty shield slots, so the layer is zero until
+        // something is fitted. A ship with no shield and a ship whose shield is down read the same
+        // here on purpose: both are one hit from the hull.
+        Shielding = Shielding.None;
+        Shield = new Meter(Shielding.Capacity);
 
         Movement = new ShipMovement(profile.Handling);
     }
@@ -61,6 +62,13 @@ public sealed class Ship
     /// slots exist and what may go in them is an open decision, so today this is what is fitted and
     /// nothing more.
     /// </summary>
+    /// <remarks>
+    /// The shield slots are <see cref="Shielding"/> rather than part of this, and they hold stats
+    /// rather than items. An <see cref="Item"/> is still only an identifier — what turns one into
+    /// the numbers it is worth is the item model, which is open. Fitting shields by their stats is
+    /// what lets the shields work now without inventing that answer early; when it arrives, reading
+    /// a shield item's stats is what <see cref="Fit"/> is handed.
+    /// </remarks>
     public Inventory Loadout { get; }
 
     /// <summary>
@@ -69,10 +77,15 @@ public sealed class Ship
     public Meter Health { get; }
 
     /// <summary>
-    /// Gets the shield the ship is carrying, and what is left of it. It comes from what is fitted,
-    /// so a ship with nothing fitted has a maximum of zero.
+    /// Gets what is in the ship's shield slots.
     /// </summary>
-    public Meter Shield { get; }
+    public Shielding Shielding { get; private set; }
+
+    /// <summary>
+    /// Gets the shield layer the ship is carrying, and what is left of it. It comes from what is
+    /// fitted, so a ship with empty shield slots has a maximum of zero.
+    /// </summary>
+    public Meter Shield { get; private set; }
 
     /// <summary>
     /// Gets the hull's structural condition, and what is left of it.
@@ -83,4 +96,71 @@ public sealed class Ship
     /// Gets the physics that flies this ship, built from its own <see cref="Handling"/>.
     /// </summary>
     public ShipMovement Movement { get; }
+
+    /// <summary>
+    /// Puts shields in the ship's shield slots, replacing whatever was in them.
+    /// </summary>
+    /// <remarks>
+    /// The layer belongs to what is fitted, so refitting builds a new one at full strength rather
+    /// than carrying over what the last set of shields had left. A shield that has just been bolted
+    /// on is a shield that has not been shot at; keeping the old charge would mean a ship's
+    /// remaining shield depended on what it used to be wearing, which nothing else in the model
+    /// would explain to the player.
+    /// </remarks>
+    /// <param name="shielding">
+    /// The shields to wear. <see cref="OliveGameStudio.Shielding.None"/> strips the slots.
+    /// </param>
+    /// <exception cref="ArgumentNullException"><paramref name="shielding"/> is <c>null</c>.</exception>
+    public void Fit(Shielding shielding)
+    {
+        ArgumentNullException.ThrowIfNull(shielding);
+
+        Shielding = shielding;
+        Shield = new Meter(shielding.Capacity);
+    }
+
+    /// <summary>
+    /// Takes a hit: sends back what the shields reflect, soaks what the layer can hold, and puts the
+    /// rest through to the hull.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Resolved in the order the fiction implies. What is reflected never arrives, so it is taken
+    /// off the hit before anything else sees it — otherwise "bounces damage back" would mean the
+    /// hull pays in full <em>and</em> the attacker is hurt too, which is a different shield from the
+    /// one that was designed. What does arrive meets the shield layer first and bleeds into health
+    /// only once the layer is gone.
+    /// </para>
+    /// <para>
+    /// Nothing here decides what an empty meter means. A ship at zero health is destroyed, but what
+    /// that costs the player is a rule about the game rather than about the hull, so it belongs
+    /// where the fight does.
+    /// </para>
+    /// </remarks>
+    /// <param name="amount">How much damage arrived. Zero is allowed and costs nothing.</param>
+    /// <returns>Where the hit went.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// The amount is negative or not a number, for the reason <see cref="Meter.Reduce"/> refuses
+    /// one: a damage calculation that came out backwards would otherwise heal what it was aimed at.
+    /// </exception>
+    public DamageOutcome TakeDamage(double amount)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(amount);
+
+        if (double.IsNaN(amount))
+        {
+            throw new ArgumentOutOfRangeException(nameof(amount), amount, "A hit has to be a number.");
+        }
+
+        double reflected = amount * Shielding.ReflectedFraction;
+        double landed = amount - reflected;
+
+        double absorbed = Math.Min(landed, Shield.Current);
+        Shield.Reduce(absorbed);
+
+        double dealt = landed - absorbed;
+        Health.Reduce(dealt);
+
+        return new DamageOutcome(reflected, absorbed, dealt);
+    }
 }
