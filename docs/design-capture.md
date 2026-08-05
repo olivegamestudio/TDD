@@ -575,6 +575,26 @@ Character**.
 - **[DECIDED] Givers & acquisition:** many giver types (NPCs, boards, world triggers). Some quests
   **auto-start** (like Quest 1); some need you to **interact with a giver** to accept. **The giver is
   not necessarily where the quest ends** — turn-in can be elsewhere.
+- **[DECIDED] Start and end are both triggers, and a trigger can be any of:**
+  - **Proximity** — reach a place. *(The only kind the engine has today.)*
+  - **Level requirement** — the character has reached a level.
+  - **Quest prerequisite** — another quest is complete. This is what makes chains work.
+  - **Collect a number of items** — gather N of something.
+  - **Destroy a number of targets** — kill N of something.
+
+  So **turn-in is not one global rule** — it is whatever a quest's end trigger says. Quest 1 ends on
+  proximity and completes where the player stands; a delivery ends by reaching its recipient; a
+  hunt ends on the last kill or on reporting back, as the author chooses. The engine already carries
+  a start trigger and an end trigger per quest, so the seam exists — what is missing is the extra
+  **kinds**, since `QuestTriggerKind` today knows only `Proximity`.
+- **[OPEN] Conditions and events are not the same thing, and this list mixes them.** *Proximity*,
+  *collect N* and *destroy N* are **events** — something happens and the quest moves. *Level* and
+  *quest prerequisite* are **conditions** — states that must hold, which do not fire on their own.
+  A real quest usually wants both: *"available once you are level 5 and have finished the last one;
+  starts when you reach the marker."* So a quest probably needs **a set of conditions gating
+  availability** plus **a trigger that fires**, rather than one trigger doing both jobs. Worth
+  settling before the extra kinds are built, because it decides whether the model grows one list or
+  two.
 - **[DECIDED] Structure:** **quest chains** (sequences) and **prerequisites** — a quest can be gated
   behind other quests / conditions.
 - **[DECIDED] Level / difficulty:** quests have a **level**; some are tougher (level-dependent), and
@@ -604,9 +624,10 @@ Character**.
 - **[DECIDED] Mission log (UI):** view each quest's **details and requirements to complete**.
 - **[DECIDED] On-screen quest display (HUD):** an active-quest tracker on screen (objectives /
   progress). → feeds the **HUD** subsystem.
-- **[OPEN]** Drop %s / reward tables; the full objective-type list; branching & choices (the
-  Diplomat's "tough decisions"); exact turn-in flow. *(Reward choice is decided: the player gets
-  all of them.)*
+- **[OPEN]** Drop %s / reward tables; branching & choices (the Diplomat's "tough decisions"); and
+  whether gating conditions and firing triggers are one list or two. *(Reward choice is decided: the
+  player gets all of them. Turn-in is decided: whatever the quest's end trigger says. The trigger
+  kinds are listed above.)*
 - **[vs main]** Engine has the Pilgrimage quest system + Quest 1 (proximity). New: varied objective
   types, givers/accept, chains, pre-reqs, levels, reward tables, faction rep, mission log + quest HUD.
 
