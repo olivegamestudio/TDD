@@ -587,14 +587,22 @@ Character**.
   hunt ends on the last kill or on reporting back, as the author chooses. The engine already carries
   a start trigger and an end trigger per quest, so the seam exists — what is missing is the extra
   **kinds**, since `QuestTriggerKind` today knows only `Proximity`.
-- **[OPEN] Conditions and events are not the same thing, and this list mixes them.** *Proximity*,
-  *collect N* and *destroy N* are **events** — something happens and the quest moves. *Level* and
-  *quest prerequisite* are **conditions** — states that must hold, which do not fire on their own.
-  A real quest usually wants both: *"available once you are level 5 and have finished the last one;
-  starts when you reach the marker."* So a quest probably needs **a set of conditions gating
-  availability** plus **a trigger that fires**, rather than one trigger doing both jobs. Worth
-  settling before the extra kinds are built, because it decides whether the model grows one list or
-  two.
+- **[DECIDED] Conditions and triggers are two different things, and the model carries both.**
+  - **Conditions gate.** *Level requirement*, *quest prerequisite* — states that must **hold** for a
+    quest to be available at all. They never fire on their own; they are asked.
+  - **Triggers fire.** *Proximity*, *collect N*, *destroy N* — something **happens** and the quest
+    moves.
+
+  A quest therefore reads as *"available once you are level 5 and have finished the last one;
+  starts when you reach the marker"* — a **set of conditions** plus **a trigger**, at each end.
+  Collapsing them into one list would have meant either conditions that pretend to fire or triggers
+  that quietly mean "and also check this".
+- **[IMPLICATION — keeps `Pilgrimage` clean]** A level requirement is a game concept, and Pilgrimage
+  holds no game knowledge by design. It follows the rule the library already lives by — **the model
+  declares the rule; the presentation applies it**. A condition is stored as **data** (a kind and a
+  value), exactly as `QuestTrigger` stores a kind and a distance today, and the **game side
+  evaluates it** against the character, just as `QuestProximityWatcher` measures distance rather
+  than the quest doing it. Pilgrimage never learns what a level is.
 - **[DECIDED] Structure:** **quest chains** (sequences) and **prerequisites** — a quest can be gated
   behind other quests / conditions.
 - **[DECIDED] Level / difficulty:** quests have a **level**; some are tougher (level-dependent), and
@@ -624,10 +632,9 @@ Character**.
 - **[DECIDED] Mission log (UI):** view each quest's **details and requirements to complete**.
 - **[DECIDED] On-screen quest display (HUD):** an active-quest tracker on screen (objectives /
   progress). → feeds the **HUD** subsystem.
-- **[OPEN]** Drop %s / reward tables; branching & choices (the Diplomat's "tough decisions"); and
-  whether gating conditions and firing triggers are one list or two. *(Reward choice is decided: the
-  player gets all of them. Turn-in is decided: whatever the quest's end trigger says. The trigger
-  kinds are listed above.)*
+- **[OPEN]** Drop %s / reward tables; branching & choices (the Diplomat's "tough decisions").
+  *(Reward choice is decided: the player gets all of them. Turn-in is decided: whatever the quest's
+  end trigger says. Conditions gate and triggers fire — both are data the game side evaluates.)*
 - **[vs main]** Engine has the Pilgrimage quest system + Quest 1 (proximity). New: varied objective
   types, givers/accept, chains, pre-reqs, levels, reward tables, faction rep, mission log + quest HUD.
 
