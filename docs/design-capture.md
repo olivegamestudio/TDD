@@ -690,11 +690,28 @@ Character**.
 - **[NOTE]** Authoring stays per-thing, but nothing stops two things **pointing at the same table**
   where they genuinely drop alike — that is a content convenience, not a second mechanism, and it is
   what keeps "every raider" tunable in one place rather than fifty.
-- **[OPEN]** Whether anything **modifies the roll** — enemy level, or a rarity tier on the item
-  carrying its own base chance. Flat percentages are easier to reason about and to tune, and a
-  modifier can be added later **without changing the table's shape**, so nothing is foreclosed by
-  leaving it flat for now.
-- **[OPEN]** The actual percentages and reward tables — content, tuned in play.
+- **[DECIDED] Nothing modifies the roll.** The chance on the entry is the chance — no level scaling,
+  no rarity multiplier, no luck stat. What is authored is what happens, which keeps the table
+  honest and tunable by reading it.
+- **[DECIDED] Some quests are replayable, with a wait between attempts.** A replayable quest can be
+  run again after a **cooldown**, so a player chasing a particular drop has something to come back
+  to rather than one roll and no recourse. The wait is what stops it collapsing into standing on the
+  spot repeating a kill.
+- **[DECIDED] Drop tables are never shown to the player.** No list of what a quest or enemy *can*
+  give, no odds, no "collected 3 of 7". A player replays because they are hoping, not because they
+  are working through a checklist — the pull is the possibility, and publishing the table turns it
+  into arithmetic. **Fixed rewards are still shown** (you know what you are being paid); it is the
+  chance-based half that stays hidden.
+- **[IMPLICATION — the quest lifecycle is currently one-way]** `Quest` runs `NotStarted → Active →
+  Completed` and stops. A replayable quest has to **return to `NotStarted`** when its cooldown
+  expires, which the model has no notion of today. It also collides with the **quest-prerequisite
+  condition**: if a completed quest can reset, "has quest A been completed" stops being a stable
+  answer, and a chain gated on A would close behind the player when A restarts. Needs the model to
+  separate **"has ever been completed"** (permanent, what prerequisites read) from **"is available
+  now"** (what the cooldown drives). Worth settling before replayable quests are built.
+- **[OPEN]** Which quests are replayable — story quests presumably not, since the spine is meant to
+  be walked once. Content, but the rule wants stating.
+- **[OPEN]** The actual percentages and cooldown lengths — content, tuned in play.
   *(Reward choice is decided: the player gets all of them. Turn-in is decided: whatever the quest's
   end trigger says. Conditions gate and triggers fire — both are data the game side evaluates.)*
 - **[vs main]** Engine has the Pilgrimage quest system + Quest 1 (proximity). New: varied objective
