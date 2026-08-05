@@ -477,11 +477,18 @@ Character**.
   hostile or negative standing, and nothing the player does loses them ground they had earned. A
   reputation is a record of what they have done for a group, and doing nothing for a rival is not an
   injury to anyone.
-- **[IMPLICATION]** **Nothing is permanently missable.** A player cannot lock themselves out of a
-  faction's rewards, quests or vendors by a choice made hours earlier without understanding it. The
-  cost of siding with one group is **opportunity** — the standing you did not gain, and the order
-  you did things in — never **loss**. That is a deliberately forgiving stance, and it removes the
-  need to warn the player before decisions or to let them undo one.
+- **[DECIDED] Standing and membership are different things.** You can **build standing with many
+  factions** — work for them, gain with them, earn their thresholds. But you **join only one**, and
+  **joining one prevents joining another**. Working with a group and belonging to it are separate
+  relationships, and only the second is exclusive.
+- **[IMPLICATION] Nothing is *lost*, but membership is a real fork.** Standing already earned is
+  never taken away, which is what "you cannot fall out" means. What a player gives up by joining is
+  the **other factions' member-only content** — the extra reward items belonging pays (§11), and
+  whatever else membership gates. So the choice is permanent and it closes doors, but only doors the
+  player had not yet walked through.
+- **[NOTE]** This is what makes the Diplomat's decisions tough, and it is the third of the options
+  the quest section was weighing: **exclusive gains**, not injuries. Choosing costs you what the
+  other side would have given, never what you already hold.
 - **[OPEN]** The group list, reputation tiers/thresholds, and whether standing gates NPC reactions —
   content/tuning.
 - **[DECIDED]** "Skills/aptitudes" **are** the gifts system — one system, not a separate stat.
@@ -665,17 +672,14 @@ Character**.
 - **[DECIDED] Mission log (UI):** view each quest's **details and requirements to complete**.
 - **[DECIDED] On-screen quest display (HUD):** an active-quest tracker on screen (objectives /
   progress). → feeds the **HUD** subsystem.
-- **[OPEN] Branching & choices — what makes a decision "tough" if nothing can be lost?** Standing
-  only rises (§6), so a choice cannot be expressed as falling out with the group not chosen, and the
-  endgame is shared, so the spine has to reconverge. What is left for the Diplomat's tough decisions
-  to cost is one of: **opportunity and order** (both paths remain, but you cannot have both *now*,
-  and the one you leave waits) · **narrative weight** (the story marks what you did and characters
-  remember, without mechanical loss) · **exclusive rewards** (each side offers something the other
-  does not, so choosing is giving up a *gain* rather than taking a *hit*). Worth settling, because
-  "tough decisions" is the Diplomat's whole arc and none of the three is the obvious default.
-- **[NOTE]** Whatever it is, **the mechanism already exists**: choices move faction standing, and
-  faction is a **condition** (see below), so a choice opening one line of quests and leaving another
-  for later needs no branching system built for it.
+- **[DECIDED] Branching is faction membership, and membership is exclusive.** Joining a faction
+  prevents joining another (§6), so the Diplomat's tough decision is *which group to belong to* —
+  and it is tough because it is **permanent and forecloses the others' member content**, not
+  because it costs anything already earned. Standing with everyone else keeps rising as before.
+- **[NOTE]** **No branching system has to be built.** A choice is a membership, membership is
+  **faction standing**, and faction is already a **condition** (see below) — so joining opens one
+  line of quests and closes another by the machinery already decided. The shared endgame is
+  preserved by the spine's quests simply carrying no faction condition.
 - **[OPEN]** Drop %s / reward tables.
   *(Reward choice is decided: the player gets all of them. Turn-in is decided: whatever the quest's
   end trigger says. Conditions gate and triggers fire — both are data the game side evaluates.)*
