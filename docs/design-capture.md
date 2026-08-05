@@ -756,11 +756,19 @@ Character**.
   input, the ship receives no thrust, and **drag brings it to rest by itself** — "the speed drops"
   is the existing physics doing exactly what it already does. No pause state, no special case, no
   second way for the ship to be stationary.
-- **[OPEN]** Whether the **world** keeps running while the player talks. Stopping the ship is
-  decided; whether enemies, hazards and the collapsing debris around them also hold still is not.
-  Letting the world run makes conversation a real risk and stops dialogue being a safe pocket to
-  hide in; freezing it means a talk is never something the player is punished for opening. The
-  answer probably differs by *where* — a vendor in a city is not a quest-giver in a firefight.
+- **[DECIDED] The world keeps running while the player talks.** Enemies still fire, hazards still
+  move, the debris still collapses. A conversation is not a safe pocket to hide in, and **where and
+  when you choose to open one is a real decision**.
+- **[WHY — this is pillar 4]** `DESIGN.md` says the world "runs without the player and outlives
+  their incarnations… does not pause for their absence". Freezing it for a chat would have been the
+  exact thing that pillar forbids, on the smallest possible scale. The player stopping to talk while
+  everything carries on is the pillar working as intended rather than a hardship invented for its
+  own sake.
+- **[IMPLICATION — a conversation must be instantly closeable]** The ship is stationary and the
+  world is armed, so a player who opens a talk at the wrong moment is a sitting target. That is fair
+  only if backing out is **immediate and always available** — one press, no confirmation, no closing
+  animation to sit through. Without that the decision stops being "when do I talk" and becomes "am I
+  willing to gamble", which is a different and worse game.
 - **[NOTE]** Voice: **text-only** for now.
 
 ## 13. HUD
