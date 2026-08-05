@@ -720,10 +720,18 @@ Character**.
   carrying its state. It now has to carry the **completion count** and the **last completion time**
   too, or a reload resets every cooldown and forgets every replay. That is a change to what older
   saves can be read back into, which §8 already flags as a decision of its own.
-- **[OPEN]** **Which clock** the cooldown runs on — real elapsed time (a quest available again
-  tomorrow, whether or not the game was running) or in-game time played. Real time is the usual
-  choice and makes a replayable quest a reason to come back; time-played never punishes someone who
-  put the game down for a fortnight.
+- **[DECIDED] Cooldowns run on real elapsed time**, not time played. A quest is available again
+  tomorrow whether or not the game was ever launched, which makes a replayable quest **a reason to
+  come back** rather than a reason to sit playing. Time played would tick only while the player is
+  already engaged, which is precisely when they least need an incentive.
+- **[IMPLICATION]** The stored timestamp is therefore **wall-clock**, and it has to survive the game
+  being closed — so it is saved as an absolute time rather than a remaining duration counted down.
+  A remaining-duration field would quietly pause whenever the game was not running, which is the
+  behaviour just rejected.
+- **[NOTE]** Wall-clock cooldowns can be skipped by changing the system clock. That is worth knowing
+  and **not worth defending against** here: this is a single-player game with no competitive
+  standing, and a player who sets their clock forward to replay a quest has only decided how they
+  want to spend their own evening.
 - **[OPEN]** Which quests are replayable — story quests presumably not, since the spine is meant to
   be walked once. Content, but the rule wants stating.
 - **[OPEN]** The actual percentages and cooldown lengths — content, tuned in play.
