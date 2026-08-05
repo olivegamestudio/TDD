@@ -177,13 +177,18 @@ public sealed class QuestLog
     /// caller that catches this still has the log it started with rather than half a save.
     /// </exception>
     /// <exception cref="ArgumentOutOfRangeException">
-    /// An entry holds a state that is not one a quest has. Refused wherever it appears, including
-    /// in the second entry naming a quest — a value outside the lifecycle is not early progress,
-    /// so it is never dropped for standing behind something.
+    /// An entry naming a registered quest holds a state that is not one a quest has. Refused
+    /// wherever it appears, including in the second entry naming a quest — a value outside the
+    /// lifecycle is not early progress, so it is never dropped for standing behind something. Like
+    /// the entry that is not there, it is checked across the whole batch before any of it is
+    /// applied: a caller that catches this still has the log it started with. An entry naming no
+    /// quest, or naming one this build no longer ships, is passed over before its state is read, so
+    /// what it holds refuses nothing.
     /// </exception>
     public void Restore(IEnumerable<QuestProgress> progress)
     {
-        // Materialised because the batch is read twice: once to refuse it whole, once to apply it.
+        // Materialised because the batch is read three times: twice to refuse it whole, once to
+        // apply it.
         List<QuestProgress> entries = [.. progress];
 
         foreach (QuestProgress saved in entries)
@@ -192,6 +197,28 @@ public sealed class QuestLog
             {
                 throw new ArgumentException(
                     "The saved progress holds an entry that is not there.", nameof(progress));
+            }
+        }
+
+        // Asked of the whole batch before any of it is applied, for the same reason the entries
+        // that are not there are: a refusal raised half way through leaves a log that is neither
+        // the one the caller had nor the one the save describes, and nothing can finish or undo it.
+        // Only the entries that will actually be applied are judged — an entry naming no quest, or
+        // naming one this build no longer ships, is drift and is passed over below whatever state
+        // it holds, so reading its state here would refuse a file the apply walk would have read.
+        foreach (QuestProgress saved in entries)
+        {
+            if (string.IsNullOrWhiteSpace(saved.QuestId) || Find(saved.QuestId) is null)
+            {
+                continue;
+            }
+
+            if (!Enum.IsDefined(saved.State))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(progress),
+                    saved.State,
+                    $"The saved progress for the quest '{saved.QuestId}' holds '{(int)saved.State}', which is not a quest state.");
             }
         }
 

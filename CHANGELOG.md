@@ -216,6 +216,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A save holding a state no quest has is now refused before any of it is applied.**
+  `QuestLog.Restore` checked the entries that were *not there* across the whole batch before
+  applying any of it — the documented reason being that a caller catching the refusal still has the
+  log it started with rather than half a save. The other refusal, a state outside the quest
+  lifecycle, was raised by `Quest.Restore` as the entry was met, during the walk that applies them.
+  So a file whose second entry was corrupt had already had its first entry committed when the
+  exception arrived, leaving a log that was neither what the caller had before the call nor what
+  the save described, and that nothing could finish or undo.
+
+  The outcome also depended on the order the entries happened to be in, which is the one thing the
+  duplicate rule was chosen to be free of: the same two lines the other way round restored a
+  different log. `Restore` now walks the batch a third time, between the two it already made,
+  refusing an undefined state wherever it names a registered quest. What it refuses is unchanged —
+  an entry naming no quest, or naming one this build no longer ships, is still passed over before
+  its state is read, so drift still costs the file nothing.
+  ([#161](https://github.com/olivegamestudio/TDD/issues/161))
+
 - **A meter can no longer be handed a not-a-number that leaves it holding nothing readable.**
   `Meter`'s constructor, `Reduce` and `Restore` all documented that they refuse a value that is not
   a number, but all three leaned on `ArgumentOutOfRangeException.ThrowIfNegative`, which reads the

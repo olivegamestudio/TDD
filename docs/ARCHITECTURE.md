@@ -233,6 +233,16 @@ have to agree, because while they did not, one blank line in a file discarded th
 campaign saved beside it — and every refusal at this boundary is final, since a refused save is
 played over by the game that replaces it.
 
+**A refusal is decided before any of the file is applied, whichever refusal it is.** A `null` entry
+and a state outside the quest lifecycle are both checked across the whole batch first, so a caller
+catching either still holds the log it started with. The state check ran as the entry was met until
+#161, which meant the entries ahead of a corrupt one were already committed when it threw: a log
+that was neither the one before the call nor the one the file described, and — because the outcome
+turned on which line came first — the order-dependence the furthest-state-wins rule below exists to
+remove. The check is scoped to entries that would actually be applied: one naming no quest, or
+naming a quest this build no longer ships, is drift and is passed over before its state is read, so
+what it holds refuses nothing.
+
 **Dropping an unnamed entry is safe because nothing can be registered under one.** `QuestLog.Register`
 refuses an identifier that is `null`, empty or nothing but whitespace, so the entry both edges skip
 can never be the only record of a quest the player really finished. That was an assumption before
