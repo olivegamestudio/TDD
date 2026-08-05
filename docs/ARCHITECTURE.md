@@ -28,7 +28,7 @@ to know about ships, quests or credits is on the wrong side of this line.
 | `OliveGameStudio.FrameRate` | Frame time filtering, so a paused or slowed game holds still while frames keep arriving. |
 | `OliveGameStudio.Input` | `InputRouter` — where a frame of input goes, and which device the game is being played on. |
 | `OliveGameStudio.Progress` | `LocalSaveProgressService`, persisting save text to a file. |
-| `OliveGameStudio.World` | `Position`, `Player`. The spatial model, plus the ship's physics and `IShipInput` — what an input means, never which device produced it. Also `Ship`, `ShipProfile`, `Meter`, `Item` and `Inventory`: a hull, the condition it is in, and the things that can be held. And what a hit costs it: `ShieldType`, `ShieldStats`, `Shielding`, `DamageOutcome`. |
+| `OliveGameStudio.World` | `Position`, `Player`. The spatial model, plus the ship's physics and `IShipInput` — what an input means, never which device produced it. Also `Ship`, `ShipProfile`, `Meter`, `Item` and `Inventory`: a hull, the condition it is in, and the things that can be held. And what a hit costs it: `ShieldType`, `ShieldStats`, `Shielding`, `DamageOutcome`. And what flies alongside it: `OrbBehaviour`, `OrbStats`, `Orbs`. |
 | `OliveGameStudio.Rendering` | `Camera2D` — the world-to-screen transform, and the only place the world's axes and the screen's are reconciled. |
 | `OliveGameStudio.Localisation` | `ITextProvider`, `JsonTextProvider`, `MissingTextException`. |
 | `Pilgrimage` | The quest system. No project references at all, by design. |
@@ -146,7 +146,44 @@ nothing maps one to the numbers it is worth, so fitting by stats is what lets th
 without inventing the item model early; when that arrives, reading a shield item's stats is what
 `Fit` is handed. `Shielding.Slots` is a constant for the same kind of reason — v1 hulls all carry
 the same layout, and when a hull is allowed to vary it the number moves to the hull without changing
-what filling the slots means.
+what filling the slots means. Orbs are fitted by stats for both of those reasons too, and
+`Orbs.Slots` is a constant on the same terms.
+
+**The two additional slots hold companions, and nothing about them adds up.** A ship carries `Orbs`
+— up to `Orbs.Slots` (two) `OrbStats`, each authored as one of the two things an orb does:
+`OrbStats.Orbiting` circles the ship and never leaves it, `OrbStats.Tracking` holds station until it
+has something to go after. The slots are filled freely, exactly as the shield slots are, and that is
+where the resemblance stops: an orb acts on its own, so two of a kind is two companions each doing
+its own thing rather than one effect at double strength. There is no total to read because there is
+no quantity two orbs share. That is the answer to the question design capture left flagged as
+*"assume free-choice / stack-or-combo like shields — confirm"*: free choice, yes; a combined effect,
+no, because there is nothing to combine.
+
+**An orb's place is worked out, not remembered.** `Orbs.PlaceAround(ship, secondsFlown)` is the whole
+of "auto-controlled companion object — no manual fire input": where a companion is depends on what it
+was authored with and how long has been flown, and on nothing the player pressed. Nothing ticks and
+nothing accumulates, so the answer cannot drift with the frame rate, a frame drawn twice draws the
+orbs in the same place both times, and a resumed game does not have to remember where they had got
+to. A time that is negative or not finite is refused there, for the reason the camera refuses a
+target that is not finite: the sine of a number that is not one places every orb nowhere, in full,
+raising nothing.
+
+Two details the geometry had to answer to work at all. Each slot takes an even share of the ring, so
+the two orbs a ship can carry start on opposite sides of it — filled freely, two of a kind is the
+ordinary case, and without a share each they would occupy one point at every instant and a player who
+fitted two would see one. And the ring is measured in *world* terms rather than turning with the
+hull: a companion runs itself, so it keeps its own bearing while the ship turns under it rather than
+being dragged round like something bolted on. Bearings are measured the way a ship's heading is —
+zero along the positive world Y axis, increasing to starboard — so this agrees with the convention
+`ShipPose` already asks of both sides of the ship.
+
+Three things this deliberately does not do. **A tracker does not track**, because nothing in the
+world is hostile: what it chases and what it costs whatever it catches belong with the fight, so it
+holds its station meanwhile, and `OrbStats.Tracking` carries no damage number nobody has designed.
+**The "ball" design capture names as a third kind of orb is not modelled** — what a ball *does* is
+stated nowhere, and an `OrbBehaviour` member with no behaviour behind it is a value every caller has
+to handle and none can act on. **Nothing draws an orb**; that is screen work and a separate issue, and
+no content authors an orb to draw in any case.
 
 **The world is the placement authority.** `IWorld.Introduce(ship, location)` brings a ship into the
 world at a *named place* and answers where that put it; `BattleForceWorld` resolves `Mines` to the
@@ -747,6 +784,15 @@ says nothing gets — a default so a game composes flyable, not a measurement of
   `ShieldStats` `Fit` is handed, and no content authors a shield to collect. The Disgraced therefore
   still flies with empty shield slots — which is what the design asks for at the start of the story,
   but it is arrived at by there being no shields rather than by a decision.
+- **Nothing the ship carries is hostile to anything either.** The additional slots hold orbs and
+  `Orbs.PlaceAround` says where they are, but `OrbBehaviour.Tracking` has nothing in the world to
+  track, so a tracker sits at its station and an orb costs an enemy nothing. That waits on enemies
+  (#137), and it is the same shape as the gap above: the model states the rule and no fight calls
+  it. The orb slots are empty for the same reason the shield slots are, and neither the "ball" the
+  design names nor an orb's damage is modelled — see above.
+- **Nothing draws an orb.** `Orbs.PlaceAround` answers where the companions are in world units and
+  nothing asks. That is `ENGINE` work of its own; with no content authoring an orb there is also
+  nothing on screen to be missing yet.
 - **Nothing selects a character.** `ICharacterRoster.Starting` is what a new game plays as, and
   `Templates` holds one entry. Choosing between them is a screen nobody has asked for yet.
 - `SaveGameSerializerTests.Deserialize_KeepsAPositionAtTheFarEdgeOfWhatCanBeDrawn` formats

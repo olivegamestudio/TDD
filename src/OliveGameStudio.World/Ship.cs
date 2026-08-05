@@ -44,6 +44,10 @@ public sealed class Ship
         Shielding = Shielding.None;
         Shield = new Meter(Shielding.Capacity);
 
+        // and the additional slots come out of the yard empty for the same reason: an orb is
+        // collected, and nothing has been collected yet
+        Orbs = Orbs.None;
+
         Movement = new ShipMovement(profile.Handling);
     }
 
@@ -88,6 +92,16 @@ public sealed class Ship
     public Meter Shield { get; private set; }
 
     /// <summary>
+    /// Gets what is in the ship's two additional slots — the companion objects that fly themselves.
+    /// </summary>
+    /// <remarks>
+    /// They are here rather than in <see cref="Loadout"/> and they hold stats rather than items, for
+    /// the reason <see cref="Shielding"/> is: an <see cref="Item"/> is still only an identifier, and
+    /// what turns one into the numbers it is worth is the item model, which is open.
+    /// </remarks>
+    public Orbs Orbs { get; private set; }
+
+    /// <summary>
     /// Gets the hull's structural condition, and what is left of it.
     /// </summary>
     public Meter Durability { get; }
@@ -117,6 +131,25 @@ public sealed class Ship
 
         Shielding = shielding;
         Shield = new Meter(shielding.Capacity);
+    }
+
+    /// <summary>
+    /// Puts orbs in the ship's additional slots, replacing whatever was in them.
+    /// </summary>
+    /// <remarks>
+    /// There is no layer to rebuild the way <see cref="Fit(Shielding)"/> has to, because an orb
+    /// carries nothing that depletes: what is fitted is the whole of what an orb is, and where it
+    /// happens to be is worked out rather than remembered.
+    /// </remarks>
+    /// <param name="orbs">
+    /// The orbs to carry. <see cref="OliveGameStudio.Orbs.None"/> strips the slots.
+    /// </param>
+    /// <exception cref="ArgumentNullException"><paramref name="orbs"/> is <c>null</c>.</exception>
+    public void Fit(Orbs orbs)
+    {
+        ArgumentNullException.ThrowIfNull(orbs);
+
+        Orbs = orbs;
     }
 
     /// <summary>

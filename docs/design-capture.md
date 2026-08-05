@@ -531,6 +531,14 @@ Character**.
   tracks** enemies (autonomous attacker), a **ball**. Data-driven behaviours; **no manual fire
   input** — they run themselves. *(Assume free-choice / stack-or-combo across the 2 slots like shields
   — confirm.)*
+  *(Built in #136 as `OrbBehaviour` / `OrbStats` / `Orbs` / `Ship.Fit`. The flagged assumption is
+  answered: free choice, yes — **stack-or-combo, no**, because an orb acts on its own and there is no
+  quantity two orbs share, so two of a kind is two companions rather than one effect at double
+  strength. Three things the model did **not** answer, none of them decided here: the **ball** is not
+  a behaviour, since what it does is stated nowhere; a **tracker has nothing to track** until enemies
+  exist (#137), so it holds station and carries no damage number; and each slot takes an **even share
+  of the ring**, measured in world terms rather than turning with the hull, so two orbs are not in one
+  place and a turning ship does not drag its companions round. All three are open to being overruled.)*
 - **[DECIDED] Firing constraints are per-weapon.** Some weapons **consume ammo** (drawn from
   **stackable ammo items** in inventory — the 99-stack kind); the **initial/starter weapons don't**
   (ammo-free, so early game isn't gated on ammo). Some weapons need a **charge time** before firing.

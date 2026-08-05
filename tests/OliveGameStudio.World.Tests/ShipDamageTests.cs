@@ -184,10 +184,12 @@ public sealed class ShipDamageTests
     [Fact]
     public void FittingNothingAtAll_IsRefused()
     {
-        // Shielding.None is how a ship carries no shields; null is a caller that lost track of them
+        // Shielding.None is how a ship carries no shields; null is a caller that lost track of them.
+        // The cast is what tells the two Fit overloads apart — a bare null names neither, and which
+        // of the ship's slots is being emptied is exactly what this asks about.
         Ship ship = ShipWith();
 
-        Assert.Throws<ArgumentNullException>(() => ship.Fit(null!));
+        Assert.Throws<ArgumentNullException>(() => ship.Fit((Shielding)null!));
     }
 
     [Fact]

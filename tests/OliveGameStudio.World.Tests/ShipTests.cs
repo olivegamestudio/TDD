@@ -67,6 +67,48 @@ public sealed class ShipTests
     }
 
     [Fact]
+    public void AShipWithNothingFitted_HasEmptyOrbSlots()
+    {
+        // what the design asks for at the start of the story: the additional slots come empty, and
+        // no content authors an orb to put in one yet
+        Ship ship = new(ProfileWith());
+
+        Assert.Empty(ship.Orbs.Fitted);
+    }
+
+    [Fact]
+    public void FittingOrbs_PutsThemInTheSlotsAndTakesOutWhatWasThere()
+    {
+        Ship ship = new(ProfileWith());
+        OrbStats replacement = OrbStats.Tracking(radius: 45);
+
+        ship.Fit(new Orbs(OrbStats.Orbiting(radius: 30, angularSpeed: 2)));
+        ship.Fit(new Orbs(replacement));
+
+        Assert.Equal([replacement], ship.Orbs.Fitted);
+    }
+
+    [Fact]
+    public void StrippingTheOrbSlots_LeavesTheShipWithNoCompanionsAtAll()
+    {
+        Ship ship = new(ProfileWith());
+        ship.Fit(new Orbs(OrbStats.Orbiting(radius: 30, angularSpeed: 2)));
+
+        ship.Fit(Orbs.None);
+
+        Assert.Empty(ship.Orbs.Fitted);
+    }
+
+    [Fact]
+    public void FittingNoOrbsAtAll_IsRejectedRatherThanReadAsStrippingTheSlots()
+    {
+        // Orbs.None says "empty slots"; a null says the caller lost the orbs on the way here
+        Ship ship = new(ProfileWith());
+
+        Assert.Throws<ArgumentNullException>(() => ship.Fit((Orbs)null!));
+    }
+
+    [Fact]
     public void AShip_IsFittedWithWhatItsProfileCameWith()
     {
         Item cell = new("power-cell");
