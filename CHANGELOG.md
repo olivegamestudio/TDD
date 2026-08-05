@@ -9,6 +9,36 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A ship carries two orbs, and they fly themselves.** `OrbStats` is the orb's stats type, authored
+  as one of the two things an orb does — `Orbiting(radius, angularSpeed)` circles the ship and never
+  leaves it, `Tracking(radius)` holds station until it has something to go after. An orb does one or
+  the other, so there is no constructor that would let a data file invent a third behaviour by
+  filling in both.
+
+  `Orbs` is what is in the two additional slots, filled freely exactly as the shield slots are — and
+  that is where the resemblance stops, because **nothing adds up**. An orb acts on its own, so two of
+  a kind is two companions each doing its own thing rather than one effect at double strength, and
+  there is no total to read because there is no quantity two orbs share. That settles the question
+  design capture flagged as *"assume free-choice / stack-or-combo like shields — confirm"*.
+
+  `Orbs.PlaceAround(ship, secondsFlown)` is the whole of "auto-controlled — no manual fire input":
+  where a companion is depends on what it was authored with and how long has been flown, and on
+  nothing the player pressed. Nothing ticks and nothing accumulates, so the answer cannot drift with
+  the frame rate and a resumed game does not have to remember where the orbs had got to. Each slot
+  takes an even share of the ring, so two orbs start on opposite sides of it rather than occupying
+  one point; the ring is measured in world terms rather than turning with the hull, because a
+  companion that runs itself keeps its own bearing while the ship turns under it. A time that is
+  negative or not finite is refused there, for the reason the camera refuses a target that is not
+  finite: it would place every orb nowhere, in full, raising nothing.
+
+  `Ship.Fit` now has an orb overload, and a new ship comes out of the yard with the additional slots
+  empty — which is what the design asks for at the start of the story. Three things this deliberately
+  does not do: a tracker does not track, because nothing in the world is hostile yet and what it
+  chases belongs with the fight; the "ball" design capture names as a third kind of orb is not
+  modelled, because what a ball *does* is stated nowhere; and nothing draws an orb, which is screen
+  work of its own.
+  ([#136](https://github.com/olivegamestudio/TDD/issues/136))
+
 - **A ship carries two shields, and what a hit costs it now depends on them.** `ShieldStats` is the
   shield's stats type, authored as one of the two things a shield can do — `Absorbing(capacity)`
   contributes to the layer that depletes before health, `Reflecting(fraction)` bounces its share of
