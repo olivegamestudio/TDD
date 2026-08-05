@@ -6,15 +6,18 @@ namespace Pilgrimage.Tests;
 /// <remarks>
 /// <para>
 /// The cover already on the branch pins that an entry that is not there is refused and that
-/// nothing beside it is applied. What none of it pins is the <em>edge</em> of that guarantee. The
-/// batch is now walked twice — once to refuse it whole, once to apply it — and only the first walk
-/// is a check, so a refusal raised during the second walk leaves the log half restored. That is
-/// the state of things and it is defensible, but it was not asserted anywhere, so a later change
-/// tightening or loosening it would go unnoticed either way.
+/// nothing beside it is applied. What none of it pinned was the <em>edge</em> of that guarantee,
+/// and the edge turned out to be in the wrong place: the batch was walked twice, once to refuse it
+/// whole and once to apply it, but only the entries that were <c>null</c> were checked in the first
+/// walk. A state outside the lifecycle was met during the second, so the entries ahead of it had
+/// already been applied when it threw — a log that was neither what it was before the call nor what
+/// the save described, and one whose contents depended on the order the entries happened to be in
+/// (#161).
 /// </para>
 /// <para>
-/// The distinction matters to a caller: catching one of these two exceptions leaves the log it
-/// started with, and catching the other does not.
+/// Both refusals are now raised before anything is applied, and these tests say so from the
+/// caller's side: whichever of the two exceptions a caller catches, it still has the log it started
+/// with.
 /// </para>
 /// </remarks>
 public sealed class QuestLogRestoreScopeAdversarialTests
@@ -31,16 +34,17 @@ public sealed class QuestLogRestoreScopeAdversarialTests
     /// </summary>
     const QuestState OutsideTheLifecycle = (QuestState)99;
 
-    // ---- where the all-or-nothing guarantee starts and stops ----
+    // ---- how far the all-or-nothing guarantee reaches ----
 
     /// <summary>
-    /// The guarantee is scoped to an entry that is <em>not there</em>, and this pins that it does
-    /// not quietly extend to every refusal. An entry holding a state outside the lifecycle is
-    /// refused where it is met rather than before the batch is applied, so the entries ahead of it
-    /// have already been applied when the exception arrives.
+    /// A state outside the lifecycle is refused before any of the batch is applied, so the entries
+    /// standing ahead of it are left alone. This is #161: the check used to run as the entry was
+    /// met, which left the log holding the first quest's saved state and not the second's — neither
+    /// the log the caller had before the call nor the one the save described, and nothing it could
+    /// finish or undo.
     /// </summary>
     [Fact]
-    public void Restore_HasAlreadyAppliedTheEntriesAhead_WhenItRefusesAStateOutsideTheLifecycle()
+    public void Restore_HasAppliedNothing_WhenItRefusesAStateOutsideTheLifecycle()
     {
         QuestLog log = new();
         Quest ahead = log.Register(Quest("quest-1"));
@@ -52,9 +56,64 @@ public sealed class QuestLogRestoreScopeAdversarialTests
             new QuestProgress("quest-2", OutsideTheLifecycle),
         ]));
 
-        // the entry ahead of the refused one is applied; the one it refused is not
-        Assert.Equal(QuestState.Completed, ahead.State);
+        Assert.Equal(QuestState.NotStarted, ahead.State);
         Assert.Equal(QuestState.NotStarted, behind.State);
+    }
+
+    /// <summary>
+    /// The same two entries in either order leave the log in the same place: untouched. The
+    /// duplicate rule was chosen because its answer does not depend on the order entries ended up
+    /// in after a merge, and a refusal that half-applied the batch handed that dependence straight
+    /// back — the same file restored differently depending on which line came first.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Restore_HasAppliedNothing_WhicheverSideOfTheBatchTheStateOutsideTheLifecycleSitsOn(
+        bool refusedEntryFirst)
+    {
+        QuestLog log = new();
+        Quest good = log.Register(Quest("quest-1"));
+        Quest bad = log.Register(Quest("quest-2"));
+
+        QuestProgress[] entries = refusedEntryFirst
+            ?
+            [
+                new QuestProgress("quest-2", OutsideTheLifecycle),
+                new QuestProgress("quest-1", QuestState.Completed),
+            ]
+            :
+            [
+                new QuestProgress("quest-1", QuestState.Completed),
+                new QuestProgress("quest-2", OutsideTheLifecycle),
+            ];
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => log.Restore(entries));
+
+        Assert.Equal(QuestState.NotStarted, good.State);
+        Assert.Equal(QuestState.NotStarted, bad.State);
+    }
+
+    /// <summary>
+    /// Refusing the batch earlier does not widen what is refused. An entry naming a quest this
+    /// build no longer ships is drift, and drift is ignored — including the state it carries, which
+    /// belongs to a quest that is not here to be bricked by it. Pinned because the check that now
+    /// runs before the batch is applied is the one place that could start reading states belonging
+    /// to quests it will never apply them to.
+    /// </summary>
+    [Fact]
+    public void Restore_StillIgnoresAnEntryNamingAQuestThatIsNotRegistered_WhateverStateItHolds()
+    {
+        QuestLog log = new();
+        Quest quest = log.Register(Quest("quest-1"));
+
+        log.Restore(
+        [
+            new QuestProgress("quest-1", QuestState.Completed),
+            new QuestProgress("quest-from-an-older-build", OutsideTheLifecycle),
+        ]);
+
+        Assert.Equal(QuestState.Completed, quest.State);
     }
 
     /// <summary>
@@ -104,9 +163,10 @@ public sealed class QuestLogRestoreScopeAdversarialTests
 
     /// <summary>
     /// A state outside the lifecycle is still refused when the entry carrying it names no quest —
-    /// or rather, it is not, because the entry is skipped before its state is ever looked at.
-    /// Pinned because the two rules are checked in the same loop in the order that decides this,
-    /// and the order is not obvious from either doc comment.
+    /// or rather, it is not, because the entry is skipped before its state is ever looked at. The
+    /// skip outranks the refusal, and it has to keep doing so now that the refusal runs in a walk
+    /// of its own: an entry naming nothing is drift whatever it says about a quest it does not
+    /// name, and refusing the file over it would throw away the progress standing beside it.
     /// </summary>
     [Fact]
     public void Restore_SkipsAnEntryNamingNoQuest_BeforeItsStateIsJudged()
