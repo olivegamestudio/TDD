@@ -6,6 +6,12 @@ namespace OliveGameStudio.World.Tests;
 /// </summary>
 public sealed class MeterTests
 {
+    // double.NaN is one particular not-a-number, and it happens to carry a set sign bit, so a guard
+    // that asks "is this negative?" stops it by accident rather than on purpose. Math.Abs clears
+    // that bit: the same not-a-number, arriving the way a defensive caller would produce it after
+    // taking the absolute value of a calculation that came out wrong.
+    static readonly double PositiveNaN = Math.Abs(double.NaN);
+
     [Fact]
     public void ANewMeter_IsFull()
     {
@@ -102,6 +108,14 @@ public sealed class MeterTests
     }
 
     [Fact]
+    public void AMaximumThatIsNotANumber_IsRejectedWhicheverWayItsSignBitPoints()
+    {
+        // a meter built from a positive NaN reports Maximum and Current as NaN and IsEmpty as
+        // false — a pool holding nothing that no amount of damage can ever empty
+        Assert.Throws<ArgumentOutOfRangeException>(() => new Meter(PositiveNaN));
+    }
+
+    [Fact]
     public void AnInfiniteMaximum_IsRejected()
     {
         // the mirror of the negative case: no amount of damage can empty it, so whatever the pool
@@ -126,6 +140,44 @@ public sealed class MeterTests
         Meter meter = new(100);
 
         Assert.Throws<ArgumentOutOfRangeException>(() => meter.Restore(-1));
+        Assert.Equal(100, meter.Current);
+    }
+
+    [Fact]
+    public void ReducingByAnAmountThatIsNotANumber_IsRejectedWhicheverWayItsSignBitPoints()
+    {
+        // the meter has to keep holding a number things downstream can compare against: once
+        // Current is NaN it is neither above zero nor at or below it, so a hull can never be
+        // emptied and a shield layer absorbs nothing
+        Meter meter = new(100);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => meter.Reduce(PositiveNaN));
+        Assert.Equal(100, meter.Current);
+    }
+
+    [Fact]
+    public void RestoringByAnAmountThatIsNotANumber_IsRejectedWhicheverWayItsSignBitPoints()
+    {
+        Meter meter = new(100);
+        meter.Reduce(50);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => meter.Restore(PositiveNaN));
+        Assert.Equal(50, meter.Current);
+    }
+
+    [Fact]
+    public void AnInfiniteChange_IsStillTheWholePool()
+    {
+        // deliberately not refused alongside NaN: an infinite reduction is simply everything there
+        // was, and an infinite restore is a full pool. Both clamp to a real number, which is the
+        // property that matters — unlike NaN, which clamps to nothing.
+        Meter meter = new(100);
+
+        meter.Reduce(double.PositiveInfinity);
+        Assert.Equal(0, meter.Current);
+        Assert.True(meter.IsEmpty);
+
+        meter.Restore(double.PositiveInfinity);
         Assert.Equal(100, meter.Current);
     }
 

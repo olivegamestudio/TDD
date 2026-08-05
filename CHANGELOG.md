@@ -216,6 +216,27 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A meter can no longer be handed a not-a-number that leaves it holding nothing readable.**
+  `Meter`'s constructor, `Reduce` and `Restore` all documented that they refuse a value that is not
+  a number, but all three leaned on `ArgumentOutOfRangeException.ThrowIfNegative`, which reads the
+  sign bit. `double.NaN` happens to carry a set sign bit, so it was stopped by accident rather than
+  on purpose — and a NaN whose sign bit is clear, which is exactly what `Math.Abs` hands back for a
+  calculation that came out wrong, walked straight past all three guards.
+
+  What got through did not throw later either, which is what made it worth fixing: `Current` became
+  NaN and stayed there, and NaN is neither above zero nor at or below it. `IsEmpty` answers `false`
+  for a pool holding nothing, so a hull can never be destroyed; and a shield layer's
+  `Math.Min(landed, NaN)` absorbs nothing, so every hit goes straight through to health. The damage
+  model breaks silently and in whichever direction is worse.
+
+  NaN is now named by the rule it actually breaks, ahead of every negative guard, the way
+  `QuestTrigger` and `ShieldStats` already name it. Infinity is deliberately still allowed in
+  `Reduce` and `Restore` — an infinite change is simply the whole pool in one go and still clamps to
+  a real number — and still refused as a `Maximum`, which is a pool nothing could ever empty. That
+  is the distinction the guard is drawing: not "is this finite", but "does this clamp to a number
+  anything downstream can compare against".
+  ([#160](https://github.com/olivegamestudio/TDD/issues/160))
+
 - **Earning experience or a level can no longer wipe out the progress it was meant to add.**
   `Progression.Gain` and `Progression.Advance` accumulated in ordinary unchecked `int` arithmetic,
   so `Experience`, `SpendPoints` and `Level` each wrapped negative once their totals carried past

@@ -32,6 +32,7 @@ public sealed class Meter
     /// </exception>
     public Meter(double maximum)
     {
+        ThrowIfNotANumber(maximum, nameof(maximum));
         ArgumentOutOfRangeException.ThrowIfNegative(maximum);
         ArgumentOutOfRangeException.ThrowIfEqual(maximum, double.PositiveInfinity);
 
@@ -65,6 +66,7 @@ public sealed class Meter
     /// </exception>
     public void Reduce(double amount)
     {
+        ThrowIfNotANumber(amount, nameof(amount));
         ArgumentOutOfRangeException.ThrowIfNegative(amount);
 
         Current = Math.Max(0, Current - amount);
@@ -79,8 +81,26 @@ public sealed class Meter
     /// </exception>
     public void Restore(double amount)
     {
+        ThrowIfNotANumber(amount, nameof(amount));
         ArgumentOutOfRangeException.ThrowIfNegative(amount);
 
         Current = Math.Min(Maximum, Current + amount);
+    }
+
+    // Ordered before every negative guard so that a NaN is named by the rule it actually breaks.
+    // ThrowIfNegative reads the sign bit, and double.NaN happens to have it set — so the standard
+    // NaN is stopped by accident rather than on purpose, and a NaN whose sign bit is clear (what
+    // Math.Abs of a calculation gone wrong hands back) walks straight past. It has to be named.
+    //
+    // Infinity is deliberately not refused here, unlike in the constructor. An infinite maximum is
+    // a pool nothing can ever empty, but an infinite change is simply the whole pool in one go and
+    // still clamps to a real number. NaN clamps to nothing: it leaves Current neither above zero
+    // nor at or below it, so a hull can never be emptied and a shield layer absorbs nothing.
+    static void ThrowIfNotANumber(double value, string name)
+    {
+        if (double.IsNaN(value))
+        {
+            throw new ArgumentOutOfRangeException(name, value, "A meter holds real numbers only.");
+        }
     }
 }
