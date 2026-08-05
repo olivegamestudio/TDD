@@ -605,9 +605,13 @@ Character**.
   raiders **and** recover three samples"* is one quest with two end triggers rather than a new
   concept. The objective variety §11 asks for is the trigger list doing its job, not a separate
   objective system sitting beside it.
-- **[OPEN]** Whether a list of triggers means **all of them** or **any of them**. All-of-them is the
-  obvious default and gives multi-objective quests; any-of-them would give *"escape by either
-  exit"*. If both are wanted the list needs to say which it is.
+- **[DECIDED] A list of triggers means *all* of them.** Every trigger in the list has to be
+  satisfied before the quest moves, which is what makes a multi-objective quest work and is the
+  behaviour an author will assume by default. *"Escape by either exit"* is not expressible and does
+  not need to be — the same thing is authored as one proximity trigger covering both ways out.
+- **[NOTE]** If an any-of case ever turns up that genuinely cannot be authored around, it is an
+  addition to the list's meaning rather than a change to it — but it is not being built for now, on
+  the grounds that a rule everyone assumes is worth more than one nobody needs yet.
 - **[IMPLICATION — scope is just a condition]** §11 had quests carrying a **scope** (shared vs
   character-specific) as a field of their own. With **character** available as a condition, scope
   stops needing to exist: a shared quest has no character condition, a character-specific one names
