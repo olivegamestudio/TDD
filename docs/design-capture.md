@@ -588,8 +588,9 @@ Character**.
   a start trigger and an end trigger per quest, so the seam exists — what is missing is the extra
   **kinds**, since `QuestTriggerKind` today knows only `Proximity`.
 - **[DECIDED] Conditions and triggers are two different things, and the model carries both.**
-  - **Conditions gate.** *Level requirement*, *quest prerequisite* — states that must **hold** for a
-    quest to be available at all. They never fire on their own; they are asked.
+  - **Conditions gate.** States that must **hold** for a quest to be available at all. They never
+    fire on their own; they are asked. The kinds are **character** (which template is being
+    played), **faction** (standing with a group), **level**, and **quest prerequisite**.
   - **Triggers fire.** *Proximity*, *collect N*, *destroy N* — something **happens** and the quest
     moves.
 
@@ -597,6 +598,12 @@ Character**.
   starts when you reach the marker"* — a **set of conditions** plus **a trigger**, at each end.
   Collapsing them into one list would have meant either conditions that pretend to fire or triggers
   that quietly mean "and also check this".
+- **[IMPLICATION — scope is just a condition]** §11 had quests carrying a **scope** (shared vs
+  character-specific) as a field of their own. With **character** available as a condition, scope
+  stops needing to exist: a shared quest has no character condition, a character-specific one names
+  its character, and a quest for two of the four names both. One mechanism instead of two, and it
+  extends to cases a two-valued scope could not express. The same goes for **faction** — "this quest
+  is the Miners' Guild's" is a condition, not a second kind of field.
 - **[IMPLICATION — keeps `Pilgrimage` clean]** A level requirement is a game concept, and Pilgrimage
   holds no game knowledge by design. It follows the rule the library already lives by — **the model
   declares the rule; the presentation applies it**. A condition is stored as **data** (a kind and a
@@ -627,8 +634,11 @@ Character**.
 - **[OPEN]** Whether the faction bonus scales with **standing tier** or is a flat "member or not".
   Tiered rewards more the deeper the relationship, and reuses the thresholds the rep system already
   needs; flat is simpler to author and to explain.
-- **[DECIDED] Scope:** **shared story quests** and **character-specific quests** (a quest carries a
-  scope + a faction, per §5).
+- **[DECIDED] Scope:** **shared story quests** and **character-specific quests**, per §5 — but this
+  is **expressed as a condition, not a field**. A shared quest carries no character condition; a
+  character-specific one names its character. Likewise a faction quest carries a faction condition.
+  *(See the conditions list above — scope and faction were going to be two bespoke fields doing what
+  the condition list already does.)*
 - **[DECIDED] Mission log (UI):** view each quest's **details and requirements to complete**.
 - **[DECIDED] On-screen quest display (HUD):** an active-quest tracker on screen (objectives /
   progress). → feeds the **HUD** subsystem.
