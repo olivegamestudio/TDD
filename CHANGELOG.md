@@ -216,6 +216,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A time scale of infinity is now refused where it is set, instead of crashing the frame loop
+  later.** `ScaledFrameTimeController.TimeScale` guarded with `value >= 0`, which is an ordered
+  comparison and so answers the wrong question about the three values that are not numbers: NaN and
+  negative infinity were refused by accident — both compare false against zero — and positive
+  infinity passed, because it really is greater than zero.
+
+  What got through did not stay quiet. `Filter` multiplies the frame time by the scale, and
+  `TimeSpan`'s multiply throws `OverflowException` for a result larger than the ticks a `TimeSpan`
+  holds, which infinity always is. So the setter succeeded, the game carried on, and the failure
+  arrived on the *next frame* — from the frame loop, on every frame, naming `TimeSpan` arithmetic
+  rather than the scale that caused it. A scale computed from a division whose divisor reached zero
+  therefore set a time bomb somewhere the stack trace no longer pointed at.
+
+  The guard now asks for a finite number ahead of the sign, which refuses all three in one check and
+  leaves zero — the documented freeze — allowed. It is the same answer `Camera2D` gives for the same
+  reason: a value that cannot be used is refused at the setter, because a frame cannot be declined
+  quietly. ([#162](https://github.com/olivegamestudio/TDD/issues/162))
+
 - **A save holding a state no quest has is now refused before any of it is applied.**
   `QuestLog.Restore` checked the entries that were *not there* across the whole batch before
   applying any of it — the documented reason being that a caller catching the refusal still has the

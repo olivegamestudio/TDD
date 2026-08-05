@@ -57,4 +57,28 @@ public sealed class ScaledFrameTimeControllerTests
         Assert.Throws<ArgumentOutOfRangeException>(() => frameTime.TimeScale = -1);
         Assert.Equal(1, frameTime.TimeScale);   // and the rejected value is not kept
     }
+
+    [Theory]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    [InlineData(double.NaN)]
+    public void RejectsAScaleThatIsNotAFiniteNumber(double scale)
+    {
+        // none of these multiplies a frame time into a TimeSpan the frame loop can advance by
+        ScaledFrameTimeController frameTime = new();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => frameTime.TimeScale = scale);
+        Assert.Equal(1, frameTime.TimeScale);   // and the rejected value is not kept
+    }
+
+    [Fact]
+    public void KeepsFilteringAfterAScaleIsRefused()
+    {
+        // the refusal is the whole of it: the controller is still the one the frame loop had
+        ScaledFrameTimeController frameTime = new() { TimeScale = 0.5 };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => frameTime.TimeScale = double.PositiveInfinity);
+
+        Assert.Equal(TimeSpan.FromMilliseconds(8), frameTime.Filter(TimeSpan.FromMilliseconds(16)));
+    }
 }
