@@ -9,6 +9,31 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A ship carries two shields, and what a hit costs it now depends on them.** `ShieldStats` is the
+  shield's stats type, authored as one of the two things a shield can do — `Absorbing(capacity)`
+  contributes to the layer that depletes before health, `Reflecting(fraction)` bounces its share of
+  an incoming hit back at whatever fired it. A shield does one or the other, so there is no
+  constructor that would let a data file invent a third type by filling in both.
+
+  `Shielding` is what is in the two slots, and **the stacking rule is that slots add up**: two of a
+  kind double one effect, a mix gives both at single strength, and neither is written down as a
+  special case. A rule phrased as "double when they match" would have to answer what happens when
+  two shields nearly match. A pair reflecting more than the whole hit is held at the whole hit —
+  each shield was authored on its own and neither is a mistake, but damage travelling back out
+  larger than it arrived is.
+
+  `Ship.Fit` puts shields in the slots and builds the shield layer from them, so a ship's shield
+  maximum is no longer always zero. `Ship.TakeDamage` resolves a hit in the order the fiction
+  implies — what is reflected never arrives, what does meets the shield layer, and only what the
+  layer cannot hold reaches health — and returns a `DamageOutcome` whose three parts add back up to
+  the hit. It *reports* the reflected damage rather than applying it: a ship knows what its shields
+  turned around and has no business knowing what shot at it, so pairing that with an attacker
+  belongs wherever the fight does.
+
+  Nothing shoots yet and no content authors a shield, so the Disgraced still flies with empty slots
+  — which is what the design asks for at the start of the story.
+  ([#135](https://github.com/olivegamestudio/TDD/issues/135))
+
 - **A sprite carries a colour, so a screen can fade or tint what it draws.** `Colour` is four
   channels from 0 to 1 — red, green, blue, and how much of it shows — and `Sprite.Colour` is
   opaque white until something says otherwise, which is what every existing caller keeps getting
