@@ -680,7 +680,21 @@ Character**.
   **faction standing**, and faction is already a **condition** (see below) — so joining opens one
   line of quests and closes another by the machinery already decided. The shared endgame is
   preserved by the spine's quests simply carrying no faction condition.
-- **[OPEN]** Drop %s / reward tables.
+- **[DECIDED] Drops are authored per thing that drops** — **per enemy**, **per quest**, and **per
+  interactable object**. Each carries its own table rather than the game holding one global loot
+  system that decides on their behalf, so what something gives up is part of what that thing *is*.
+- **[DECIDED] One table shape serves all three.** An entry is **item · chance · quantity range** —
+  `Scrap Plating · 40% · 1–3` — and a guaranteed drop is simply an entry at 100%. So a quest's
+  fixed reward and its *"random piece with a % chance"* (above) are **the same mechanism** as a
+  raider's loot and a mining node's yield, not three systems that happen to resemble each other.
+- **[NOTE]** Authoring stays per-thing, but nothing stops two things **pointing at the same table**
+  where they genuinely drop alike — that is a content convenience, not a second mechanism, and it is
+  what keeps "every raider" tunable in one place rather than fifty.
+- **[OPEN]** Whether anything **modifies the roll** — enemy level, or a rarity tier on the item
+  carrying its own base chance. Flat percentages are easier to reason about and to tune, and a
+  modifier can be added later **without changing the table's shape**, so nothing is foreclosed by
+  leaving it flat for now.
+- **[OPEN]** The actual percentages and reward tables — content, tuned in play.
   *(Reward choice is decided: the player gets all of them. Turn-in is decided: whatever the quest's
   end trigger says. Conditions gate and triggers fire — both are data the game side evaluates.)*
 - **[vs main]** Engine has the Pilgrimage quest system + Quest 1 (proximity). New: varied objective
