@@ -702,13 +702,28 @@ Character**.
   are working through a checklist — the pull is the possibility, and publishing the table turns it
   into arithmetic. **Fixed rewards are still shown** (you know what you are being paid); it is the
   chance-based half that stays hidden.
-- **[IMPLICATION — the quest lifecycle is currently one-way]** `Quest` runs `NotStarted → Active →
-  Completed` and stops. A replayable quest has to **return to `NotStarted`** when its cooldown
-  expires, which the model has no notion of today. It also collides with the **quest-prerequisite
-  condition**: if a completed quest can reset, "has quest A been completed" stops being a stable
-  answer, and a chain gated on A would close behind the player when A restarts. Needs the model to
-  separate **"has ever been completed"** (permanent, what prerequisites read) from **"is available
-  now"** (what the cooldown drives). Worth settling before replayable quests are built.
+- **[DECIDED] A quest keeps a completion count and the time it was last completed.** The lifecycle
+  `NotStarted → Active → Completed` describes **the current attempt**; the count and the timestamp
+  are **the history**, and they persist across resets.
+  - **Prerequisites read the count** — "has quest A ever been completed" is `count > 0`, which never
+    goes backwards. A chain gated on A therefore stays open no matter how often A is replayed. This
+    is the collision that had to be solved: a resetting quest must not close the chain behind the
+    player.
+  - **Availability reads the timestamp** — a replayable quest becomes available again once its
+    cooldown has elapsed since the **last** completion.
+- **[IMPLICATION — `Pilgrimage` still holds no clock]** Knowing *when* a quest was last completed is
+  data, so the library can store it; deciding whether enough time has passed needs a "now", which
+  the library has no business owning. Same rule as everywhere else — **the model declares, the
+  presentation applies**: the game side supplies the current time and asks, exactly as
+  `QuestProximityWatcher` supplies position and asks.
+- **[IMPLICATION — the save shape grows]** `QuestLog.Capture`/`Restore` writes one entry per quest
+  carrying its state. It now has to carry the **completion count** and the **last completion time**
+  too, or a reload resets every cooldown and forgets every replay. That is a change to what older
+  saves can be read back into, which §8 already flags as a decision of its own.
+- **[OPEN]** **Which clock** the cooldown runs on — real elapsed time (a quest available again
+  tomorrow, whether or not the game was running) or in-game time played. Real time is the usual
+  choice and makes a replayable quest a reason to come back; time-played never punishes someone who
+  put the game down for a fortnight.
 - **[OPEN]** Which quests are replayable — story quests presumably not, since the spine is meant to
   be walked once. Content, but the rule wants stating.
 - **[OPEN]** The actual percentages and cooldown lengths — content, tuned in play.
