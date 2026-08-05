@@ -598,6 +598,16 @@ Character**.
   starts when you reach the marker"* — a **set of conditions** plus **a trigger**, at each end.
   Collapsing them into one list would have meant either conditions that pretend to fire or triggers
   that quietly mean "and also check this".
+- **[DECIDED] Both are lists, not fields.** A quest holds a **list of conditions** and a **list of
+  triggers**, rather than a fixed slot for each kind. Nothing about the model has to change to
+  express a quest gated on three things at once, and adding a new kind never adds a field.
+- **[IMPLICATION — multi-objective quests come free]** Because triggers are a list, *"destroy five
+  raiders **and** recover three samples"* is one quest with two end triggers rather than a new
+  concept. The objective variety §11 asks for is the trigger list doing its job, not a separate
+  objective system sitting beside it.
+- **[OPEN]** Whether a list of triggers means **all of them** or **any of them**. All-of-them is the
+  obvious default and gives multi-objective quests; any-of-them would give *"escape by either
+  exit"*. If both are wanted the list needs to say which it is.
 - **[IMPLICATION — scope is just a condition]** §11 had quests carrying a **scope** (shared vs
   character-specific) as a field of their own. With **character** available as a condition, scope
   stops needing to exist: a shared quest has no character condition, a character-specific one names
