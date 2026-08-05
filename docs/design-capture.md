@@ -749,7 +749,19 @@ Character**.
   (proximity + the mapped interact button — routes through the input system).
 - **[OPEN] Consequences:** whether dialogue **choices** change outcomes / reputation / which quests
   open — undecided (relates to the quest branching in §11).
-- **[OPEN]** Whether talking **pauses flight** or plays out in-world; voice (assume text-only for now).
+- **[DECIDED] Talking stops the ship — the UI holds the controls while a conversation is open.** The
+  player cannot fly and talk at once: while dialogue has focus, ship movement is not accepted.
+- **[NOTE — the mechanism already exists]** §7 already says **the UI has first claim on input, and
+  the ship gets it only when nothing is focused**. A conversation with focus therefore takes the
+  input, the ship receives no thrust, and **drag brings it to rest by itself** — "the speed drops"
+  is the existing physics doing exactly what it already does. No pause state, no special case, no
+  second way for the ship to be stationary.
+- **[OPEN]** Whether the **world** keeps running while the player talks. Stopping the ship is
+  decided; whether enemies, hazards and the collapsing debris around them also hold still is not.
+  Letting the world run makes conversation a real risk and stops dialogue being a safe pocket to
+  hide in; freezing it means a talk is never something the player is punished for opening. The
+  answer probably differs by *where* — a vendor in a city is not a quest-giver in a firefight.
+- **[NOTE]** Voice: **text-only** for now.
 
 ## 13. HUD
 
