@@ -23,8 +23,13 @@ public sealed class ShipView(ICamera camera) : IShipView
     /// the world it flies through — a zoom changes how much of the world is on screen, not how
     /// big the ship is in it. The artwork is far larger than this; the scale is derived from the
     /// texture below, so replacing the sprite with one of another size changes nothing here.
+    ///
+    /// It shipped at 96, which was chosen against an empty starfield where there was nothing to
+    /// judge it against. Beside the debris the ship is meant to be flown through it read as far
+    /// too large — the scenery is the thing that gives the ship a size, so the number moved once
+    /// there was scenery.
     /// </remarks>
-    public const float LengthInWorldUnits = 96f;
+    public const float LengthInWorldUnits = 55f;
 
     string _assetKey = DefaultAssetKey;
 

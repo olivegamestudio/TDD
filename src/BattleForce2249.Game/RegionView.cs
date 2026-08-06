@@ -76,21 +76,45 @@ public sealed class RegionView(ICamera camera) : IRenderable
 
             Vector2 world = new((float)body.X, (float)body.Y);
 
-            // A fixed body is painted on the sky rather than standing in the scene: it takes none
-            // of the camera's movement and none of its turn, so flying past it — or turning under
-            // it — leaves it exactly where it was. Everything else goes through the camera and
-            // behaves like a thing you can fly around.
-            Vector2 screen = fixedToScreen
-                ? (renderer.ViewportSize / 2f) + (world * camera.PixelsPerUnit)
-                : camera.WorldToScreen(world, renderer.ViewportSize);
+            // One scale, from the average of the two the content carries. Sprite draws with a
+            // single factor, so a body squashed on one axis cannot be drawn as authored — this
+            // keeps its area right rather than its shape, and is the thing to revisit when a
+            // sprite can be drawn with two.
+            float authored = (float)((body.ScaleX + body.ScaleY) / 2);
 
-            float rotation = (float)(body.RotationDegrees * Math.PI / 180);
-            if (!fixedToScreen)
+            Vector2 screen;
+            // Negated, because the two conventions turn opposite ways. The content was authored
+            // where a positive angle turns anticlockwise and Y points up; a Sprite's rotation is
+            // clockwise, because the screen's Y axis points down. Taken across unchanged, every
+            // rock authored at an angle lands mirrored — which reads as scenery that is subtly
+            // wrong everywhere rather than as anything obviously broken.
+            float rotation = (float)(-body.RotationDegrees * Math.PI / 180);
+            float scale;
+
+            if (fixedToScreen)
             {
+                // Painted on the sky. It takes none of the camera's movement and none of its turn,
+                // so flying past it — or turning under it — leaves it exactly where it was.
+                //
+                // It is also measured against the *view* rather than the world: what matters about
+                // a backdrop is how much of the screen it fills, so it is laid out as though this
+                // window were the one it was authored against. That is what lets the same star
+                // field cover a small window and a large one.
+                float ofView = renderer.ViewportSize.Y / AuthoredViewHeightInPixels;
+
+                screen = (renderer.ViewportSize / 2f)
+                    + (world * AuthoredPixelsPerUnit * ofView);
+                scale = authored * ofView;
+            }
+            else
+            {
+                screen = camera.WorldToScreen(world, renderer.ViewportSize);
+
                 // The world's rotation plus the camera's, because the camera turns with the ship
                 // and the scenery has to turn with the world rather than staying upright in a
                 // world that is rotating around it.
                 rotation += camera.Orientation;
+                scale = authored * camera.PixelsPerUnit / AuthoredPixelsPerUnit;
             }
 
             renderer.Draw(new Sprite(
@@ -98,23 +122,30 @@ public sealed class RegionView(ICamera camera) : IRenderable
                 Position: screen,
                 Rotation: rotation,
                 Origin: new Vector2(texture.Width, texture.Height) / 2f,
-                // One scale, from the average of the two the content carries. Sprite draws with a
-                // single factor, so a body squashed on one axis cannot be drawn as authored — this
-                // keeps its area right rather than its shape, and is the thing to revisit when a
-                // sprite can be drawn with two.
-                Scale: (float)((body.ScaleX + body.ScaleY) / 2 * camera.PixelsPerUnit / PixelsPerWorldUnitAtAuthoredScale)));
+                Scale: scale));
         }
     }
 
     /// <summary>
-    /// How many pixels of a body's texture the author took to be one world unit.
+    /// How many pixels of a body's texture the author took to be one unit.
     /// </summary>
     /// <remarks>
     /// The scenery was authored in a tool where a sprite at scale 1 covered this many pixels per
     /// unit. Without it, a rock authored at scale 1 would be drawn at its full texture size
     /// whatever the zoom, and a debris field would be a wall.
     /// </remarks>
-    public const float PixelsPerWorldUnitAtAuthoredScale = 100f;
+    public const float AuthoredPixelsPerUnit = 100f;
+
+    /// <summary>
+    /// How tall the view a backdrop was composed against was, in those same pixels.
+    /// </summary>
+    /// <remarks>
+    /// Backdrops are laid out against the window rather than the world, so this is what "full
+    /// screen" meant to whoever placed them. A window taller than this shows more of the sky and a
+    /// shorter one less, which is what keeps a backdrop covering the screen at any size instead of
+    /// leaving a band of black at one edge.
+    /// </remarks>
+    public const float AuthoredViewHeightInPixels = 1080f;
 
     /// <summary>
     /// The texture for an asset key, loaded once and kept. A region draws the same handful of

@@ -63,6 +63,41 @@ DEFAULT_RADIUS = {
     "CameraShake": 3.0,
 }
 
+# How many of this game's world units one Unity unit becomes.
+#
+# The two projects measure the world differently and neither is wrong. The Unity
+# scene spans about 130 units end to end; this game flies the opening quest over
+# 1000, and its camera draws one world unit as one pixel. Imported straight, the
+# whole debris field lands in a patch a couple of hundred pixels across with the
+# ship filling it.
+#
+# Applied here rather than at load, because it is a property of importing
+# foreign content and not of the format: a region authored in this game's own
+# editor will already be in this game's units and must not be scaled again.
+WORLD_SCALE = 15.0
+
+# How much bigger an imported body is drawn, which is deliberately NOT the same
+# number.
+#
+# Positions and sizes want different factors here, and the reason is worth
+# stating rather than discovering again. This game's ship is 96 world units long
+# where the Unity scene's was about one, so matching the two projects'
+# ship-to-rock proportions would mean scaling by nearer 96 — which would spread
+# the debris field over twelve thousand units, when the opening quest's marker
+# sits 1000 units out and is meant to be a six second run.
+#
+# So the layout is scaled to fit the distances this game flies, and the bodies
+# are scaled to read against the ship that flies them. Applying one number to
+# both gives either a field the ship crosses in a second or debris the ship
+# cannot be seen against.
+BODY_SIZE_SCALE = 6.0
+
+# What the Unity content took one unit to be, in texture pixels, and how tall the
+# scene's camera view was in those same pixels. Backdrops are laid out against
+# the second: they are painted on the sky, so what matters is how much of the
+# view they filled rather than where they stood in the world.
+AUTHORED_PIXELS_PER_UNIT = 100.0
+
 QUEST_NAME = re.compile(r"^Q(\d+)_(START|END)_ZONE$", re.IGNORECASE)
 
 # Bodies that are backdrop rather than scenery: painted on the sky, taking none
@@ -126,21 +161,30 @@ def main() -> int:
             continue
         kept.append(b)
 
-    bodies = [
-        {
-            "name": b["name"],
-            "sprite": b["sprite"],
-            "x": round(b["x"], 4),
-            "y": round(b["y"], 4),
-            "rotationDegrees": round(b["rotationDegrees"], 4),
-            "scaleX": round(b["scaleX"], 4),
-            "scaleY": round(b["scaleY"], 4),
-            "layer": b["sortingLayer"],
-            "order": b["sortingOrder"],
-            "parallax": 0 if b["name"] in FIXED_BODIES else 1,
-        }
-        for b in kept
-    ]
+    bodies = []
+    for b in kept:
+        fixed = b["name"] in FIXED_BODIES
+
+        # A backdrop keeps its authored numbers: it is measured against the view
+        # rather than the world, so scaling it into world units would be
+        # converting it into a space it never occupied.
+        position_scale = 1.0 if fixed else WORLD_SCALE
+        size_scale = 1.0 if fixed else BODY_SIZE_SCALE
+
+        bodies.append(
+            {
+                "name": b["name"],
+                "sprite": b["sprite"],
+                "x": round(b["x"] * position_scale, 4),
+                "y": round(b["y"] * position_scale, 4),
+                "rotationDegrees": round(b["rotationDegrees"], 4),
+                "scaleX": round(b["scaleX"] * size_scale, 4),
+                "scaleY": round(b["scaleY"] * size_scale, 4),
+                "layer": b["sortingLayer"],
+                "order": b["sortingOrder"],
+                "parallax": 0 if fixed else 1,
+            }
+        )
 
     markers = []
     guessed = Counter()
@@ -164,10 +208,13 @@ def main() -> int:
                 "name": m["name"],
                 "kind": kind,
                 "reference": reference,
-                "x": round(m["x"], 4),
-                "y": round(m["y"], 4),
+                "x": round(m["x"] * WORLD_SCALE, 4),
+                "y": round(m["y"] * WORLD_SCALE, 4),
                 "rotationDegrees": round(m["rotationDegrees"], 4),
-                "radius": radius,
+                # Scaled with everything else, or a trigger authored to fire when
+                # the player is close would fire when they are fifteen times too
+                # far away — or never.
+                "radius": round(radius * WORLD_SCALE, 4),
             }
         )
 
@@ -180,6 +227,7 @@ def main() -> int:
     print(f"{destination}: {len(bodies)} bodies, {len(markers)} markers")
     print(f"  kinds: {dict(Counter(m['kind'] for m in markers))}")
     print(f"  fixed to the screen: {[b['name'] for b in bodies if b['parallax'] == 0]}")
+    print(f"  positions x{WORLD_SCALE:g}, body sizes x{BODY_SIZE_SCALE:g}, into this game's units")
     print(f"  radii GUESSED (the export carried none): {dict(guessed)}")
     if dropped:
         print(f"  bodies dropped, no such sprite in the content build: {dict(dropped)}")
