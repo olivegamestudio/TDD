@@ -29,6 +29,38 @@ public sealed class GameScreen(
     : IGameScreen, IActivatable, IRenderable
 {
     /// <summary>
+    /// How close the camera sits to the world, in pixels per world unit.
+    /// </summary>
+    /// <remarks>
+    /// Set here rather than left at the camera's default of one, which was chosen when there was
+    /// nothing on screen but stars and a ship and so had nothing to be right or wrong about. With
+    /// scenery to fly through, the zoom decides how much debris is in view at once — and therefore
+    /// how much warning the player gets of what they are flying into, which is a gameplay number
+    /// rather than a rendering one.
+    /// </remarks>
+    public const float Zoom = 2.5f;
+
+    /// <summary>
+    /// How quickly the camera comes round to the ship's heading, as a proportion of the angle
+    /// still to cover each second.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The camera used to be handed the ship's heading outright, which made the world snap to
+    /// every flick of the helm and pinned the ship rigidly upright — it never appeared to turn at
+    /// all, because it was drawn at its heading minus a camera orientation that was always exactly
+    /// its heading. That is what read as robotic: the ship is the one thing on screen that never
+    /// moves.
+    /// </para>
+    /// <para>
+    /// Lagging the camera fixes both ends of it. The world comes about smoothly instead of
+    /// jumping, and the difference between where the ship is pointed and where the camera has got
+    /// to shows up as the ship leaning into its own turn and settling once the turn is done.
+    /// </para>
+    /// </remarks>
+    public const float CameraCatchUpPerSecond = 6f;
+
+    /// <summary>
     /// The region the game opens in — the collapsing debris field the Disgraced escapes from.
     /// An identifier, never translated.
     /// </summary>
@@ -55,6 +87,8 @@ public sealed class GameScreen(
         // constructor because a region is content read from disk, and reading it is work that
         // belongs to entering a screen rather than to building the container.
         region.Scene = regions.Load(OpeningRegionId);
+        camera.PixelsPerUnit = Zoom;
+        _cameraSettled = false;
 
         Started = session.Continue();
         return EnterResult.Stay;
@@ -90,6 +124,69 @@ public sealed class GameScreen(
         // of what the two stages agree about: the physics has no idea a screen exists, and the
         // view has no idea physics does.
         view.Pose = PoseOf(session.Player.Position, ship.Heading);
+
+        // The first frame of a game snaps rather than eases. There is nothing to ease from — the
+        // camera has never been anywhere — so lagging it would swing the world round from due
+        // north to wherever the ship is actually facing, as the player's opening move.
+        _cameraHeading = _cameraSettled
+            ? CatchUp(_cameraHeading, (float)ship.Heading, frameTime)
+            : (float)ship.Heading;
+
+        _cameraSettled = true;
+    }
+
+    /// <summary>
+    /// Where the camera has got to in coming round to the ship's heading. Held here rather than on
+    /// the camera because it is a decision about how this game feels to fly, not a property of a
+    /// camera — another screen pointing the same camera at something else should not inherit it.
+    /// </summary>
+    float _cameraHeading;
+
+    /// <summary>
+    /// Gets where the camera has got to in coming round to the ship's heading, in radians.
+    /// Exposed so the lag itself can be asserted on: it is the difference between this and the
+    /// ship's heading that the player reads as the ship leaning into a turn.
+    /// </summary>
+    public float CameraHeading => _cameraHeading;
+
+    /// <summary>
+    /// Gets the game this screen is playing, so a test can see what the ship it is drawing is
+    /// actually doing.
+    /// </summary>
+    public IGameSession Session => session;
+
+    /// <summary>
+    /// Whether the camera has a heading to catch up <em>from</em>. Cleared on entering, so
+    /// starting a game or coming back to one begins pointed where the ship is pointed rather than
+    /// swinging round to find it.
+    /// </summary>
+    bool _cameraSettled;
+
+    /// <summary>
+    /// Eases one angle towards another, taking the short way round.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The step is a proportion of what is left rather than a fixed number of radians, so a hard
+    /// turn moves quickly and the last few degrees settle gently — a constant rate arrives at the
+    /// heading and stops dead, which is the robotic feel this exists to avoid.
+    /// </para>
+    /// <para>
+    /// Framed against elapsed time rather than per frame, so the camera behaves the same on a slow
+    /// machine as a fast one. Wrapped to the shorter arc, or coming about past due north would
+    /// send the camera the whole way round the compass to reach a heading a few degrees away.
+    /// </para>
+    /// </remarks>
+    static float CatchUp(float from, float to, TimeSpan frameTime)
+    {
+        float difference = to - from;
+
+        // Into the range −π..π, so the camera turns the short way.
+        difference -= MathF.Tau * MathF.Round(difference / MathF.Tau);
+
+        float caught = 1f - MathF.Exp(-CameraCatchUpPerSecond * (float)frameTime.TotalSeconds);
+
+        return from + (difference * caught);
     }
 
     /// <summary>
@@ -113,7 +210,7 @@ public sealed class GameScreen(
         // that stays upright. Set here beside the target because the two are one decision — where
         // the camera is and which way it is facing — and a camera that followed the ship's
         // position but not its heading would leave the ship spinning on the spot again.
-        camera.Orientation = view.Pose.Heading;
+        camera.Orientation = _cameraHeading;
 
         // Before the ship, so the ship is over the stars rather than behind one. It is also what
         // makes the ship look like it is going anywhere: the camera holds the ship still in the

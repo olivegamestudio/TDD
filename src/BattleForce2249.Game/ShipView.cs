@@ -29,7 +29,7 @@ public sealed class ShipView(ICamera camera) : IShipView
     /// too large — the scenery is the thing that gives the ship a size, so the number moved once
     /// there was scenery.
     /// </remarks>
-    public const float LengthInWorldUnits = 55f;
+    public const float LengthInWorldUnits = 30f;
 
     string _assetKey = DefaultAssetKey;
 

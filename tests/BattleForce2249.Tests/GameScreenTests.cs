@@ -137,56 +137,107 @@ public sealed class GameScreenTests : HostTestBase
     }
 
     [Fact]
-    public void Render_TurnsTheCameraToTheShipsHeading()
+    public void TheFirstFrame_PutsTheCameraStraightOntoTheShipsHeading()
     {
-        // the camera follows where the ship is pointing as well as where it is. Following only
-        // the position leaves the ship spinning in the middle of a world that stays upright,
-        // which is the camera this screen used to have.
+        // Snapped rather than eased, because there is nothing to ease from — a camera lagging on
+        // its very first frame would swing the world round from due north to wherever the ship is
+        // actually facing, as the player's opening move.
         Camera2D camera = new();
-        StubShipView ship = new() { Pose = new ShipPose(new Vector2(120f, -45f), 1.9f) };
-        GameScreen screen = ScreenFor(camera, ship);
+        FixedShipInput pilot = new() { Controls = new ShipControls(thrust: 0, turn: 1) };
+        GameScreen screen = ScreenFor(camera, new StubShipView(), pilot: pilot);
+
+        screen.Update(TimeSpan.FromSeconds(0.2));
 
         screen.Render(new RecordingRenderer());
 
-        Assert.Equal(1.9f, camera.Orientation);
+        Assert.Equal(camera.Orientation, screen.CameraHeading);
+        Assert.NotEqual(0f, camera.Orientation);
     }
 
     [Fact]
-    public void Render_KeepsTheCameraOnTheShipsHeading_AsItTurns()
+    public void AsTheShipTurns_TheCameraLagsBehindIt_AndThenCatchesUp()
     {
+        // The lag is the feature. Handed the heading outright the world snaps to every flick of
+        // the helm, and the ship — drawn at its heading minus a camera orientation that is always
+        // exactly its heading — never appears to turn at all. What is left behind by the camera
+        // shows up as the ship leaning into its own turn.
         Camera2D camera = new();
-        StubShipView ship = new();
-        GameScreen screen = ScreenFor(camera, ship);
+        FixedShipInput pilot = new();
+        GameScreen screen = ScreenFor(camera, new StubShipView(), pilot: pilot);
 
-        ship.Pose = new ShipPose(Vector2.Zero, 0.4f);
-        screen.Render(new RecordingRenderer());
-        ship.Pose = new ShipPose(Vector2.Zero, -2.6f);
-        screen.Render(new RecordingRenderer());
+        screen.Update(TimeSpan.FromSeconds(0.1));   // settles the camera on the ship
 
-        Assert.Equal(-2.6f, camera.Orientation);
+        pilot.Controls = new ShipControls(thrust: 0, turn: 1);
+        screen.Update(TimeSpan.FromSeconds(0.1));
+
+        float shipHeading = (float)((StubGameSession)screen.Session).Ship.Movement.Heading;
+        Assert.NotEqual(shipHeading, screen.CameraHeading);
+
+        // and given long enough at that heading, it arrives.
+        pilot.Controls = ShipControls.Neutral;
+        for (int frame = 0; frame < 200; frame++)
+        {
+            screen.Update(TimeSpan.FromSeconds(1d / 60));
+        }
+
+        Assert.Equal(shipHeading, screen.CameraHeading, precision: 3);
     }
 
     [Theory]
-    [InlineData(0f)]
-    [InlineData(1.2f)]
-    [InlineData(-0.9f)]
-    [InlineData(4.5f)]
-    public void Render_LeavesTheShipPointingUpTheScreen_WhateverItIsFlying(float heading)
+    [InlineData(0.4)]
+    [InlineData(1.0)]
+    [InlineData(-1.0)]
+    public void OnceTheCameraHasCaughtUp_TheShipPointsUpTheScreen(double turn)
     {
-        // the two halves of the feature meeting: the screen turns the camera, the view takes the
-        // camera's turn off the ship's own heading, and what the player sees is a ship that never
-        // rotates while the world rotates around it. Asserted through the real view rather than
-        // the stub, because it is the pair that has to agree.
+        // The two halves of the feature meeting: the screen turns the camera, the view takes the
+        // camera's turn off the ship's own heading, and once the camera has caught up the player
+        // sees a ship pointing up a world that has rotated around it. Asserted through the real
+        // view rather than the stub, because it is the pair that has to agree.
+        //
+        // "Once it has caught up" rather than "always": the ship leans while the camera is still
+        // coming round, which is deliberate and is what stops a turn feeling robotic.
         Camera2D camera = new();
-        ShipView ship = new(camera) { Pose = new ShipPose(new Vector2(700f, -1300f), heading) };
-        GameScreen screen = ScreenFor(camera, ship);
-        RecordingRenderer renderer = new();
+        FixedShipInput pilot = new() { Controls = new ShipControls(thrust: 0, turn: turn) };
+        ShipView ship = new(camera);
+        GameScreen screen = ScreenFor(camera, ship, pilot: pilot);
 
+        // fly the turn, then hold the heading long enough for the camera to arrive
+        for (int frame = 0; frame < 30; frame++)
+        {
+            screen.Update(TimeSpan.FromSeconds(1d / 60));
+        }
+
+        pilot.Controls = ShipControls.Neutral;
+        for (int frame = 0; frame < 300; frame++)
+        {
+            screen.Update(TimeSpan.FromSeconds(1d / 60));
+        }
+
+        RecordingRenderer renderer = new();
         screen.Render(renderer);
 
-        // last, because the ship is drawn over the stars
-        Assert.Equal(0f, renderer.Drawn[^1].Rotation);
+        // last, because the ship is drawn over the stars and the scenery
+        Assert.Equal(0f, renderer.Drawn[^1].Rotation, precision: 3);
         Assert.Equal(renderer.ViewportCentre, renderer.Drawn[^1].Position);
+    }
+
+    [Fact]
+    public void MidTurn_TheShipLeansIntoIt()
+    {
+        // What the lag buys. The ship is the one thing on screen that never moved before this;
+        // now it tips into a turn and settles upright when the turn is done.
+        Camera2D camera = new();
+        FixedShipInput pilot = new() { Controls = new ShipControls(thrust: 0, turn: 1) };
+        ShipView ship = new(camera);
+        GameScreen screen = ScreenFor(camera, ship, pilot: pilot);
+
+        screen.Update(TimeSpan.FromSeconds(1d / 60));   // settles the camera
+        screen.Update(TimeSpan.FromSeconds(1d / 60));   // and now it is behind
+
+        RecordingRenderer renderer = new();
+        screen.Render(renderer);
+
+        Assert.NotEqual(0f, renderer.Drawn[^1].Rotation);
     }
 
     [Fact]
