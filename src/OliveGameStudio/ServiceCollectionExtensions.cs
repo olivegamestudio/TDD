@@ -33,12 +33,23 @@ public static class ServiceCollectionExtensions
             .AddSingleton<RoutedShipInput>()
             .AddSingleton<IShipInput>(services => services.GetRequiredService<RoutedShipInput>())
 
+            // And where the frame's other asks are left: to talk to somebody, or to be out of
+            // whatever has the controls. Separate from the ship's controls because these are
+            // presses rather than states, and nothing that flies a ship should have to know that.
+            .AddSingleton<RoutedInteraction>()
+
+            // The conversation the player is in, if they are in one. Engine state rather than
+            // game state: who is talking and what they say is content, but there being one
+            // conversation at a time is not.
+            .AddSingleton<Conversations>()
+
             // Registered by hand rather than by type so the dead zone is a stated argument. A host
             // that knows its own hardware registers another after this call; one that says nothing
             // gets InputRouter.DefaultDeadZone rather than a stick read raw.
             .AddSingleton<IInputRouter>(services => new InputRouter(
                 services.GetRequiredService<IUIController>(),
-                services.GetRequiredService<RoutedShipInput>()))
+                services.GetRequiredService<RoutedShipInput>(),
+                services.GetRequiredService<RoutedInteraction>()))
 
             // one camera for the whole game: everything drawn in the world has to agree about
             // where the viewport is, or two things at the same world position draw apart

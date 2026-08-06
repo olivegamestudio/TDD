@@ -45,7 +45,7 @@ public sealed class ShippedDeadZoneTests
         // played on at all.
         UIController ui = new();
         RoutedShipInput ship = new();
-        InputRouter router = new(ui, ship, DesktopGamePad.DeadZone);
+        InputRouter router = new(ui, ship, new RoutedInteraction(), DesktopGamePad.DeadZone);
 
         Button start = new("START");
         ui.Add(start);

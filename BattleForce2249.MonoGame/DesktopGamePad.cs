@@ -52,10 +52,17 @@ public static class DesktopGamePad
         }
 
         // Y is up on the stick and ahead is positive thrust, so the axes map straight across.
+        //
+        // A interacts as well as confirms, which is the pad's version of the space bar doing both:
+        // the same button means "yes" to whatever is on screen and "talk to them" when nothing is.
+        // B backs out, which is where every pad in this genre puts it, and it is bound to nothing
+        // else so that leaving a conversation is one button that always means leave.
         return new GamePadFrame(
             Connected: true,
             Thrust: pad.ThumbSticks.Left.Y,
             Turn: pad.ThumbSticks.Left.X,
-            Confirm: pad.Buttons.A == ButtonState.Pressed || pad.Buttons.Start == ButtonState.Pressed);
+            Confirm: pad.Buttons.A == ButtonState.Pressed || pad.Buttons.Start == ButtonState.Pressed,
+            Interact: pad.Buttons.A == ButtonState.Pressed,
+            Cancel: pad.Buttons.B == ButtonState.Pressed);
     }
 }

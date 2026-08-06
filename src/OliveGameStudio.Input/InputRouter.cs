@@ -40,6 +40,7 @@ public sealed class InputRouter : IInputRouter
 
     readonly IUIController _ui;
     readonly RoutedShipInput _ship;
+    readonly RoutedInteraction _interaction;
     readonly double _deadZone;
 
     /// <summary>
@@ -55,22 +56,50 @@ public sealed class InputRouter : IInputRouter
     bool _confirmHeld;
 
     /// <summary>
+    /// Whether the interact the router is tracking was held on the previous frame.
+    /// </summary>
+    /// <remarks>
+    /// Kept for the same reason as <see cref="_confirmHeld"/>, and kept whether or not the frame
+    /// went to the UI for a reason this one shows plainly: interact and confirm can be the same
+    /// key, so the press that commits the menu's start button is still held on the first frame of
+    /// the game. Tracked across the change of focus, that is one press and opens nothing; tracked
+    /// only while flying, it would be a fresh press the moment the game began.
+    /// </remarks>
+    bool _interactHeld;
+
+    /// <summary>
+    /// Whether the back-out the router is tracking was held on the previous frame.
+    /// </summary>
+    bool _cancelHeld;
+
+    /// <summary>
     /// Routes input between the given user interface and the given ship.
     /// </summary>
     /// <param name="ui">The user interface, asked each frame whether it holds focus.</param>
     /// <param name="ship">Where the ship's controls are put for the physics to read.</param>
+    /// <param name="interaction">
+    /// Where what the player asked for besides flying is put for the frame path to read.
+    /// </param>
     /// <param name="deadZone">
     /// How far a stick must travel before it counts as being pushed, from 0 to 1. Defaults to
     /// <see cref="DefaultDeadZone"/>.
     /// </param>
-    /// <exception cref="ArgumentNullException">There is no user interface, or no ship.</exception>
-    public InputRouter(IUIController ui, RoutedShipInput ship, double deadZone = DefaultDeadZone)
+    /// <exception cref="ArgumentNullException">
+    /// There is no user interface, no ship, or nowhere to put an interaction.
+    /// </exception>
+    public InputRouter(
+        IUIController ui,
+        RoutedShipInput ship,
+        RoutedInteraction interaction,
+        double deadZone = DefaultDeadZone)
     {
         ArgumentNullException.ThrowIfNull(ui);
         ArgumentNullException.ThrowIfNull(ship);
+        ArgumentNullException.ThrowIfNull(interaction);
 
         _ui = ui;
         _ship = ship;
+        _interaction = interaction;
         _deadZone = deadZone;
     }
 
@@ -82,11 +111,19 @@ public sealed class InputRouter : IInputRouter
     {
         ControlDevice confirming = Confirming(frame);
         bool confirm = confirming != ControlDevice.None;
+        bool interact = Interacting(frame);
+        bool cancel = Cancelling(frame);
 
         // asked, not remembered: Add, Enable and Disable all move focus on their own, so a router
         // that tracked what it last focused would be wrong the frame after any of them
         if (_ui.HasFocus)
         {
+            // UI first, here as everywhere. While something on screen holds the controls the only
+            // thing besides working it that the player can ask for is to be out of it, so interact
+            // is not offered — a conversation cannot open a second conversation.
+            _interaction.Interact = false;
+            _interaction.Cancel = LockedTo != ControlDevice.None && cancel && !_cancelHeld;
+
             if (confirm && !_confirmHeld)
             {
                 // the press, not the release. The menu commits its start button on release and
@@ -108,10 +145,69 @@ public sealed class InputRouter : IInputRouter
         else
         {
             _ship.Controls = ControlsOf(frame);
+
+            // The press, not the hold: a finger resting on the interact key is one request to talk
+            // to somebody, not one on every frame it rests there. Nothing offers a way to back out
+            // of flying, so the other half is written false rather than left where it was.
+            //
+            // Nobody asks for anything until a device has been chosen, which is the same answer
+            // the ship gets — the game cannot be reached without pressing start, so this is not a
+            // state the player can be in rather than a case being handled.
+            _interaction.Interact = LockedTo != ControlDevice.None && interact && !_interactHeld;
+            _interaction.Cancel = false;
         }
 
         _confirmHeld = confirm;
+        _interactHeld = interact;
+        _cancelHeld = cancel;
     }
+
+    /// <summary>
+    /// Whether the locked device is asking to interact this frame.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Once a device is locked it is the only one asked, which is the lock being a statement about
+    /// the whole control method rather than only about the flight controls: a pad left plugged in
+    /// must not be able to talk to somebody on behalf of a player at the keys.
+    /// </para>
+    /// <para>
+    /// Before then <em>any</em> device counts, and that is about the edge rather than about who is
+    /// playing. Interact is the same key as confirm on a keyboard and the same button on a pad, so
+    /// the press that chooses the device is a press of this too — and a frame that answered "no"
+    /// because no device had been chosen yet would make the next frame, on which one has, look
+    /// like a fresh press of a key nobody has let go of. Nothing acts on the answer until a device
+    /// is locked, so counting the press early costs nothing and stops the game opening a
+    /// conversation with whoever the player spawns next to.
+    /// </para>
+    /// </remarks>
+    bool Interacting(InputFrame frame) => LockedTo switch
+    {
+        ControlDevice.Keyboard => frame.Keyboard.Interact,
+        ControlDevice.GamePad => PadIsInteracting(frame),
+        _ => PadIsInteracting(frame) || frame.Keyboard.Interact,
+    };
+
+    /// <summary>
+    /// Whether a pad that is actually plugged in is asking to interact.
+    /// </summary>
+    static bool PadIsInteracting(InputFrame frame) => frame.GamePad is { Connected: true, Interact: true };
+
+    /// <summary>
+    /// Whether the locked device is asking to back out this frame, tracked from before the lock
+    /// for the same reason as <see cref="Interacting"/>.
+    /// </summary>
+    bool Cancelling(InputFrame frame) => LockedTo switch
+    {
+        ControlDevice.Keyboard => frame.Keyboard.Cancel,
+        ControlDevice.GamePad => PadIsCancelling(frame),
+        _ => PadIsCancelling(frame) || frame.Keyboard.Cancel,
+    };
+
+    /// <summary>
+    /// Whether a pad that is actually plugged in is asking to back out.
+    /// </summary>
+    static bool PadIsCancelling(InputFrame frame) => frame.GamePad is { Connected: true, Cancel: true };
 
     /// <summary>
     /// Which device is asking to confirm this frame, or <see cref="ControlDevice.None"/> if none is.

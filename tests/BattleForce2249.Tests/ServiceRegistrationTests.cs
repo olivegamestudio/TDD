@@ -57,6 +57,44 @@ public sealed class ServiceRegistrationTests
     }
 
     [Fact]
+    public void ResolvesTheTalkingSystem()
+    {
+        using ServiceProvider provider = BuildProvider();
+
+        Assert.NotNull(provider.GetRequiredService<Conversations>());
+        Assert.NotNull(provider.GetRequiredService<NpcInteractionWatcher>());
+        Assert.NotNull(provider.GetRequiredService<RoutedInteraction>());
+    }
+
+    [Fact]
+    public void TheConversationAndTheWatcherAreOnePerGame()
+    {
+        // The watcher holds the button a conversation takes the controls with, and a second one
+        // would add a second button to the same interface — while two conversations would let the
+        // screen and the router disagree about whether anybody is talking.
+        using ServiceProvider provider = BuildProvider();
+
+        Assert.Same(provider.GetRequiredService<Conversations>(), provider.GetRequiredService<Conversations>());
+        Assert.Same(
+            provider.GetRequiredService<NpcInteractionWatcher>(),
+            provider.GetRequiredService<NpcInteractionWatcher>());
+    }
+
+    [Fact]
+    public void TheRouterWritesToTheInteractionTheGameScreenReads()
+    {
+        // the seam only works if both ends are the same object; two would leave every press
+        // written to one and read from the other
+        using ServiceProvider provider = BuildProvider();
+
+        RoutedInteraction interaction = provider.GetRequiredService<RoutedInteraction>();
+        provider.GetRequiredService<IInputRouter>().Route(InputFrame.None);
+
+        Assert.Same(interaction, provider.GetRequiredService<RoutedInteraction>());
+        Assert.False(interaction.Interact);
+    }
+
+    [Fact]
     public void ResolvesTheCharactersTheGameCanBePlayedAs()
     {
         using ServiceProvider provider = BuildProvider();

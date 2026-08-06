@@ -71,13 +71,25 @@ public sealed class GameScreenTests : HostTestBase
         ICamera camera,
         IShipView view,
         IGameSession? session = null,
-        IShipInput? pilot = null) =>
-        new(session ?? new StubGameSession(),
+        IShipInput? pilot = null,
+        IWorld? world = null,
+        RoutedInteraction? interaction = null,
+        Conversations? conversations = null)
+    {
+        world ??= new BattleForceWorld();
+        conversations ??= new Conversations();
+
+        return new GameScreen(
+            session ?? new StubGameSession(),
             pilot ?? new NeutralShipInput(),
-            new QuestProximityWatcher(new BattleForceWorld()),
+            interaction ?? new RoutedInteraction(),
+            new QuestProximityWatcher(world),
+            new NpcInteractionWatcher(world, conversations, new UIController()),
+            world,
             camera,
             view,
             new StarField(camera));
+    }
 
     [Fact]
     public void Render_DrawsTheShip()

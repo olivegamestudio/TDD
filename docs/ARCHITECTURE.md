@@ -28,7 +28,7 @@ to know about ships, quests or credits is on the wrong side of this line.
 | `OliveGameStudio.FrameRate` | Frame time filtering, so a paused or slowed game holds still while frames keep arriving. |
 | `OliveGameStudio.Input` | `InputRouter` — where a frame of input goes, and which device the game is being played on. |
 | `OliveGameStudio.Progress` | `LocalSaveProgressService`, persisting save text to a file. |
-| `OliveGameStudio.World` | `Position`, `Player`. The spatial model, plus the ship's physics and `IShipInput` — what an input means, never which device produced it. Also `Ship`, `ShipProfile`, `Meter`, `Item` and `Inventory`: a hull, the condition it is in, and the things that can be held. And what a hit costs it: `ShieldType`, `ShieldStats`, `Shielding`, `DamageOutcome`. And what flies alongside it: `OrbBehaviour`, `OrbStats`, `Orbs`. And how a dropped thing reaches its owner: `LootMagnet`, `LootDrop`, `Loot` — the mechanic only; what drops out of what is content. |
+| `OliveGameStudio.World` | `Position`, `Player`. The spatial model, plus the ship's physics and `IShipInput` — what an input means, never which device produced it. Also `Ship`, `ShipProfile`, `Meter`, `Item` and `Inventory`: a hull, the condition it is in, and the things that can be held. And what a hit costs it: `ShieldType`, `ShieldStats`, `Shielding`, `DamageOutcome`. And what flies alongside it: `OrbBehaviour`, `OrbStats`, `Orbs`. And how a dropped thing reaches its owner: `LootMagnet`, `LootDrop`, `Loot` — the mechanic only; what drops out of what is content. And who else is standing in it: `Npc`, `NpcPatrol`, and the `Conversation` / `ConversationLine` / `Conversations` a player reads when they talk to one — the machinery only; who is out there and what they say is content. `RoutedInteraction` is where the frame's asks that are not flying are left. |
 | `OliveGameStudio.Rendering` | `Camera2D` — the world-to-screen transform, and the only place the world's axes and the screen's are reconciled. |
 | `OliveGameStudio.Localisation` | `ITextProvider`, `JsonTextProvider`, `MissingTextException`. |
 | `Pilgrimage` | The quest system. No project references at all, by design. |
@@ -773,6 +773,52 @@ catches a `NaN` arriving by any other route. The two cover different holes and n
 zone off and hands `DesktopGamePad.DeadZone` to the router at composition, so there is one stated
 number rather than whatever the driver decided. `InputRouter.DefaultDeadZone` is what a host that
 says nothing gets — a default so a game composes flyable, not a measurement of anybody's hardware.
+
+## Talking to somebody
+
+`Npc` is somebody standing in the world: where they are, how close counts as within earshot, and
+what they say. One type for every kind of them — quest giver, vendor, somebody with a line of story
+— because they differ in what they say and what that does, which is content, not in what they are.
+Static or dynamic is the presence or absence of an `NpcPatrol`; there is no flag that can disagree
+with the route.
+
+`Conversation` is what somebody has to say and holds no state, so several NPCs can share one and
+the same one can be read again. `Conversations` is the state of reading one, and there is a single
+instance of it because the player has one pair of ears. A `ConversationLine` holds a **speaker key
+and a text key**, never words: the engine ships no text, and a line carrying the sentence itself
+would be a build fixed in whichever language the author typed.
+
+**Conditions on where the halves meet are the same as the quest system's.** Nothing in
+`Conversations` measures a distance. `NpcInteractionWatcher`, on the game side, knows where
+everybody is standing and is the side that can answer "is there anybody here to talk to" —
+`QuestProximityWatcher`'s counterpart, for the same reason.
+
+Reach is measured from where the player **is**, and that is the deliberate opposite of a quest
+trigger, which is swept along the journey the frame covered. A trigger is something the world does
+to a ship flying past, so a fast one must not step over it; talking is the player asking at the
+moment they ask, and answering from anywhere the frame passed would open a conversation with
+somebody they have already flown well beyond.
+
+**A conversation takes the controls by holding focus**, which is the routing rule the engine
+already has rather than anything new: the UI has first claim, the ship gets input only when nothing
+is focused, so a conversation with focus leaves the ship with `Neutral` and drag brings it to rest
+by itself. No pause state, and no second way for the ship to be stationary. The button it focuses
+is not a button the player is shown — it exists because focus is what routing asks about, and
+releasing it is what turns the page. It is added on the first conversation rather than at
+construction, because adding a button adopts the focus when nothing holds it and the watcher is
+built with the rest of the game.
+
+**Nothing pauses.** NPCs walk their patrols on every frame the game screen updates, whether or not
+a conversation is open — pillar 4 at its smallest. What that costs the player is paid for by the
+way out: `RoutedInteraction.Cancel` closes on the frame it was asked for, on any line, with no
+confirmation and nothing to sit through.
+
+**The two asks that are not flying are edges, not states.** `RoutedInteraction` is
+`RoutedShipInput`'s counterpart with that one difference: a held thrust key means thrust every
+frame, while a held interact key means *one* request to talk. The router writes both members every
+frame so a request cannot be found still sitting there on the next one, and it tracks the held
+state across the change of focus — interact and confirm are the same key on the shipped bindings,
+so the press that starts the game is still held on the game's first frame.
 
 ## Known gaps
 

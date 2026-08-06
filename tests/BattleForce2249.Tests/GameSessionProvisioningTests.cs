@@ -38,6 +38,9 @@ public sealed class GameSessionProvisioningTests
         public IReadOnlyList<QuestMarkers> QuestMarkers { get; } =
             [new QuestMarkers(QuestId, Start, End)];
 
+        // nobody stands in these worlds; what they are for is quests and saves
+        public IReadOnlyList<Npc> Npcs { get; } = [];
+
         public Ship? Introduced { get; private set; }
 
         public string? IntroducedAt { get; private set; }

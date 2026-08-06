@@ -65,6 +65,11 @@ public static class BattleForceServiceCollectionExtensions
             .AddSingleton<ICampaign, BattleForceCampaign>()
             .AddSingleton<IWorld, BattleForceWorld>()
             .AddSingleton<QuestProximityWatcher>()
+
+            // and the watcher that decides when the player is close enough to somebody to talk to
+            // them. A singleton because it holds the button a conversation takes the controls with,
+            // and a second one would add a second button to the same interface.
+            .AddSingleton<NpcInteractionWatcher>()
             .AddSingleton<IGameSession, GameSession>()
 
             .AddSingleton<ICompanyScreen, CompanyScreen>()

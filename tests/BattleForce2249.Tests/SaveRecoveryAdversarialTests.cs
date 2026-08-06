@@ -32,6 +32,9 @@ public class SaveRecoveryAdversarialTests
 
         public IReadOnlyList<QuestMarkers> QuestMarkers { get; } =
             [new QuestMarkers("quest-1", Start, End)];
+
+        // nobody stands in these worlds; what they are for is quests and saves
+        public IReadOnlyList<Npc> Npcs { get; } = [];
     }
 
     static GameSession CreateSession(ISaveProgressService saves) =>

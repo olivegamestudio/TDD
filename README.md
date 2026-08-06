@@ -97,12 +97,23 @@ resting on the stick cannot take the ship from somebody flying it on the keys. I
 the game one frame at a time and routed UI first: it works the menu while a button is focused and
 flies the ship when none is. See [the input notes](docs/ARCHITECTURE.md#input).
 
+People can be talked to. Fly up to somebody and press space (or `E`, or A on a pad) and their
+conversation opens; the same key that works a menu button turns the page, and escape or B gets you
+out on any line with no confirmation. The ship stops during a conversation because the conversation
+has the input, not because anything paused — and nothing does pause: whoever else is out there
+carries on walking their route while you read, so where and when you choose to talk is a real
+decision. Nothing is drawn yet (see below), and the world ships with nobody standing in it.
+
 Not yet built:
 
 - **Strafing** (#7) — the ship has thrust and helm, so it rotates and burns ahead and astern, but
   there are no lateral thrusters. Moving sideways means turning, burning and turning back.
 - **On-screen key prompts** — nothing tells the player which keys fly the ship or which device the
   game locked to.
+- **Text on screen** — the renderer draws sprites and there is no font in the content pipeline, so
+  nothing the player reads can be shown yet. That is what stands between the working conversation
+  system and a visible one, and it is the same gap under the HUD (#141) and the title screen
+  (#149).
 - **Any on-screen quest display** — no HUD, no quest log. The session knows when the player's
   progress is not being saved, but there is nowhere yet to tell them.
 - **Language selection** — translations follow the machine's own culture.
