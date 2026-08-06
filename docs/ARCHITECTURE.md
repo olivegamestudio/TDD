@@ -134,6 +134,16 @@ match; adding never has to. A pair reflecting more than the whole hit is held at
 than refused — each shield was authored on its own and neither is a mistake, and damage travelling
 back out larger than it came in is.
 
+**Both sums are held, and for one reason.** The layer is capped at `double.MaxValue` exactly as the
+reflected share is capped at 1: a pair large enough to run off the end of a double adds up to
+infinity, and an infinite layer is the one thing `Meter` refuses, because nothing can ever empty it.
+Held, not refused, because the pair is the same shape as the reflecting one — each shield passed its
+own validation and neither is the mistake. The alternative was the defect it fixed (#168): every
+layer validated its own inputs, `Shielding` produced an output the next layer rejected, and the
+refusal surfaced from `Meter` inside `Ship.Fit`, naming the meter for a pair of shields the caller
+had every right to fit. Only pairs that would arrive as infinity are touched; anything a double can
+still count adds up to exactly what it sums to.
+
 `Ship.TakeDamage` is where that becomes a cost: the reflected share comes off the hit before
 anything sees it, what is left meets the shield layer, and only what the layer cannot hold reaches
 health. `DamageOutcome` reports the three parts, which always add back up to the hit that arrived.
