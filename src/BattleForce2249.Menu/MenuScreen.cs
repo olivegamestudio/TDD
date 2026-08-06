@@ -49,7 +49,7 @@ public sealed class MenuScreen : IMenuScreen, IActivatable, IRenderable
     public const float LoneCharacterHeightFraction = 1.13f;
 
     /// <inheritdoc cref="LoneCharacterHeightFraction" />
-    public const float CharacterPairHeightFraction = 1.00f;
+    public const float CharacterPairHeightFraction = 0.93f;
 
     /// <summary>
     /// Where the bottom of each character lands, as a fraction of the screen's height.
@@ -60,14 +60,16 @@ public sealed class MenuScreen : IMenuScreen, IActivatable, IRenderable
     /// a figure scaled until it fits entirely on screen is a small figure, whichever way it is
     /// anchored.
     ///
-    /// Together with the height, this is what decides where a face lands: the lone figure is both
-    /// the taller and the lower-anchored, so his head clears the pair's while his feet fall
-    /// furthest off the bottom. The horizon is drawn over all of it.
+    /// Together with the height, this is what decides where a face lands, and the gap between the
+    /// two is doing real work. The pair are dropped well below the lone figure so that their heads
+    /// clear his face rather than crowding it — the pair are one image with a gap between their
+    /// heads, and lowering them is what opens that gap for him to look through. Anchored level, he
+    /// is merely behind them; anchored apart, he looms.
     /// </remarks>
     public const float LoneCharacterBaselineFraction = 1.15f;
 
     /// <inheritdoc cref="LoneCharacterBaselineFraction" />
-    public const float CharacterPairBaselineFraction = 1.13f;
+    public const float CharacterPairBaselineFraction = 1.24f;
 
     /// <summary>
     /// How tall the title logo is, and where its middle sits — both as fractions of the screen's
@@ -85,7 +87,24 @@ public sealed class MenuScreen : IMenuScreen, IActivatable, IRenderable
     public const float TitleHeightFraction = 0.23f;
 
     /// <inheritdoc cref="TitleHeightFraction" />
-    public const float TitleCentreFraction = 0.63f;
+    public const float TitleCentreFraction = 0.68f;
+
+    /// <summary>
+    /// Where the logo's artwork actually sits across its own file, as a fraction of the texture's
+    /// width.
+    /// </summary>
+    /// <remarks>
+    /// Not a half, because the asset is not centred within its own bounds — there is dead space
+    /// down its left side, so the ink is centred nearer 56% across. Placing the texture by its
+    /// geometric middle therefore hangs the artwork right of where it was asked to go, by a
+    /// distance that grows with the scale.
+    ///
+    /// Corrected here rather than by trimming the asset, so that redrawing the logo cannot
+    /// silently move it: this number describes the file, and a new file would restate it. Measured
+    /// from the alpha channel, ignoring a stray mark in the bottom-left corner that the bounding
+    /// box alone would have taken for content.
+    /// </remarks>
+    public const float TitleContentCentreFraction = 0.56f;
 
     /// <inheritdoc cref="LoneCharacterHeightFraction" />
     public const float StartButtonWidthFraction = 0.13f;
@@ -198,7 +217,8 @@ public sealed class MenuScreen : IMenuScreen, IActivatable, IRenderable
             Texture: _title,
             Position: new Vector2(viewport.X / 2f, viewport.Y * TitleCentreFraction),
             Rotation: 0f,
-            Origin: new Vector2(_title.Width, _title.Height) / 2f,
+            // Placed by where the artwork is, not by where the file's middle is.
+            Origin: new Vector2(_title.Width * TitleContentCentreFraction, _title.Height / 2f),
             Scale: scale));
     }
 
