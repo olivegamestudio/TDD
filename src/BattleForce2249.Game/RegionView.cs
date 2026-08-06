@@ -110,10 +110,14 @@ public sealed class RegionView(ICamera camera) : IRenderable
             {
                 screen = camera.WorldToScreen(world, renderer.ViewportSize);
 
-                // The world's rotation plus the camera's, because the camera turns with the ship
-                // and the scenery has to turn with the world rather than staying upright in a
-                // world that is rotating around it.
-                rotation += camera.Orientation;
+                // Minus the camera's turn, not plus. The camera swings the world the opposite way
+                // to its own heading — a body dead ahead moves to the left of the screen when the
+                // camera turns to starboard — and a sprite's rotation is clockwise, so a body has
+                // to be turned anticlockwise by the same angle to stay square with the world it is
+                // standing in. Added instead, the scenery counter-rotates: it turns at twice the
+                // rate and the wrong way, which looks like the whole field spinning as the ship
+                // comes about.
+                rotation -= camera.Orientation;
                 scale = authored * camera.PixelsPerUnit / AuthoredPixelsPerUnit;
             }
 

@@ -76,21 +76,18 @@ DEFAULT_RADIUS = {
 # editor will already be in this game's units and must not be scaled again.
 WORLD_SCALE = 15.0
 
-# How much bigger an imported body is drawn, which is deliberately NOT the same
-# number.
+# Body sizes take the SAME factor as positions, and must keep doing so.
 #
-# Positions and sizes want different factors here, and the reason is worth
-# stating rather than discovering again. This game's ship is 96 world units long
-# where the Unity scene's was about one, so matching the two projects'
-# ship-to-rock proportions would mean scaling by nearer 96 — which would spread
-# the debris field over twelve thousand units, when the opening quest's marker
-# sits 1000 units out and is meant to be a six second run.
+# This was briefly split — positions scaled one way and sizes another — to make
+# the debris read smaller against the ship. It does not work: scaling where
+# things are without scaling how big they are pulls the composition apart, so a
+# cluster somebody authored as a cluster arrives as scattered specks with gaps
+# between them that were never drawn. The spacing IS the content.
 #
-# So the layout is scaled to fit the distances this game flies, and the bodies
-# are scaled to read against the ship that flies them. Applying one number to
-# both gives either a field the ship crosses in a second or debris the ship
-# cannot be seen against.
-BODY_SIZE_SCALE = 6.0
+# The ship reading too large beside the scenery is a real problem, but it is the
+# ship's problem: ShipView.LengthInWorldUnits and the camera's zoom both change
+# how the ship sits in the scene without touching how the scene sits in itself.
+BODY_SIZE_SCALE = WORLD_SCALE
 
 # What the Unity content took one unit to be, in texture pixels, and how tall the
 # scene's camera view was in those same pixels. Backdrops are laid out against
