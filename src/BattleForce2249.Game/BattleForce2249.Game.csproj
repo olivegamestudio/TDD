@@ -13,6 +13,13 @@
       -->
       <None Remove="Text\**\*.json" />
       <Content Include="Text\**\*.json" CopyToOutputDirectory="PreserveNewest" />
+
+      <!--
+        Regions ship the same way and for the same reason: a region is authored content, edited by
+        a tool rather than written in code, and correcting a marker should not need a rebuild.
+      -->
+      <None Remove="Regions\**\*.json" />
+      <Content Include="Regions\**\*.json" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
     <ItemGroup>
@@ -22,6 +29,7 @@
     <ItemGroup>
       <ProjectReference Include="..\BattleForce2249.Abstractions\BattleForce2249.Abstractions.csproj" />
       <ProjectReference Include="..\OliveGameStudio.Localisation\OliveGameStudio.Localisation.csproj" />
+      <ProjectReference Include="..\OliveGameStudio.Scenes\OliveGameStudio.Scenes.csproj" />
       <ProjectReference Include="..\OliveGameStudio.World\OliveGameStudio.World.csproj" />
       <ProjectReference Include="..\Pilgrimage\Pilgrimage.csproj" />
     </ItemGroup>

@@ -77,7 +77,9 @@ public sealed class GameScreenTests : HostTestBase
             new QuestProximityWatcher(new BattleForceWorld()),
             camera,
             view,
-            new StarField(camera));
+            new StarField(camera),
+            new RegionView(camera),
+            new RegionLoader(Path.Combine(AppContext.BaseDirectory, RegionLoader.FolderName)));
 
     [Fact]
     public void Render_DrawsTheShip()

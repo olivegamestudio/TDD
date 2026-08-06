@@ -15,15 +15,25 @@ namespace BattleForce2249;
 /// <param name="camera">The camera the world is drawn through.</param>
 /// <param name="view">The ship on screen, which draws whatever pose it was last given.</param>
 /// <param name="stars">The stars the ship flies through.</param>
+/// <param name="region">The scenery of the place being flown through.</param>
+/// <param name="regions">Where an authored region is read from.</param>
 public sealed class GameScreen(
     IGameSession session,
     IShipInput pilot,
     QuestProximityWatcher questProximity,
     ICamera camera,
     IShipView view,
-    StarField stars)
+    StarField stars,
+    RegionView region,
+    RegionLoader regions)
     : IGameScreen, IActivatable, IRenderable
 {
+    /// <summary>
+    /// The region the game opens in — the collapsing debris field the Disgraced escapes from.
+    /// An identifier, never translated.
+    /// </summary>
+    public const string OpeningRegionId = "debris-field";
+
     /// <summary>
     /// Gets the task that begins the game, so a caller can await the save being read. Loading
     /// happens off the frame loop; nothing drives the session until it has finished.
@@ -40,6 +50,12 @@ public sealed class GameScreen(
         // never how fast they were going, so nothing is inherited from a previous session. Nothing
         // is reset here to get that — starting or resuming builds a new ship, and a new ship is at
         // rest facing forward because that is what a new one is.
+        // The one place there is, until the world is streamed by proximity: entering the game puts
+        // the player in the debris field the opening is set in. Loaded here rather than in the
+        // constructor because a region is content read from disk, and reading it is work that
+        // belongs to entering a screen rather than to building the container.
+        region.Scene = regions.Load(OpeningRegionId);
+
         Started = session.Continue();
         return EnterResult.Stay;
     }
@@ -103,6 +119,10 @@ public sealed class GameScreen(
         // makes the ship look like it is going anywhere: the camera holds the ship still in the
         // middle of the viewport, so the only thing that can move is what is behind it.
         stars.Render(renderer);
+
+        // Between the stars and the ship: the scenery is in the world, so it passes in front of the
+        // starfield and behind the thing flying through it.
+        region.Render(renderer);
 
         view.Render(renderer);
     }

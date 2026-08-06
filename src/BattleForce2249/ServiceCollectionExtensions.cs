@@ -76,6 +76,11 @@ public static class BattleForceServiceCollectionExtensions
             // sets anything on it — it reads the camera and nothing else — so an interface would
             // be a name for the container's benefit and no one else's.
             .AddSingleton<StarField>()
+
+            // Likewise, and it is handed its region rather than fetching one: what place the player
+            // is in is the session's business, not the drawing's.
+            .AddSingleton<RegionView>()
+            .AddSingleton<RegionLoader>()
             .AddSingleton<IHost, BattleForceHost>();
 
         return services;
