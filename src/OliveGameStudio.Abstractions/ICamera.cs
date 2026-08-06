@@ -60,9 +60,10 @@ public interface ICamera
     /// the window.
     /// </para>
     /// <para>
-    /// It turns the world and nothing else. A sprite that is meant to stay aligned with the
-    /// world has to take this off its own rotation — see <c>ShipView</c> — and anything drawn
-    /// outside the camera, which is every menu and every future HUD, is untouched by it.
+    /// It turns the world and nothing else. Anything drawn outside the camera — every menu and
+    /// every future HUD — is untouched by it. A sprite that is meant to stay aligned with the
+    /// world puts its own angle through <see cref="WorldToScreenRotation"/> rather than doing the
+    /// arithmetic itself.
     /// </para>
     /// </remarks>
     float Orientation { get; set; }
@@ -78,4 +79,29 @@ public interface ICamera
     /// </param>
     /// <returns>The position in pixels from the top left of the viewport.</returns>
     Vector2 WorldToScreen(Vector2 world, Vector2 viewportSize);
+
+    /// <summary>
+    /// Converts an angle in the world into the angle it is drawn at on screen.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The other half of <see cref="WorldToScreen"/>. Placing a body takes both — where it is and
+    /// which way it faces — and the two have to agree about which way the camera turned or the
+    /// body lands in the right place pointing the wrong way. That reads as the world spinning
+    /// rather than as anything to do with rotation, so it is worth the two being one decision made
+    /// in one place.
+    /// </para>
+    /// <para>
+    /// <b>A body's own angle is its own.</b> This does not change what a rock is turned to in the
+    /// world; it answers what that turn looks like from where the camera is standing. Nothing
+    /// calling it should be folding the camera's orientation in by hand — that was duplicated
+    /// across every view that drew anything, and each copy was a chance to get the sign wrong
+    /// independently.
+    /// </para>
+    /// </remarks>
+    /// <param name="worldRotation">
+    /// The angle in the world, in radians, measured the way the world measures angles.
+    /// </param>
+    /// <returns>The clockwise angle to draw at, in radians, as <see cref="Sprite.Rotation"/> wants.</returns>
+    float WorldToScreenRotation(float worldRotation);
 }

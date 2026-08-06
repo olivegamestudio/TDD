@@ -154,4 +154,7 @@ public sealed class Camera2D : ICamera
             viewportSize.X / 2f + turned.X,
             viewportSize.Y / 2f - turned.Y);
     }
+
+    /// <inheritdoc />
+    public float WorldToScreenRotation(float worldRotation) => worldRotation - _orientation;
 }

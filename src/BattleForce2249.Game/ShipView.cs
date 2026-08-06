@@ -81,7 +81,7 @@ public sealed class ShipView(ICamera camera) : IShipView
         renderer.Draw(new Sprite(
             _texture,
             camera.WorldToScreen(Pose.Position, renderer.ViewportSize),
-            Pose.Heading - camera.Orientation,
+            camera.WorldToScreenRotation(Pose.Heading),
             origin,
             LengthInWorldUnits * camera.PixelsPerUnit / _texture.Height));
     }

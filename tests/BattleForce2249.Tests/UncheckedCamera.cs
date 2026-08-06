@@ -34,6 +34,9 @@ public sealed class UncheckedCamera : ICamera
     public float Orientation { get; set; }
 
     /// <inheritdoc />
+    public float WorldToScreenRotation(float worldRotation) => worldRotation - Orientation;
+
+    /// <inheritdoc />
     public Vector2 WorldToScreen(Vector2 world, Vector2 viewportSize)
     {
         Vector2 fromTarget = (world - Target) * PixelsPerUnit;
