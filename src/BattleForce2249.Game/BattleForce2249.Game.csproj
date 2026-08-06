@@ -22,6 +22,12 @@
     <ItemGroup>
       <ProjectReference Include="..\BattleForce2249.Abstractions\BattleForce2249.Abstractions.csproj" />
       <ProjectReference Include="..\OliveGameStudio.Localisation\OliveGameStudio.Localisation.csproj" />
+      <!--
+        A conversation takes the controls the way everything else on screen does — by holding the
+        focus the input router asks about — so the game screen's half of it needs the same interface
+        the menu already uses.
+      -->
+      <ProjectReference Include="..\OliveGameStudio.UI.Abstractions\OliveGameStudio.UI.Abstractions.csproj" />
       <ProjectReference Include="..\OliveGameStudio.World\OliveGameStudio.World.csproj" />
       <ProjectReference Include="..\Pilgrimage\Pilgrimage.csproj" />
     </ItemGroup>

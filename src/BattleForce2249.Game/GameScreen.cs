@@ -11,14 +11,20 @@ namespace BattleForce2249;
 /// </summary>
 /// <param name="session">The game in progress, including the ship it is being flown in.</param>
 /// <param name="pilot">Where the pilot's intent comes from this frame.</param>
+/// <param name="interaction">What the player asked for this frame besides flying.</param>
 /// <param name="questProximity">Applies the quests' proximity triggers against the world.</param>
+/// <param name="npcInteraction">Opens and closes conversations with the world's NPCs.</param>
+/// <param name="world">The world the ship and everybody else stands in.</param>
 /// <param name="camera">The camera the world is drawn through.</param>
 /// <param name="view">The ship on screen, which draws whatever pose it was last given.</param>
 /// <param name="stars">The stars the ship flies through.</param>
 public sealed class GameScreen(
     IGameSession session,
     IShipInput pilot,
+    RoutedInteraction interaction,
     QuestProximityWatcher questProximity,
+    NpcInteractionWatcher npcInteraction,
+    IWorld world,
     ICamera camera,
     IShipView view,
     StarField stars)
@@ -68,7 +74,20 @@ public sealed class GameScreen(
         // frame rather than where they were at the end of the last one
         ship.Update(session.Player, pilot.Read(), frameTime);
 
+        // Everybody else moves whether or not the player is talking to somebody. That is pillar 4
+        // at its smallest: the world runs without the player and does not pause for their absence,
+        // and a conversation is the shortest absence there is. Nothing here asks whether one is
+        // open, and nothing should.
+        foreach (Npc npc in world.Npcs)
+        {
+            npc.Update(frameTime);
+        }
+
         questProximity.Update(session.Quests, began, session.Player.Position);
+
+        // and after the world has moved, so the player is measured against where everybody ended
+        // up rather than where they stood at the start of the frame
+        npcInteraction.Update(session.Player.Position, interaction.Interact, interaction.Cancel);
 
         // and last, what the frame produced is handed to the drawing side. The pose is the whole
         // of what the two stages agree about: the physics has no idea a screen exists, and the

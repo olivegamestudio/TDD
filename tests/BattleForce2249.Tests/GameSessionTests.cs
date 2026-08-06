@@ -21,6 +21,9 @@ public sealed class GameSessionTests
         public Position Introduce(Ship ship, string location) => PlayerStart;
 
         public IReadOnlyList<QuestMarkers> QuestMarkers { get; } = markers;
+
+        // nobody stands in these worlds; what they are for is quests and saves
+        public IReadOnlyList<Npc> Npcs { get; } = [];
     }
 
     static QuestDefinition Quest(string id, bool autoStarts = true) =>

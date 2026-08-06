@@ -28,6 +28,16 @@ public interface IWorld
     IReadOnlyList<QuestMarkers> QuestMarkers { get; }
 
     /// <summary>
+    /// Gets the people standing in the world, whether they stand still or walk a route.
+    /// </summary>
+    /// <remarks>
+    /// The same list every frame, holding the same NPCs: a walking one carries where it has got to,
+    /// so a world that answered with a fresh set each time would put everybody back where they
+    /// started once a frame.
+    /// </remarks>
+    IReadOnlyList<Npc> Npcs { get; }
+
+    /// <summary>
     /// Brings a ship into the world at a named place, and answers where that put it.
     /// </summary>
     /// <remarks>
@@ -92,6 +102,16 @@ public sealed class BattleForceWorld : IWorld
                 "The world has no place by that name."),
         };
     }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Nobody yet. The machinery for talking to somebody is here and covered, but who is standing
+    /// in the mines and what they say is <em>writing</em> — a character, a voice and a scene — and
+    /// none of it has been written. An NPC invented to exercise the code would be fiction nobody
+    /// asked for, sitting in the opening of the game where the design canon is most specific, so
+    /// the tests author their own and the mines stay empty until somebody writes what is in them.
+    /// </remarks>
+    public IReadOnlyList<Npc> Npcs { get; } = [];
 
     /// <inheritdoc />
     public IReadOnlyList<QuestMarkers> QuestMarkers { get; } =

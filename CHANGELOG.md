@@ -9,6 +9,42 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The player can talk to somebody.** `Npc` stands in the world with a position, a reach and a
+  `Conversation`; it walks an `NpcPatrol` or stands still, and which of the two it is is the
+  presence or absence of the route rather than a flag beside it. `Conversation` is an ordered run
+  of `ConversationLine`s, each one a **speaker key and a text key** — the engine ships no text, and
+  a line holding the words would be a build fixed in the language its author typed. `Conversations`
+  is the one conversation the player can be in, with `Begin`, `Advance` and `Close`; reading past
+  the last line closes it, and closing is allowed on any line.
+
+  Interaction arrives as two new asks on the input frames — `Interact` and `Cancel` — routed into
+  `RoutedInteraction`. They are **edges rather than states**, which is the whole difference from
+  `RoutedShipInput`: a held thrust key means thrust every frame, a held interact key means one
+  request to talk. The router tracks the held state across a change of focus, because interact and
+  confirm are the same key on the shipped bindings and the press that starts the game is still held
+  on the game's first frame — otherwise a player would arrive already talking to whoever is
+  standing there. Bound on the desktop host to space and `E`, and to escape for backing out; on a
+  pad to A and B.
+
+  `NpcInteractionWatcher` is the game's half, the counterpart of `QuestProximityWatcher`: it knows
+  where everybody is standing, opens the nearest reachable NPC's conversation on an interact, and
+  closes on a cancel. Reach is measured from where the player **is**, deliberately unlike a quest
+  trigger, which is swept across the frame — a trigger is something the world does to a ship flying
+  past, while talking is the player asking at the moment they ask.
+
+  A conversation takes the controls by **holding focus**, so the ship is given `Neutral` and drag
+  brings it to rest by itself. No pause state and no second way for the ship to be stationary, and
+  the world keeps running while the player reads: NPCs walk their patrols on every frame, whether
+  or not somebody is talking. That is pillar 4 at its smallest, and what it costs the player is
+  paid for by one press of cancel closing the conversation on the frame it was asked for.
+
+  Two things this deliberately does not do. **Nothing is drawn**: the engine has no way to put text
+  on screen at all — there is no font in the content pipeline and `IRenderer` draws sprites — so a
+  conversation is playable and covered by tests but invisible, and that capability is a decision
+  about an asset rather than something to slip in here. And **the shipped world holds nobody**: who
+  is standing in the mines and what they say is writing that has not been done, so the tests author
+  their own NPCs rather than inventing fiction in the opening of the game.
+
 - **Loot reaches the player without a button.** `Loot` holds what has been dropped into the world
   and not yet picked up. `Drop(item, position)` leaves an item where it fell; `Update(from, to,
   elapsedSeconds, into)` draws in whatever the frame came near, moves what is already coming, and

@@ -8,6 +8,13 @@ namespace OliveGameStudio;
 /// <param name="Port">Whether the turn-to-port key is held.</param>
 /// <param name="Starboard">Whether the turn-to-starboard key is held.</param>
 /// <param name="Confirm">Whether the confirm key is held — the one that works a menu button.</param>
+/// <param name="Interact">
+/// Whether the interact key is held — the one that opens a conversation with whoever the player
+/// has flown up to.
+/// </param>
+/// <param name="Cancel">
+/// Whether the back-out key is held — the one that hands the controls back from whatever has them.
+/// </param>
 /// <remarks>
 /// Named for what the player is asking for rather than for the keys that ask it, because which
 /// keys those are is the host's decision and nothing downstream of it should be able to see the
@@ -19,7 +26,9 @@ public readonly record struct KeyboardFrame(
     bool Astern,
     bool Port,
     bool Starboard,
-    bool Confirm)
+    bool Confirm,
+    bool Interact = false,
+    bool Cancel = false)
 {
     /// <summary>
     /// A keyboard nobody is touching. What a host with no keyboard reports, and what the tests

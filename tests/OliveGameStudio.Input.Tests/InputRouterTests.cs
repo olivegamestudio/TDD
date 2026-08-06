@@ -9,12 +9,13 @@ public sealed class InputRouterTests
 {
     readonly UIController _ui = new();
     readonly RoutedShipInput _ship = new();
+    readonly RoutedInteraction _interaction = new();
     readonly Button _start = new("START");
     readonly InputRouter _router;
 
     public InputRouterTests()
     {
-        _router = new InputRouter(_ui, _ship);
+        _router = new InputRouter(_ui, _ship, _interaction);
     }
 
     /// <summary>
@@ -312,7 +313,7 @@ public sealed class InputRouterTests
     [Fact]
     public void ARestingStick_IsHandsOff_AtTheDeadZoneItWasGiven()
     {
-        InputRouter router = new(_ui, _ship, deadZone: 0.5);
+        InputRouter router = new(_ui, _ship, _interaction, deadZone: 0.5);
         ShowTheMenu();
         router.Route(Stick(confirm: true));
         router.Route(Stick(confirm: false));
@@ -340,12 +341,18 @@ public sealed class InputRouterTests
     [Fact]
     public void RoutingRefusesNoUIController()
     {
-        Assert.Throws<ArgumentNullException>(() => new InputRouter(null!, _ship));
+        Assert.Throws<ArgumentNullException>(() => new InputRouter(null!, _ship, _interaction));
     }
 
     [Fact]
     public void RoutingRefusesNoShipToFly()
     {
-        Assert.Throws<ArgumentNullException>(() => new InputRouter(_ui, null!));
+        Assert.Throws<ArgumentNullException>(() => new InputRouter(_ui, null!, _interaction));
+    }
+
+    [Fact]
+    public void RoutingRefusesNowhereToPutAnInteraction()
+    {
+        Assert.Throws<ArgumentNullException>(() => new InputRouter(_ui, _ship, null!));
     }
 }

@@ -7,6 +7,14 @@ namespace OliveGameStudio;
 /// <param name="Thrust">The stick's thrust axis, nominally -1 to 1, before any dead zone.</param>
 /// <param name="Turn">The stick's helm axis, nominally -1 to 1, before any dead zone.</param>
 /// <param name="Confirm">Whether the confirm button is held — the one that works a menu button.</param>
+/// <param name="Interact">
+/// Whether the interact button is held — the one that opens a conversation with whoever the player
+/// has flown up to.
+/// </param>
+/// <param name="Cancel">
+/// Whether the back-out button is held — the one that hands the controls back from whatever has
+/// them.
+/// </param>
 /// <remarks>
 /// The axes arrive raw, with the platform's own dead zone turned off, because the dead zone is a
 /// decision about how the game should feel rather than something a driver should be making on the
@@ -22,7 +30,9 @@ public readonly record struct GamePadFrame(
     bool Connected,
     double Thrust,
     double Turn,
-    bool Confirm)
+    bool Confirm,
+    bool Interact = false,
+    bool Cancel = false)
 {
     /// <summary>
     /// No pad at all. What a host with nothing plugged in reports.

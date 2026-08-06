@@ -780,6 +780,15 @@ Character**.
   animation to sit through. Without that the decision stops being "when do I talk" and becomes "am I
   willing to gamble", which is a different and worse game.
 - **[NOTE]** Voice: **text-only** for now.
+- **[vs `main`]** The machinery is now on `main` (#140): `Npc` (+ `NpcPatrol` for the dynamic ones),
+  `Conversation` / `Conversations` in the engine, `NpcInteractionWatcher` on the game side, and
+  `Interact` / `Cancel` on the input frames — space or `E` to talk, escape to back out, A and B on a
+  pad. A conversation holds the UI focus, so the ship is given nothing and coasts to a stop exactly
+  as the note above predicted; NPCs walk their routes while the player reads. **Two gaps remain and
+  neither is a decision:** nothing is *drawn*, because the engine has no way to put text on screen
+  at all (no font in the content pipeline — the same gap that blocks the HUD, #141, and the menu,
+  #149); and the world holds **no NPC**, because who is in the mines and what they say has not been
+  written.
 
 ## 13. HUD
 

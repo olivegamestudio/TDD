@@ -32,5 +32,6 @@ public static class DesktopPilotServiceCollectionExtensions
         services.AddSingleton<IInputRouter>(provider => new InputRouter(
             provider.GetRequiredService<IUIController>(),
             provider.GetRequiredService<RoutedShipInput>(),
+            provider.GetRequiredService<RoutedInteraction>(),
             DesktopGamePad.DeadZone));
 }
