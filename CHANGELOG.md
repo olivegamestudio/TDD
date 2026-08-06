@@ -246,6 +246,33 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **An infinite hit is now refused as the hit it was, instead of surfacing from inside a meter as a
+  number nobody passed.** `Ship.TakeDamage` guarded against a negative amount and against NaN, and
+  neither guard refused infinity. The arithmetic below them then turned an infinite hit into a NaN
+  by either of two IEEE 754 routes, depending on what was in the shield slots: with nothing
+  reflecting, `reflected = ∞ × 0` is NaN; with anything reflecting, `reflected` is infinity and
+  `landed = ∞ − ∞` is NaN.
+
+  Either way the NaN reached `Meter.Reduce`, which refused it — so the call did fail, and failed
+  with the wrong story. The exception said *"a meter holds real numbers only"* and reported an
+  actual value of NaN: it named the meter for the caller's mistake, pointed at a layer the caller
+  never called, and gave a number that appears nowhere in the call. `Meter.Reduce` accepting
+  infinity is deliberate, and it never got the chance, because the intermediate arithmetic corrupted
+  the value before it arrived.
+
+  The guard now asks for a finite number ahead of the sign, which names infinity, negative infinity
+  and NaN by the rule they actually break — the ordering `QuestTrigger` already uses on a distance,
+  and for the second of the same two reasons: `ThrowIfNegative` stops the standard NaN only because
+  the sign bit of `double.NaN` happens to be set, and one whose sign bit is clear walks past it.
+
+  The stricter line is drawn here and not in `Meter` on purpose. A meter takes a single change, and
+  an infinite one is simply the whole pool in one go; a hit is *apportioned* across three parts, and
+  infinity divides into no shares — reflecting a quarter of an infinite hit sends back infinity,
+  which is the whole of it, so a shield authored to bounce a share back would bounce all of it and
+  `DamageOutcome` could no longer add up to the hit that arrived. There is still no upper bound
+  short of infinity: `double.MaxValue` lands, because nothing caps what a weapon may be authored to
+  hit for. ([#167](https://github.com/olivegamestudio/TDD/issues/167))
+
 - **A time scale of infinity is now refused where it is set, instead of crashing the frame loop
   later.** `ScaledFrameTimeController.TimeScale` guarded with `value >= 0`, which is an ordered
   comparison and so answers the wrong question about the three values that are not numbers: NaN and

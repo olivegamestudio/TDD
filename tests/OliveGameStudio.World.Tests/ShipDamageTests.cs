@@ -138,6 +138,8 @@ public sealed class ShipDamageTests
     [Theory]
     [InlineData(-1)]
     [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
     public void AHitThatIsNotAHit_IsRefusedWhereItLands(double amount)
     {
         // Meter.Reduce refuses a negative for the same reason: a damage calculation that came out
@@ -145,6 +147,65 @@ public sealed class ShipDamageTests
         Ship ship = ShipWith();
 
         Assert.Throws<ArgumentOutOfRangeException>(() => ship.TakeDamage(amount));
+    }
+
+    public static TheoryData<Shielding, double> InfiniteHits => new()
+    {
+        // The two shield configurations reach a bad number by different IEEE 754 routes, so a guard
+        // covering only one of them leaves the other reporting nonsense. With nothing reflecting,
+        // infinity * 0 is NaN; with something reflecting, infinity - infinity is NaN.
+        { Shielding.None, double.PositiveInfinity },
+        { new Shielding(ShieldStats.Reflecting(0.25)), double.PositiveInfinity },
+        { new Shielding(ShieldStats.Absorbing(40)), double.PositiveInfinity },
+        { Shielding.None, double.NegativeInfinity },
+        { new Shielding(ShieldStats.Reflecting(0.25)), double.NegativeInfinity },
+    };
+
+    [Theory]
+    [MemberData(nameof(InfiniteHits))]
+    public void AnInfiniteHit_IsRefusedAsTheHitItActuallyWas(Shielding shielding, double amount)
+    {
+        // The refusal has to name the number the caller passed. It used to name a NaN nobody passed:
+        // the intermediate arithmetic above turned an infinite hit into one by either of the routes
+        // named on InfiniteHits, and the NaN then surfaced from inside Meter.Reduce as "a meter
+        // holds real numbers only" — which blamed the meter for the caller's number, pointed at a
+        // layer the caller never called, and reported a value that appears nowhere in the call.
+        Ship ship = ShipWith(shielding);
+
+        ArgumentOutOfRangeException refusal =
+            Assert.Throws<ArgumentOutOfRangeException>(() => ship.TakeDamage(amount));
+
+        Assert.Equal(amount, refusal.ActualValue);
+        Assert.Equal("amount", refusal.ParamName);
+    }
+
+    [Fact]
+    public void AHitThatIsRefused_CostsTheShipNothingOnTheWayOut()
+    {
+        // the guard stands in front of the arithmetic rather than among it, so a refused hit is a
+        // hit that never happened — a ship left half damaged by a throw is a ship whose condition
+        // depends on how far down TakeDamage the bad number got
+        Ship ship = ShipWith(new Shielding(ShieldStats.Absorbing(40)));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => ship.TakeDamage(double.PositiveInfinity));
+
+        Assert.Equal(40, ship.Shield.Current);
+        Assert.Equal(80, ship.Health.Current);
+    }
+
+    [Fact]
+    public void TheBiggestHitADoubleCanHold_StillLands()
+    {
+        // what is refused is a number that is not an amount of damage, not a large one. The world is
+        // unbounded and nothing caps what a weapon may be authored to hit for, so the boundary is
+        // finiteness — the same line QuestTrigger draws around a distance.
+        Ship ship = ShipWith(new Shielding(ShieldStats.Absorbing(40)));
+
+        DamageOutcome outcome = ship.TakeDamage(double.MaxValue);
+
+        Assert.Equal(40, outcome.Absorbed);
+        Assert.True(ship.Shield.IsEmpty);
+        Assert.True(ship.Health.IsEmpty);
     }
 
     [Fact]
