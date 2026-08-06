@@ -52,17 +52,35 @@ public sealed class BattleForceHostTests : HostTestBase
     }
 
     [Fact]
-    public void DrawsNothing_OnTheSplashAndTheMenu()
+    public void DrawsTheStudioLogo_OnTheSplash()
     {
-        // neither screen draws yet; the host must survive being asked to draw them anyway,
-        // because the platform draws every frame from the first one
+        // end to end through the real composition, as the ship test below is: host, director,
+        // screen, renderer. This used to assert that nothing was drawn at all, which was true of
+        // a build whose first two screens were black — the splash now has a logo to put up, so
+        // what the test pins is which one and that the host reaches it.
         IHost game = CreateHost();
         RecordingRenderer renderer = new();
 
         game.Start();
         game.Draw(renderer);
 
-        Assert.Empty(renderer.Drawn);
+        Assert.Equal(CompanyScreen.LogoAssetKey, Assert.Single(renderer.Textures.Requested));
+    }
+
+    [Fact]
+    public void DrawsTheMenu_OnceTheMenuIsCurrent()
+    {
+        IHost game = CreateHost();
+        RecordingRenderer renderer = new();
+
+        game.Start();
+        game.Update(TimeSpan.FromDays(1));   // past the splash
+        Assert.IsType<MenuScreen>(ScreenDirector.Current);
+
+        game.Draw(renderer);
+
+        Assert.Contains(MenuScreen.TitleAssetKey, renderer.Textures.Requested);
+        Assert.Contains(MenuScreen.StartButtonAssetKey, renderer.Textures.Requested);
     }
 
     [Fact]

@@ -1,3 +1,4 @@
+using System.Numerics;
 using OliveGameStudio;
 
 namespace BattleForce2249;
@@ -8,8 +9,172 @@ namespace BattleForce2249;
 /// initial screen where users can interact with the menu options, such as starting the game.
 /// Implements the <see cref="IScreen"/> interface.
 /// </summary>
-public sealed class MenuScreen : IMenuScreen, IActivatable
+public sealed class MenuScreen : IMenuScreen, IActivatable, IRenderable
 {
+    /// <summary>
+    /// The asset keys the menu is drawn from, in the order they stack. Identifiers, not text:
+    /// asset keys are never translated.
+    /// </summary>
+    /// <remarks>
+    /// The horizon is drawn first and the button last, so each layer covers the one behind it.
+    /// The lone figure stands behind the pair deliberately — it is the character the game is
+    /// played as, and the pair reads as the company they are heading towards.
+    /// </remarks>
+    public const string HorizonAssetKey = "title-earth";
+
+    /// <inheritdoc cref="HorizonAssetKey" />
+    public const string LoneCharacterAssetKey = "character";
+
+    /// <inheritdoc cref="HorizonAssetKey" />
+    public const string CharacterPairAssetKey = "characters";
+
+    /// <inheritdoc cref="HorizonAssetKey" />
+    public const string TitleAssetKey = "titlelogo";
+
+    /// <inheritdoc cref="HorizonAssetKey" />
+    public const string StartButtonAssetKey = "StartButton";
+
+    /// <summary>
+    /// How much of the screen each layer spans, and where it sits. Proportions rather than pixels,
+    /// so the menu holds its composition at any window size — the assets are authored far larger
+    /// than any window and are always scaled down.
+    /// </summary>
+    /// <remarks>
+    /// The horizon is the exception: it is sized to the screen's <em>width</em> and pinned to the
+    /// bottom edge, because it is a horizon band rather than a wallpaper. At 3.4:1 it covers only
+    /// the lower part of a 16:9 window, and the space above it is meant to stay black — the band's
+    /// own top edge is already near-black, so the two meet without a seam.
+    /// </remarks>
+    public const float LoneCharacterHeightFraction = 0.62f;
+
+    /// <inheritdoc cref="LoneCharacterHeightFraction" />
+    public const float CharacterPairHeightFraction = 0.55f;
+
+    /// <inheritdoc cref="LoneCharacterHeightFraction" />
+    public const float TitleWidthFraction = 0.44f;
+
+    /// <inheritdoc cref="LoneCharacterHeightFraction" />
+    public const float StartButtonWidthFraction = 0.18f;
+
+    /// <summary>
+    /// How bright the start button is drawn when it holds focus, against
+    /// <see cref="UnfocusedButtonBrightness"/> when it does not.
+    /// </summary>
+    /// <remarks>
+    /// The focused state is a tint on the one asset rather than a second texture. The button is
+    /// the only control on this screen, so a player who cannot tell it is selected has nothing
+    /// else to compare it against — and dimming the unfocused state costs no art and works for
+    /// every button added later.
+    /// </remarks>
+    public const float FocusedButtonBrightness = 1f;
+
+    /// <inheritdoc cref="FocusedButtonBrightness" />
+    public const float UnfocusedButtonBrightness = 0.55f;
+
+    /// <summary>
+    /// How opaque the start button is while it is disabled — which it is until the save state is
+    /// known, per the rule that Start only becomes pressable once there is an answer.
+    /// </summary>
+    public const float DisabledButtonOpacity = 0.35f;
+
+    ITexture? _horizon;
+    ITexture? _loneCharacter;
+    ITexture? _characterPair;
+    ITexture? _title;
+    ITexture? _startButtonTexture;
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Textures are loaded on the first frame this screen draws rather than up front: the graphics
+    /// device does not exist when the container is built, so there is nothing to load them with
+    /// until a frame is actually being drawn.
+    /// </remarks>
+    public void Render(IRenderer renderer)
+    {
+        _horizon ??= renderer.Textures.Load(HorizonAssetKey);
+        _loneCharacter ??= renderer.Textures.Load(LoneCharacterAssetKey);
+        _characterPair ??= renderer.Textures.Load(CharacterPairAssetKey);
+        _title ??= renderer.Textures.Load(TitleAssetKey);
+        _startButtonTexture ??= renderer.Textures.Load(StartButtonAssetKey);
+
+        Vector2 viewport = renderer.ViewportSize;
+
+        DrawHorizon(renderer, viewport);
+        DrawCharacter(renderer, viewport, _loneCharacter, LoneCharacterHeightFraction);
+        DrawCharacter(renderer, viewport, _characterPair, CharacterPairHeightFraction);
+        DrawTitle(renderer, viewport);
+        DrawStartButton(renderer, viewport);
+    }
+
+    /// <summary>
+    /// Draws the horizon band across the bottom of the screen, sized to the screen's width and
+    /// pinned to its bottom edge.
+    /// </summary>
+    void DrawHorizon(IRenderer renderer, Vector2 viewport)
+    {
+        float scale = viewport.X / _horizon!.Width;
+
+        renderer.Draw(new Sprite(
+            Texture: _horizon,
+            Position: new Vector2(viewport.X / 2f, viewport.Y),
+            Rotation: 0f,
+            // Bottom centre of the texture, so the band's own bottom edge lands on the screen's.
+            Origin: new Vector2(_horizon.Width / 2f, _horizon.Height),
+            Scale: scale));
+    }
+
+    /// <summary>
+    /// Draws a character standing on the bottom of the screen, centred horizontally.
+    /// </summary>
+    static void DrawCharacter(IRenderer renderer, Vector2 viewport, ITexture texture, float heightFraction)
+    {
+        float scale = viewport.Y * heightFraction / texture.Height;
+
+        renderer.Draw(new Sprite(
+            Texture: texture,
+            Position: new Vector2(viewport.X / 2f, viewport.Y),
+            Rotation: 0f,
+            Origin: new Vector2(texture.Width / 2f, texture.Height),
+            Scale: scale));
+    }
+
+    /// <summary>
+    /// Draws the title logo across the upper part of the screen.
+    /// </summary>
+    void DrawTitle(IRenderer renderer, Vector2 viewport)
+    {
+        float scale = viewport.X * TitleWidthFraction / _title!.Width;
+
+        renderer.Draw(new Sprite(
+            Texture: _title,
+            Position: new Vector2(viewport.X / 2f, viewport.Y * 0.28f),
+            Rotation: 0f,
+            Origin: new Vector2(_title.Width, _title.Height) / 2f,
+            Scale: scale));
+    }
+
+    /// <summary>
+    /// Draws the start button, dimmed while it cannot be pressed and brightened while it holds
+    /// focus.
+    /// </summary>
+    void DrawStartButton(IRenderer renderer, Vector2 viewport)
+    {
+        float scale = viewport.X * StartButtonWidthFraction / _startButtonTexture!.Width;
+
+        float brightness = _controller.HasFocus ? FocusedButtonBrightness : UnfocusedButtonBrightness;
+        float opacity = IsReadyForInput ? 1f : DisabledButtonOpacity;
+
+        renderer.Draw(new Sprite(
+            Texture: _startButtonTexture,
+            Position: new Vector2(viewport.X / 2f, viewport.Y * 0.86f),
+            Rotation: 0f,
+            Origin: new Vector2(_startButtonTexture.Width, _startButtonTexture.Height) / 2f,
+            Scale: scale)
+        {
+            Colour = new Colour(brightness, brightness, brightness, opacity),
+        });
+    }
+
     readonly IUIController _controller;
     readonly ISaveProgressService _saveProgressService;
     readonly Image _background = new("BACKGROUND");
