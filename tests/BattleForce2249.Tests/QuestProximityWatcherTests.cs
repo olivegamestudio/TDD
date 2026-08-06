@@ -23,15 +23,34 @@ public sealed class QuestProximityWatcherTests
     }
 
     readonly QuestLog _quests = new();
+    readonly Character _character;
 
-    QuestProximityWatcher CreateWatcher(bool autoStarts = true, double startDistance = 25, double endDistance = 50)
+    public QuestProximityWatcherTests() => _character = CharacterFor(_quests);
+
+    /// <summary>
+    /// The character the watcher measures for. Conditions are read off the character, so the
+    /// watcher is handed one rather than a bare log — and a plain character with nothing earned is
+    /// what an ungated quest is checked against.
+    /// </summary>
+    static Character CharacterFor(QuestLog quests) => new(new TestRoster().Starting, quests);
+
+    QuestProximityWatcher CreateWatcher(
+        bool autoStarts = true,
+        double startDistance = 25,
+        double endDistance = 50,
+        IReadOnlyList<QuestCondition>? startConditions = null,
+        IReadOnlyList<QuestCondition>? endConditions = null)
     {
         _quests.Register(new QuestDefinition(
             "quest-1",
             "A title",
             new QuestTrigger(QuestTriggerKind.Proximity, startDistance),
             new QuestTrigger(QuestTriggerKind.Proximity, endDistance),
-            autoStarts));
+            autoStarts)
+        {
+            StartConditions = startConditions ?? [],
+            EndConditions = endConditions ?? [],
+        });
 
         return new QuestProximityWatcher(new TestWorld(new QuestMarkers("quest-1", StartMarker, EndMarker)));
     }
@@ -45,7 +64,7 @@ public sealed class QuestProximityWatcherTests
     {
         QuestProximityWatcher watcher = CreateWatcher();
 
-        watcher.Update(_quests, StartMarker);
+        watcher.Update(_character, StartMarker);
 
         Assert.Equal(QuestState.Active, Quest1.State);
     }
@@ -55,7 +74,7 @@ public sealed class QuestProximityWatcherTests
     {
         QuestProximityWatcher watcher = CreateWatcher();
 
-        watcher.Update(_quests, new Position(15, 20));    // exactly 25 away
+        watcher.Update(_character, new Position(15, 20));    // exactly 25 away
 
         Assert.Equal(QuestState.Active, Quest1.State);
     }
@@ -65,7 +84,7 @@ public sealed class QuestProximityWatcherTests
     {
         QuestProximityWatcher watcher = CreateWatcher();
 
-        watcher.Update(_quests, new Position(0, 25.001));
+        watcher.Update(_character, new Position(0, 25.001));
 
         Assert.Equal(QuestState.NotStarted, Quest1.State);
     }
@@ -75,7 +94,7 @@ public sealed class QuestProximityWatcherTests
     {
         QuestProximityWatcher watcher = CreateWatcher(autoStarts: false);
 
-        watcher.Update(_quests, StartMarker);
+        watcher.Update(_character, StartMarker);
 
         Assert.Equal(QuestState.NotStarted, Quest1.State);
     }
@@ -89,7 +108,7 @@ public sealed class QuestProximityWatcherTests
 
         for (int frame = 0; frame < 10; frame++)
         {
-            watcher.Update(_quests, StartMarker);
+            watcher.Update(_character, StartMarker);
         }
 
         Assert.Equal(1, started);
@@ -103,7 +122,7 @@ public sealed class QuestProximityWatcherTests
         QuestProximityWatcher watcher = CreateWatcher();
         Quest1.Start();
 
-        watcher.Update(_quests, new Position(0, 960));    // within the 50 unit end distance
+        watcher.Update(_character, new Position(0, 960));    // within the 50 unit end distance
 
         Assert.Equal(QuestState.Completed, Quest1.State);
     }
@@ -114,7 +133,7 @@ public sealed class QuestProximityWatcherTests
         QuestProximityWatcher watcher = CreateWatcher();
         Quest1.Start();
 
-        watcher.Update(_quests, new Position(0, 940));
+        watcher.Update(_character, new Position(0, 940));
 
         Assert.Equal(QuestState.Active, Quest1.State);
     }
@@ -124,7 +143,7 @@ public sealed class QuestProximityWatcherTests
     {
         QuestProximityWatcher watcher = CreateWatcher(autoStarts: false);
 
-        watcher.Update(_quests, EndMarker);
+        watcher.Update(_character, EndMarker);
 
         Assert.Equal(QuestState.NotStarted, Quest1.State);
     }
@@ -139,7 +158,7 @@ public sealed class QuestProximityWatcherTests
 
         for (int frame = 0; frame < 10; frame++)
         {
-            watcher.Update(_quests, EndMarker);
+            watcher.Update(_character, EndMarker);
         }
 
         Assert.Equal(1, completed);
@@ -149,10 +168,10 @@ public sealed class QuestProximityWatcherTests
     public void DoesNotRestartACompletedQuest()
     {
         QuestProximityWatcher watcher = CreateWatcher();
-        watcher.Update(_quests, StartMarker);
-        watcher.Update(_quests, EndMarker);
+        watcher.Update(_character, StartMarker);
+        watcher.Update(_character, EndMarker);
 
-        watcher.Update(_quests, StartMarker);              // back where it began
+        watcher.Update(_character, StartMarker);              // back where it began
 
         Assert.Equal(QuestState.Completed, Quest1.State);
     }
@@ -166,7 +185,7 @@ public sealed class QuestProximityWatcherTests
 
         for (Position at = StartMarker; at.Y <= EndMarker.Y; at = at.Offset(0, 10))
         {
-            watcher.Update(_quests, at);
+            watcher.Update(_character, at);
         }
 
         Assert.Equal(QuestState.Completed, Quest1.State);
@@ -185,7 +204,7 @@ public sealed class QuestProximityWatcherTests
         QuestProximityWatcher watcher =
             new(new TestWorld(new QuestMarkers("quest-1", StartMarker, StartMarker)));
 
-        watcher.Update(quests, StartMarker);
+        watcher.Update(CharacterFor(quests), StartMarker);
 
         Assert.Equal(QuestState.Completed, quests.Find("quest-1")!.State);
     }
@@ -197,7 +216,7 @@ public sealed class QuestProximityWatcherTests
         QuestProximityWatcher watcher =
             new(new TestWorld(new QuestMarkers("quest-gone", StartMarker, EndMarker)));
 
-        watcher.Update(new QuestLog(), StartMarker);       // must not throw
+        watcher.Update(CharacterFor(new QuestLog()), StartMarker);       // must not throw
     }
 
     // ---- sweeping the frame, rather than sampling the end of it ----
@@ -210,7 +229,7 @@ public sealed class QuestProximityWatcherTests
         QuestProximityWatcher watcher = CreateWatcher();
         Quest1.Start();
 
-        watcher.Update(_quests, new Position(0, 900), new Position(0, 1100));
+        watcher.Update(_character, new Position(0, 900), new Position(0, 1100));
 
         Assert.Equal(QuestState.Completed, Quest1.State);
     }
@@ -220,7 +239,7 @@ public sealed class QuestProximityWatcherTests
     {
         QuestProximityWatcher watcher = CreateWatcher();
 
-        watcher.Update(_quests, new Position(0, -200), new Position(0, 200));
+        watcher.Update(_character, new Position(0, -200), new Position(0, 200));
 
         Assert.Equal(QuestState.Active, Quest1.State);
     }
@@ -232,7 +251,7 @@ public sealed class QuestProximityWatcherTests
         // whole 1000 units in one step passes both markers, so it both starts and finishes.
         QuestProximityWatcher watcher = CreateWatcher();
 
-        watcher.Update(_quests, new Position(0, -100), new Position(0, 1100));
+        watcher.Update(_character, new Position(0, -100), new Position(0, 1100));
 
         Assert.Equal(QuestState.Completed, Quest1.State);
     }
@@ -244,7 +263,7 @@ public sealed class QuestProximityWatcherTests
         // 400 units off to one side never came near it
         QuestProximityWatcher watcher = CreateWatcher();
 
-        watcher.Update(_quests, new Position(400, -200), new Position(400, 200));
+        watcher.Update(_character, new Position(400, -200), new Position(400, 200));
 
         Assert.Equal(QuestState.NotStarted, Quest1.State);
     }
@@ -255,7 +274,7 @@ public sealed class QuestProximityWatcherTests
         QuestProximityWatcher watcher = CreateWatcher();
         Quest1.Start();
 
-        watcher.Update(_quests, new Position(0, 100), new Position(0, 940));
+        watcher.Update(_character, new Position(0, 100), new Position(0, 940));
 
         Assert.Equal(QuestState.Active, Quest1.State);
     }
@@ -266,7 +285,7 @@ public sealed class QuestProximityWatcherTests
         // only this frame's journey is measured, not everything flown since the game began: a
         // frame between 400 and 600 never came near the marker back at the origin
         QuestProximityWatcher watcher = CreateWatcher();
-        watcher.Update(_quests, new Position(0, 400), new Position(0, 600));
+        watcher.Update(_character, new Position(0, 400), new Position(0, 600));
 
         Assert.Equal(QuestState.NotStarted, Quest1.State);
     }
@@ -280,7 +299,7 @@ public sealed class QuestProximityWatcherTests
 
         for (int frame = 0; frame < 10; frame++)
         {
-            watcher.Update(_quests, new Position(0, -50), new Position(0, 50));
+            watcher.Update(_character, new Position(0, -50), new Position(0, 50));
         }
 
         Assert.Equal(1, started);
@@ -293,7 +312,7 @@ public sealed class QuestProximityWatcherTests
         // quest. Start is applied before end, exactly as it is for a frame that lands on one.
         QuestProximityWatcher watcher = CreateWatcher();
 
-        watcher.Update(_quests, StartMarker, EndMarker);
+        watcher.Update(_character, StartMarker, EndMarker);
 
         Assert.Equal(QuestState.Completed, Quest1.State);
     }
@@ -307,7 +326,7 @@ public sealed class QuestProximityWatcherTests
         QuestProximityWatcher watcher = CreateWatcher();
         Quest1.Start();
 
-        watcher.Update(_quests, new Position(0, 1100), new Position(0, 900));
+        watcher.Update(_character, new Position(0, 1100), new Position(0, 900));
 
         Assert.Equal(QuestState.Completed, Quest1.State);
     }
@@ -318,7 +337,7 @@ public sealed class QuestProximityWatcherTests
         // the three argument call with both ends the same is the two argument call
         QuestProximityWatcher watcher = CreateWatcher();
 
-        watcher.Update(_quests, StartMarker, StartMarker);
+        watcher.Update(_character, StartMarker, StartMarker);
 
         Assert.Equal(QuestState.Active, Quest1.State);
     }
@@ -330,8 +349,92 @@ public sealed class QuestProximityWatcherTests
         // number, and every comparison against it is false
         QuestProximityWatcher watcher = CreateWatcher();
 
-        watcher.Update(_quests, StartMarker, new Position(double.NaN, double.NaN));
+        watcher.Update(_character, StartMarker, new Position(double.NaN, double.NaN));
 
         Assert.Equal(QuestState.NotStarted, Quest1.State);
+    }
+
+    // ---- conditions gate, and triggers fire ----
+
+    [Fact]
+    public void DoesNotStartTheQuest_WhileItsStartConditionsDoNotHold()
+    {
+        // standing on the marker is not enough: the gate is shut
+        QuestProximityWatcher watcher = CreateWatcher(startConditions: [QuestCondition.AtLeastLevel(5)]);
+
+        watcher.Update(_character, StartMarker);
+
+        Assert.Equal(QuestState.NotStarted, Quest1.State);
+    }
+
+    [Fact]
+    public void StartsTheQuest_OnceItsStartConditionsHold()
+    {
+        QuestProximityWatcher watcher = CreateWatcher(startConditions: [QuestCondition.AtLeastLevel(2)]);
+
+        watcher.Update(_character, StartMarker);
+        Assert.Equal(QuestState.NotStarted, Quest1.State);
+
+        _character.Progression.Advance(0);
+        watcher.Update(_character, StartMarker);
+
+        Assert.Equal(QuestState.Active, Quest1.State);
+    }
+
+    [Fact]
+    public void AConditionIsAStateThatHolds_NotATriggerThatFired()
+    {
+        // flying over the marker under-levelled leaves nothing remembered: the player comes back
+        // when they are ready and the quest begins then, rather than beginning the moment they
+        // level up somewhere else entirely
+        QuestProximityWatcher watcher = CreateWatcher(startConditions: [QuestCondition.AtLeastLevel(2)]);
+
+        watcher.Update(_character, StartMarker);
+        _character.Progression.Advance(0);
+        watcher.Update(_character, EndMarker);           // levelled, but nowhere near the marker
+
+        Assert.Equal(QuestState.NotStarted, Quest1.State);
+    }
+
+    [Fact]
+    public void DoesNotCompleteTheQuest_WhileItsEndConditionsDoNotHold()
+    {
+        // it starts, because only the turn-in is gated
+        QuestProximityWatcher watcher =
+            CreateWatcher(endConditions: [QuestCondition.StandingWith("miners-guild", 100)]);
+
+        watcher.Update(_character, StartMarker);
+        watcher.Update(_character, EndMarker);
+
+        Assert.Equal(QuestState.Active, Quest1.State);
+    }
+
+    [Fact]
+    public void CompletesTheQuest_OnceItsEndConditionsHold()
+    {
+        QuestProximityWatcher watcher =
+            CreateWatcher(endConditions: [QuestCondition.StandingWith("miners-guild", 100)]);
+
+        watcher.Update(_character, StartMarker);
+        _character.Reputation.Adjust("miners-guild", 100);
+        watcher.Update(_character, EndMarker);
+
+        Assert.Equal(QuestState.Completed, Quest1.State);
+    }
+
+    [Fact]
+    public void StartConditionsDoNotGateTheTurnIn()
+    {
+        // a quest that opened to a character who has since fallen out of favour still finishes:
+        // availability and turn-in are different questions, asked of different lists
+        QuestProximityWatcher watcher = CreateWatcher(
+            startConditions: [QuestCondition.StandingWith("miners-guild", 100)]);
+
+        _character.Reputation.Adjust("miners-guild", 100);
+        watcher.Update(_character, StartMarker);
+        _character.Reputation.Adjust("miners-guild", -100);
+        watcher.Update(_character, EndMarker);
+
+        Assert.Equal(QuestState.Completed, Quest1.State);
     }
 }

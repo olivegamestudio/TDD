@@ -89,7 +89,7 @@ public sealed class ResumedPositionTests
 
         for (int frame = 0; frame < FrameLimit && !quest1.IsCompleted; frame++)
         {
-            watcher.Update(session.Quests, session.Player.Position);
+            watcher.Update(session.Character, session.Player.Position);
             session.Player.MoveBy(0, UnitsPerFrame);
         }
     }
