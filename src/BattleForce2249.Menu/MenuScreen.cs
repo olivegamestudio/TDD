@@ -16,9 +16,10 @@ public sealed class MenuScreen : IMenuScreen, IActivatable, IRenderable
     /// asset keys are never translated.
     /// </summary>
     /// <remarks>
-    /// The horizon is drawn first and the button last, so each layer covers the one behind it.
-    /// The lone figure stands behind the pair deliberately — it is the character the game is
-    /// played as, and the pair reads as the company they are heading towards.
+    /// The figures are drawn first and the button last, so each layer covers the one behind it.
+    /// The lone figure stands behind the pair deliberately, and the horizon is drawn over both —
+    /// so the planet cuts across their feet and they stand <em>in</em> the scene rather than in
+    /// front of a picture of one.
     /// </remarks>
     public const string HorizonAssetKey = "title-earth";
 
@@ -45,16 +46,54 @@ public sealed class MenuScreen : IMenuScreen, IActivatable, IRenderable
     /// the lower part of a 16:9 window, and the space above it is meant to stay black — the band's
     /// own top edge is already near-black, so the two meet without a seam.
     /// </remarks>
-    public const float LoneCharacterHeightFraction = 0.62f;
+    public const float LoneCharacterHeightFraction = 1.13f;
 
     /// <inheritdoc cref="LoneCharacterHeightFraction" />
-    public const float CharacterPairHeightFraction = 0.55f;
+    public const float CharacterPairHeightFraction = 1.00f;
+
+    /// <summary>
+    /// Where the bottom of each character lands, as a fraction of the screen's height.
+    /// </summary>
+    /// <remarks>
+    /// Past 1 on purpose: the figures are taller than the window and their feet land below its
+    /// bottom edge, so they are cropped rather than shrunk to fit. That is what fills the frame —
+    /// a figure scaled until it fits entirely on screen is a small figure, whichever way it is
+    /// anchored.
+    ///
+    /// Together with the height, this is what decides where a face lands: the lone figure is both
+    /// the taller and the lower-anchored, so his head clears the pair's while his feet fall
+    /// furthest off the bottom. The horizon is drawn over all of it.
+    /// </remarks>
+    public const float LoneCharacterBaselineFraction = 1.15f;
+
+    /// <inheritdoc cref="LoneCharacterBaselineFraction" />
+    public const float CharacterPairBaselineFraction = 1.13f;
+
+    /// <summary>
+    /// How tall the title logo is, and where its middle sits — both as fractions of the screen's
+    /// height.
+    /// </summary>
+    /// <remarks>
+    /// Sized by <em>height</em> rather than width, unlike everything else measured against the
+    /// window. The logo shares the frame with the figures, and it is their scale it has to hold
+    /// against — sizing it by width would swell it on a wide window and shrink it on a narrow one
+    /// while the figures beside it stayed put.
+    ///
+    /// It sits over the middle of them rather than crowning the top, which is what stops the
+    /// composition splitting into a band of art and a separate band of title.
+    /// </remarks>
+    public const float TitleHeightFraction = 0.23f;
+
+    /// <inheritdoc cref="TitleHeightFraction" />
+    public const float TitleCentreFraction = 0.63f;
 
     /// <inheritdoc cref="LoneCharacterHeightFraction" />
-    public const float TitleWidthFraction = 0.44f;
+    public const float StartButtonWidthFraction = 0.13f;
 
-    /// <inheritdoc cref="LoneCharacterHeightFraction" />
-    public const float StartButtonWidthFraction = 0.18f;
+    /// <summary>
+    /// Where the middle of the start button sits, as a fraction of the screen's height.
+    /// </summary>
+    public const float StartButtonCentreFraction = 0.90f;
 
     /// <summary>
     /// How bright the start button is drawn when it holds focus, against
@@ -99,9 +138,12 @@ public sealed class MenuScreen : IMenuScreen, IActivatable, IRenderable
 
         Vector2 viewport = renderer.ViewportSize;
 
+        // The characters go down before the horizon, so the planet is drawn over their feet and
+        // they stand behind it rather than on top of it. It is what puts them in the scene instead
+        // of in front of a picture of one.
+        DrawCharacter(renderer, viewport, _loneCharacter, LoneCharacterHeightFraction, LoneCharacterBaselineFraction);
+        DrawCharacter(renderer, viewport, _characterPair, CharacterPairHeightFraction, CharacterPairBaselineFraction);
         DrawHorizon(renderer, viewport);
-        DrawCharacter(renderer, viewport, _loneCharacter, LoneCharacterHeightFraction);
-        DrawCharacter(renderer, viewport, _characterPair, CharacterPairHeightFraction);
         DrawTitle(renderer, viewport);
         DrawStartButton(renderer, viewport);
     }
@@ -124,16 +166,23 @@ public sealed class MenuScreen : IMenuScreen, IActivatable, IRenderable
     }
 
     /// <summary>
-    /// Draws a character standing on the bottom of the screen, centred horizontally.
+    /// Draws a character centred horizontally, standing on the given baseline.
     /// </summary>
-    static void DrawCharacter(IRenderer renderer, Vector2 viewport, ITexture texture, float heightFraction)
+    static void DrawCharacter(
+        IRenderer renderer,
+        Vector2 viewport,
+        ITexture texture,
+        float heightFraction,
+        float baselineFraction)
     {
         float scale = viewport.Y * heightFraction / texture.Height;
 
         renderer.Draw(new Sprite(
             Texture: texture,
-            Position: new Vector2(viewport.X / 2f, viewport.Y),
+            Position: new Vector2(viewport.X / 2f, viewport.Y * baselineFraction),
             Rotation: 0f,
+            // The texture's bottom centre, so the character stands on the baseline rather than
+            // hanging from it.
             Origin: new Vector2(texture.Width / 2f, texture.Height),
             Scale: scale));
     }
@@ -143,11 +192,11 @@ public sealed class MenuScreen : IMenuScreen, IActivatable, IRenderable
     /// </summary>
     void DrawTitle(IRenderer renderer, Vector2 viewport)
     {
-        float scale = viewport.X * TitleWidthFraction / _title!.Width;
+        float scale = viewport.Y * TitleHeightFraction / _title!.Height;
 
         renderer.Draw(new Sprite(
             Texture: _title,
-            Position: new Vector2(viewport.X / 2f, viewport.Y * 0.28f),
+            Position: new Vector2(viewport.X / 2f, viewport.Y * TitleCentreFraction),
             Rotation: 0f,
             Origin: new Vector2(_title.Width, _title.Height) / 2f,
             Scale: scale));
@@ -166,7 +215,7 @@ public sealed class MenuScreen : IMenuScreen, IActivatable, IRenderable
 
         renderer.Draw(new Sprite(
             Texture: _startButtonTexture,
-            Position: new Vector2(viewport.X / 2f, viewport.Y * 0.86f),
+            Position: new Vector2(viewport.X / 2f, viewport.Y * StartButtonCentreFraction),
             Rotation: 0f,
             Origin: new Vector2(_startButtonTexture.Width, _startButtonTexture.Height) / 2f,
             Scale: scale)

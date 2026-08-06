@@ -36,9 +36,10 @@ public sealed class MenuScreenRenderTests
     [Fact]
     public void Render_StacksTheLayers_FurthestFirst()
     {
-        // The order is the composition. The lone figure stands behind the pair, and the title
-        // reads over both — drawn in any other order the menu is still five sprites and looks
-        // wrong, which is exactly the kind of thing a list of sprites can catch and an eye may not.
+        // The order is the composition, and this asserts the order things were *drawn* rather than
+        // the order they were loaded — they differ, and only the first of the two is what the
+        // player sees. The horizon lands over both figures on purpose, so the planet cuts across
+        // their feet; drawn the other way round they stand on top of it and the scene falls flat.
         MenuScreen menu = Ready(out _);
         RecordingRenderer renderer = new();
 
@@ -46,14 +47,30 @@ public sealed class MenuScreenRenderTests
 
         Assert.Equal(
         [
+            MenuScreen.LoneCharacterAssetKey,
+            MenuScreen.CharacterPairAssetKey,
+            MenuScreen.HorizonAssetKey,
+            MenuScreen.TitleAssetKey,
+            MenuScreen.StartButtonAssetKey,
+        ], renderer.Drawn.Select(sprite => KeyOf(renderer, sprite)));
+    }
+
+    /// <summary>
+    /// Which asset key a drawn sprite came from. The loader hands out one texture per key, so
+    /// identity is enough to name it.
+    /// </summary>
+    static string KeyOf(RecordingRenderer renderer, Sprite sprite)
+    {
+        string[] keys =
+        [
             MenuScreen.HorizonAssetKey,
             MenuScreen.LoneCharacterAssetKey,
             MenuScreen.CharacterPairAssetKey,
             MenuScreen.TitleAssetKey,
             MenuScreen.StartButtonAssetKey,
-        ], renderer.Textures.Requested);
+        ];
 
-        Assert.Equal(5, renderer.Drawn.Count);
+        return keys.Single(key => ReferenceEquals(renderer.Textures.Load(key), sprite.Texture));
     }
 
     [Fact]
@@ -82,25 +99,63 @@ public sealed class MenuScreenRenderTests
 
         menu.Render(renderer);
 
-        Sprite horizon = renderer.Drawn[0];
+        Sprite horizon = renderer.Drawn[2];
         Assert.Equal(new Vector2(960f, 1080f), horizon.Position);
         Assert.Equal(new Vector2(1374f, 800f), horizon.Origin);
         Assert.Equal(1920f / 2748f, horizon.Scale, precision: 5);
     }
 
     [Fact]
-    public void Render_StandsTheCharactersOnTheBottomOfTheScreen()
+    public void Render_StandsTheCharactersOnTheirBaselines()
     {
+        // Lifted clear of the bottom edge rather than stood on it. The horizon is drawn over them,
+        // so where the baseline sits decides how much of each figure the planet cuts across.
         MenuScreen menu = Ready(out _);
         RecordingRenderer renderer = new(width: 1920f, height: 1080f);
 
         menu.Render(renderer);
 
-        foreach (Sprite character in new[] { renderer.Drawn[1], renderer.Drawn[2] })
-        {
-            Assert.Equal(1080f, character.Position.Y);
-            Assert.Equal(960f, character.Position.X);
-        }
+        Assert.Equal(960f, renderer.Drawn[0].Position.X);
+        Assert.Equal(960f, renderer.Drawn[1].Position.X);
+
+        Assert.Equal(1080f * MenuScreen.LoneCharacterBaselineFraction, renderer.Drawn[0].Position.Y, precision: 3);
+        Assert.Equal(1080f * MenuScreen.CharacterPairBaselineFraction, renderer.Drawn[1].Position.Y, precision: 3);
+    }
+
+    [Fact]
+    public void Render_RaisesTheLoneFiguresHead_AboveThePair()
+    {
+        // He is the one meant to dominate, and it is the top of him that says so — his head has to
+        // clear theirs. Comparing the baselines would say the opposite and be right about the
+        // wrong thing: he is anchored *lower* than the pair precisely so more of him falls off the
+        // bottom, and it is his greater height that carries his head above them.
+        MenuScreen menu = Ready(out _);
+        RecordingRenderer renderer = new(width: 1920f, height: 1080f);
+
+        menu.Render(renderer);
+
+        Assert.True(TopOf(renderer.Drawn[0]) < TopOf(renderer.Drawn[1]));
+    }
+
+    /// <summary>
+    /// Where the top edge of a drawn sprite lands. A smaller Y is higher up: the screen's Y axis
+    /// points down.
+    /// </summary>
+    static float TopOf(Sprite sprite) => sprite.Position.Y - (sprite.Origin.Y * sprite.Scale);
+
+    [Fact]
+    public void Render_CropsTheFigures_RatherThanShrinkingThemToFit()
+    {
+        // Both stand taller than the window and their feet land past its bottom edge. A figure
+        // scaled until it fits entirely on screen is a small figure, and the frame is meant to be
+        // full of them.
+        MenuScreen menu = Ready(out _);
+        RecordingRenderer renderer = new(width: 1920f, height: 1080f);
+
+        menu.Render(renderer);
+
+        Assert.True(renderer.Drawn[0].Position.Y > 1080f);
+        Assert.True(renderer.Drawn[1].Position.Y > 1080f);
     }
 
     [Fact]
@@ -112,7 +167,7 @@ public sealed class MenuScreenRenderTests
 
         menu.Render(renderer);
 
-        Assert.True(renderer.Drawn[1].Scale > renderer.Drawn[2].Scale);
+        Assert.True(renderer.Drawn[0].Scale > renderer.Drawn[1].Scale);
     }
 
     [Fact]
