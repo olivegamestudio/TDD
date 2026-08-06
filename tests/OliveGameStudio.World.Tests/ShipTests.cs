@@ -67,6 +67,23 @@ public sealed class ShipTests
     }
 
     [Fact]
+    public void FittingTwoShieldsTooLargeToAddUp_LeavesAShipShieldedRatherThanCrashingIt()
+    {
+        // the crash the layers between them used to allow: each shield passed ShieldStats' own
+        // validation, the sum ran off the end of a double, and Meter refused the infinity that came
+        // back — so a ship blew up on being handed two shields that were individually fine, and blew
+        // up in Meter's words rather than anywhere the caller had been.
+        Ship ship = new(ProfileWith());
+
+        ship.Fit(new Shielding(
+            ShieldStats.Absorbing(double.MaxValue),
+            ShieldStats.Absorbing(double.MaxValue)));
+
+        Assert.Equal(double.MaxValue, ship.Shield.Maximum);
+        Assert.False(ship.Shield.IsEmpty);
+    }
+
+    [Fact]
     public void AShipWithNothingFitted_HasEmptyOrbSlots()
     {
         // what the design asks for at the start of the story: the additional slots come empty, and

@@ -246,6 +246,26 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A pair of shields too large to add up now leaves a ship enormously well shielded instead of
+  crashing the fit.** `Shielding` summed the capacity of its fitted shields without asking whether
+  the total was still a number a pool could hold. Two `ShieldStats.Absorbing` shields that each
+  passed their own validation — `ShieldStats` correctly refuses anything not finite — summed past
+  the end of a double and came back as infinity, and `Ship.Fit` then handed that infinity to
+  `Meter`, which refuses it deliberately: an infinite pool can never be emptied.
+
+  So fitting two individually valid shields threw, and threw in the wrong layer's words —
+  *"maximum ('Infinity') must not be equal to 'Infinity'"*, from a constructor the caller never
+  called, about a number the caller never passed. Every layer validated its own inputs; the gap was
+  that `Shielding` never validated its own *output*, and nobody in between caught it.
+
+  The sum is now held at `double.MaxValue`, which is the line the reflected share on the next line
+  was already drawn on and drawn for the same reason: each shield is authored on its own and neither
+  of such a pair is a mistake, so the total is held rather than refused. The ceiling is not a rule
+  about stacking — a pair that adds up to anything a double can still count adds up to exactly that,
+  however large, so the only pairs it touches are the ones that would otherwise arrive as infinity.
+  Practically this is content nobody will author; the defect was the chain, not the number.
+  ([#168](https://github.com/olivegamestudio/TDD/issues/168))
+
 - **An infinite hit is now refused as the hit it was, instead of surfacing from inside a meter as a
   number nobody passed.** `Ship.TakeDamage` guarded against a negative amount and against NaN, and
   neither guard refused infinity. The arithmetic below them then turned an infinite hit into a NaN

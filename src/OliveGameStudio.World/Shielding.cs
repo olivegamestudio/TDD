@@ -63,7 +63,13 @@ public sealed class Shielding
         // ship is wearing after it has been fitted
         _fitted = [.. fitted];
 
-        Capacity = _fitted.Sum(shield => shield.Capacity);
+        // held at the largest pool there is, for the same reason the reflected share below is held
+        // at the whole hit: each shield is authored on its own and neither of a pair is a mistake,
+        // but two large enough to run off the end of a double add up to infinity — and an infinite
+        // layer is precisely what Meter refuses, because nothing can ever empty it. Without this the
+        // refusal landed on Ship.Fit, blaming the meter for a pair of shields that had each passed
+        // their own validation.
+        Capacity = Math.Min(double.MaxValue, _fitted.Sum(shield => shield.Capacity));
 
         // held at the whole hit: each shield is authored on its own and neither of a pair is a
         // mistake, but a pair adding past one would send back more damage than arrived
@@ -81,7 +87,10 @@ public sealed class Shielding
     public IReadOnlyList<ShieldStats> Fitted => _fitted;
 
     /// <summary>
-    /// Gets the shield layer everything fitted adds up to — what stands in front of the hull.
+    /// Gets the shield layer everything fitted adds up to — what stands in front of the hull. Held
+    /// at <see cref="double.MaxValue"/> when a pair adds up past what a pool can hold, because
+    /// <see cref="Meter"/> refuses a layer nothing can ever empty and neither shield of such a pair
+    /// is a mistake on its own.
     /// </summary>
     public double Capacity { get; }
 

@@ -57,6 +57,35 @@ public sealed class ShieldingTests
     }
 
     [Fact]
+    public void TwoShieldsThatWouldAddUpToMoreLayerThanAPoolCanHold_AreHeldAtTheLargestPoolThereIs()
+    {
+        // held rather than refused for the reason the reflected pair is: each shield passed its own
+        // validation and neither is a mistake, but the sum runs off the end of what a double can
+        // count and comes back as infinity — and an infinite layer is the one thing a Meter refuses,
+        // because nothing can ever empty it. Holding it at the largest finite pool keeps the ship
+        // enormously well shielded and still destroyable.
+        Shielding shielding = new(
+            ShieldStats.Absorbing(double.MaxValue),
+            ShieldStats.Absorbing(double.MaxValue));
+
+        Assert.Equal(double.MaxValue, shielding.Capacity);
+        Assert.True(double.IsFinite(shielding.Capacity));
+    }
+
+    [Fact]
+    public void CapacitiesThatFitInsideAPool_AreStillSimplyAddedUp()
+    {
+        // the clamp is a ceiling and not a rule: a pair that adds up to a number a double can count
+        // adds up to exactly that, however large, so the only pairs it touches are the ones that
+        // would otherwise arrive as infinity
+        Shielding shielding = new(
+            ShieldStats.Absorbing(double.MaxValue / 4),
+            ShieldStats.Absorbing(double.MaxValue / 4));
+
+        Assert.Equal(double.MaxValue / 2, shielding.Capacity);
+    }
+
+    [Fact]
     public void WhatIsFitted_IsHeldInTheOrderItWasSlotted()
     {
         ShieldStats first = ShieldStats.Absorbing(40);
