@@ -68,7 +68,7 @@ public sealed class GameScreen(
         // frame rather than where they were at the end of the last one
         ship.Update(session.Player, pilot.Read(), frameTime);
 
-        questProximity.Update(session.Quests, began, session.Player.Position);
+        questProximity.Update(session.Character, began, session.Player.Position);
 
         // and last, what the frame produced is handed to the drawing side. The pose is the whole
         // of what the two stages agree about: the physics has no idea a screen exists, and the
