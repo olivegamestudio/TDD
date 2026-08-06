@@ -22,6 +22,12 @@ a gap on screen, so shipping a region that names one turns a content oversight
 into a crash — and the prototype's export names several that belonged to the
 player's ship prefab and to editor gizmos rather than to the level.
 
+What counts as "has" is read from `Content.mgcb`, not from the folder listing.
+The two are different, and the difference has already cost us: `glow.png` sat in
+the content folder and was never registered, so the folder said yes, the build
+shipped nothing, and the game crashed on entering the world. Only the `/build:`
+lines say what is actually produced.
+
 Run:  python3 scripts/import-unity-scene.py <export.json> <region-id> <out.json> [content-dir]
 """
 
@@ -103,9 +109,13 @@ def main() -> int:
 
     available = None
     if content:
-        available = {
-            os.path.splitext(f)[0] for f in os.listdir(content) if f.endswith(".png")
-        }
+        mgcb = os.path.join(content, "Content.mgcb")
+        with open(mgcb) as handle:
+            available = {
+                os.path.splitext(line.strip()[len("/build:") :])[0]
+                for line in handle
+                if line.startswith("/build:")
+            }
 
     dropped = Counter()
     kept = []

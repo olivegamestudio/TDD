@@ -20,6 +20,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\..\BattleForce2249.MonoGame\BattleForce2249.MonoGame.csproj" />
+      <ProjectReference Include="..\..\src\OliveGameStudio.Scenes\OliveGameStudio.Scenes.csproj" />
     </ItemGroup>
 
 </Project>
