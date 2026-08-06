@@ -170,20 +170,42 @@ public sealed class Ship
     /// where the fight does.
     /// </para>
     /// </remarks>
-    /// <param name="amount">How much damage arrived. Zero is allowed and costs nothing.</param>
+    /// <param name="amount">
+    /// How much damage arrived, as a finite number. Zero is allowed and costs nothing; there is no
+    /// upper bound short of infinity, because nothing caps what a weapon may be authored to hit for.
+    /// </param>
     /// <returns>Where the hit went.</returns>
     /// <exception cref="ArgumentOutOfRangeException">
-    /// The amount is negative or not a number, for the reason <see cref="Meter.Reduce"/> refuses
-    /// one: a damage calculation that came out backwards would otherwise heal what it was aimed at.
+    /// The amount is negative, for the reason <see cref="Meter.Reduce"/> refuses one: a damage
+    /// calculation that came out backwards would otherwise heal what it was aimed at. Or it is not a
+    /// finite number, which is a stricter line than <see cref="Meter.Reduce"/> draws, and
+    /// deliberately — a meter takes a single change and an infinite one is simply the whole pool in
+    /// one go, but a hit is <em>apportioned</em> across three, and infinity divides into no shares.
+    /// Reflecting a quarter of an infinite hit sends back infinity, which is the whole of it, so a
+    /// shield authored to bounce a share back would bounce all of it and <see cref="DamageOutcome"/>
+    /// could no longer add up to the hit that arrived.
     /// </exception>
     public DamageOutcome TakeDamage(double amount)
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(amount);
-
-        if (double.IsNaN(amount))
+        // Ordered before the negative guard so that negative infinity is named by the rule it
+        // actually breaks, and NaN by a rule at all — ThrowIfNegative stops the standard NaN only
+        // because the sign bit of double.NaN happens to be set, and one whose sign bit is clear
+        // walks straight past it. This is the ordering QuestTrigger uses on a distance, for the same
+        // two reasons.
+        //
+        // Refusing here is what keeps the arithmetic below honest. An infinity reaches it and comes
+        // out a NaN either way the slots are filled — nothing reflecting makes it infinity * 0, and
+        // anything reflecting makes it infinity - infinity — and that NaN then surfaced from inside
+        // Meter.Reduce, naming the meter and not the hit that was never a hit.
+        if (!double.IsFinite(amount))
         {
-            throw new ArgumentOutOfRangeException(nameof(amount), amount, "A hit has to be a number.");
+            throw new ArgumentOutOfRangeException(
+                nameof(amount),
+                amount,
+                "A hit has to be a finite number of damage.");
         }
+
+        ArgumentOutOfRangeException.ThrowIfNegative(amount);
 
         double reflected = amount * Shielding.ReflectedFraction;
         double landed = amount - reflected;

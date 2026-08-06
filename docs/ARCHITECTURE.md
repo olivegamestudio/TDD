@@ -141,6 +141,22 @@ It *reports* what was reflected rather than applying it — the model declares t
 presentation applies it, and a ship knowing how much damage it turned around is a different claim
 from a ship knowing what shot at it.
 
+**A hit has to be a finite number, and that is a stricter line than `Meter.Reduce` draws.** The two
+are asked different questions. A meter takes a single change, so an infinite one is simply the whole
+pool in one go and still clamps to a real number — which is why `Meter.Reduce` accepts it. A hit is
+*apportioned* across three parts, and infinity divides into no shares: a quarter of an infinite hit
+is infinity, so a shield authored to bounce a share back would bounce the whole of it and
+`DamageOutcome` could no longer add up to the hit that arrived. So `TakeDamage` refuses at its own
+door, ahead of the sign check, the way `QuestTrigger` refuses a distance. Only infinity is refused,
+not a large number: `double.MaxValue` lands, because nothing caps what a weapon may be authored to
+hit for.
+
+Refusing at the door is also what keeps the *report* honest. Without it the arithmetic turned an
+infinite hit into a NaN — `∞ × 0` with nothing reflecting, `∞ − ∞` with anything reflecting — and
+that NaN surfaced from inside `Meter.Reduce` as "a meter holds real numbers only", naming the meter
+for the caller's mistake and reporting an actual value that appears nowhere in the call. The failure
+was never silent; it was attributed to the wrong layer, which is its own kind of wrong (#167).
+
 Shields are fitted as stats rather than as items on purpose. `Item` is still an identifier and
 nothing maps one to the numbers it is worth, so fitting by stats is what lets the shields work
 without inventing the item model early; when that arrives, reading a shield item's stats is what
