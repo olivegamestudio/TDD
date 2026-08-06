@@ -9,6 +9,37 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Loot reaches the player without a button.** `Loot` holds what has been dropped into the world
+  and not yet picked up. `Drop(item, position)` leaves an item where it fell; `Update(from, to,
+  elapsedSeconds, into)` draws in whatever the frame came near, moves what is already coming, and
+  collects what arrives. Coming near a drop is the whole of collecting it, which is what keeps the
+  mechanic identical on a device with no buttons to spare — nothing here takes an input.
+
+  Reach is measured against the **journey** a frame covered rather than the point it ended at, the
+  same measure `QuestProximityWatcher` is held to and for the same reason: sampling one point a
+  frame would make a pickup a property of the frame rate, and the faster the player flew the more
+  of their loot they would leave behind. `Loot` keeps no memory of where the player was, so a
+  resumed save cannot sweep up every drop lying between where the player was put down and wherever
+  they had been.
+
+  `LootMagnet` is the mechanic's stats type — `Reach` and `DriftSpeed`, both refused at authoring
+  unless positive and finite, because a reach of zero asks for a pickup the player has no button to
+  perform and a drift speed of zero draws a drop in and then never delivers it.
+
+  `DropGuaranteed(item, into)` is the drop that cannot be missed: collected the instant it falls,
+  wherever the player is, never lying in the world at all. It is a separate method rather than a
+  flag because it shares no step with the ordinary path, and it is what the game will use where a
+  missed drop would soft-lock a quest.
+
+  Two things the model had to answer to work at all, neither of them decided in design capture: a
+  drop that has been drawn in **stays** drawn in, so flying back out of reach does not strand loot
+  the player has no button to claim; and a drop that would overshoot the player arrives instead.
+  Both are open to being overruled. Three things this deliberately does not do: nothing drops loot,
+  because nothing in the world can be destroyed yet (#137); no `LootMagnet` is authored, because
+  its numbers are content's and no content drops anything; and nothing draws a drop, which is
+  screen work of its own.
+  ([#138](https://github.com/olivegamestudio/TDD/issues/138))
+
 - **A ship carries two orbs, and they fly themselves.** `OrbStats` is the orb's stats type, authored
   as one of the two things an orb does — `Orbiting(radius, angularSpeed)` circles the ship and never
   leaves it, `Tracking(radius)` holds station until it has something to go after. An orb does one or

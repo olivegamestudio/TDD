@@ -568,6 +568,16 @@ Character**.
   Feeds inventory, crafting, and the economy.
 - **[DECIDED] Quest items auto-collect** the moment you **destroy** the quest object — instant and
   guaranteed (not proximity-drift), so a required drop can never be missed / soft-lock a quest.
+  *(Both built in #138 as `LootMagnet` / `LootDrop` / `Loot`. Reach is measured across the journey a
+  frame covered rather than the point it ended at, so the magnet is not something a fast ship
+  outruns — pillar 1, the same measure quest proximity already gets. The guaranteed drop is a
+  separate method rather than a flag, because it shares no step with the ordinary path: nothing to
+  reach, nothing to drift, no frame at which it has not arrived. Two things the model had to answer
+  to work at all, neither of them decided here: a drop that has been drawn in **stays** drawn in, so
+  flying back out of reach cannot strand loot the player has no button to claim; and a drop that
+  would overshoot the player **arrives** instead. Both are open to being overruled. Nothing drops
+  loot yet — there is nothing in the world to destroy (#137) — and no magnet is authored, because
+  its two numbers are content's.)*
 - **[OPEN]** How the **player's** homing weapons / lock pick their target (nearest / in-arc / cycled);
   other shield types & reflect detail; enemy roster & drop tables (content/tuning).
 
