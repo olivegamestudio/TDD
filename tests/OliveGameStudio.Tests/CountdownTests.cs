@@ -67,6 +67,47 @@ public sealed class CountdownTests
     }
 
     [Fact]
+    public void Tick_RejectsANegativeTime()
+    {
+        // Ticking backwards is not slowing a countdown down, it is un-elapsing one: the same
+        // mistake Meter.Reduce refuses, where a calculation that came out backwards heals the
+        // thing it was aimed at instead of hurting it.
+        Countdown countdown = new(TimeSpan.FromSeconds(2));
+
+        ArgumentOutOfRangeException exception =
+            Assert.Throws<ArgumentOutOfRangeException>(() => countdown.Tick(TimeSpan.FromSeconds(-1)));
+
+        Assert.Equal("time", exception.ParamName);
+    }
+
+    [Fact]
+    public void Tick_LeavesAnElapsedCountdownElapsed()
+    {
+        // The point of refusing the negative tick: IsElapsed goes one way, and only Reset comes
+        // back. A countdown that quietly rearms itself is a screen that plays twice.
+        Countdown countdown = new(TimeSpan.FromSeconds(2));
+        countdown.Tick(TimeSpan.FromSeconds(2));
+        Assert.True(countdown.IsElapsed);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => countdown.Tick(TimeSpan.FromSeconds(-1)));
+
+        Assert.True(countdown.IsElapsed);
+    }
+
+    [Fact]
+    public void Tick_AllowsAZeroTime()
+    {
+        // A frame that took no measurable time is a real frame, not a caller mistake — refusing it
+        // would make the game loop check the clock before it was allowed to report it.
+        Countdown countdown = new(TimeSpan.FromSeconds(2));
+
+        countdown.Tick(TimeSpan.Zero);
+
+        Assert.False(countdown.IsElapsed);
+        Assert.Equal(TimeSpan.FromSeconds(2), countdown.Remaining);
+    }
+
+    [Fact]
     public void Constructor_AllowsAZeroDuration()
     {
         // Zero is not the same mistake: a countdown given no time to run is finished the moment it

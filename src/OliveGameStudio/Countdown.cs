@@ -80,6 +80,22 @@ public sealed class Countdown
     /// <summary>
     /// Decrements the remaining time of the countdown by the specified time interval.
     /// </summary>
-    /// <param name="time">The amount of time to decrease from the countdown.</param>
-    public void Tick(TimeSpan time) => _remainingTime -= time;
+    /// <param name="time">
+    /// How much time has passed. Zero is allowed and does nothing — a frame that took no
+    /// measurable time is a real frame, and refusing it would make the game loop check the clock
+    /// before it was allowed to report it.
+    /// </param>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// The time is negative. Ticking backwards is not slowing a countdown down, it is un-elapsing
+    /// one: <see cref="IsElapsed"/> is meant to go one way and only <see cref="Reset"/> is meant to
+    /// bring it back, so a negative tick would rearm a countdown behind the back of the screen
+    /// that owns it. The same mistake <c>Meter.Reduce</c> refuses, and refused for the same reason
+    /// — a duration that came out backwards should be read as an error, not as time returned.
+    /// </exception>
+    public void Tick(TimeSpan time)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(time, TimeSpan.Zero);
+
+        _remainingTime -= time;
+    }
 }
