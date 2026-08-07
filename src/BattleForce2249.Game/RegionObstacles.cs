@@ -32,10 +32,14 @@ public static class RegionObstacles
     /// <remarks>
     /// Each entry is <c>(pixelWidth + pixelHeight) / (4 × AuthoredPixelsPerUnit)</c>: half the
     /// average of the texture's own width and height, converted from authored pixels to world
-    /// units. The pixel sizes are measured directly from the shipped PNGs —
-    /// <c>rock1.png</c> 985×562, <c>rock2.png</c> 977×586, <c>rock3.png</c> 974×657,
-    /// <c>asteroid1.png</c> 512×512 — not chosen by eye, though the *shape* this reduces them to
-    /// still is: see the remarks on the type for why a circle.
+    /// units. The pixel sizes are the texture's actual opaque art, not its canvas — measured from
+    /// the shipped PNGs' own alpha channel rather than chosen by eye. <c>rock1.png</c>,
+    /// <c>rock2.png</c> and <c>rock3.png</c> have no transparent margin at all, so their canvas
+    /// size and their visible size are the same number: 985×562, 977×586, 974×657.
+    /// <c>asteroid1.png</c> does — a 512×512 canvas with the asteroid itself occupying 69..442 by
+    /// 36..476 of it, 373×440 — and using the full canvas there before this was measured had every
+    /// solid asteroid colliding several units out from where it is actually drawn. The *shape*
+    /// every entry is reduced to is still a circle regardless: see the remarks on the type for why.
     /// </remarks>
     static readonly IReadOnlyDictionary<string, double> RadiusPerUnitOfScale =
         new Dictionary<string, double>(StringComparer.Ordinal)
@@ -43,7 +47,7 @@ public static class RegionObstacles
             ["rock1"] = RadiusPerUnitScale(pixelWidth: 985, pixelHeight: 562),
             ["rock2"] = RadiusPerUnitScale(pixelWidth: 977, pixelHeight: 586),
             ["rock3"] = RadiusPerUnitScale(pixelWidth: 974, pixelHeight: 657),
-            ["asteroid1"] = RadiusPerUnitScale(pixelWidth: 512, pixelHeight: 512),
+            ["asteroid1"] = RadiusPerUnitScale(pixelWidth: 373, pixelHeight: 440),
         };
 
     static double RadiusPerUnitScale(double pixelWidth, double pixelHeight) =>

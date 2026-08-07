@@ -65,13 +65,17 @@ public static class DisgracedShip
     /// Nothing is fitted. The Disgraced starts with eight empty slots, which is what the design
     /// asks for — "critically low on everything" is a ship with the slots and nothing in them.
     ///
-    /// <b>The hull radius is reasoned, not measured, and is not tuned either.</b> <see cref="ShipView.LengthInWorldUnits"/>
-    /// says the ship is 30 units nose to engines, but that is the sprite's authored length, not its
-    /// width — a square texture with a narrower silhouette drawn inside it, and nothing here reads
-    /// pixels to find where the hull actually ends. Eight is a fraction of the length that reads as
-    /// "narrower than it is long" without anything to check it against; the debris field is the
-    /// first thing this hull collides with, and it is a number a human flying through one should
-    /// settle rather than this comment.
+    /// <b>The hull radius is measured against the ship's own art, not reasoned by eye.</b> An
+    /// earlier guess of 8 read as "narrower than the ship is long" with nothing to check it
+    /// against, and was well under half the ship's real size — a ship that visibly overlapped a
+    /// rock for several units before the hull it was flying on noticed. <c>ship1.png</c> is a
+    /// 1024×1024 canvas, but the ship's own art — everything with any opacity — only fills
+    /// 68..953 by 94..926 of it, 885×832 pixels. At <see cref="ShipView.LengthInWorldUnits"/>
+    /// (30, mapped to the canvas' full height), that art is about 25.9 by 24.4 world units, and
+    /// <see cref="HullRadius"/> is half the shorter of the two — a circle sized to fit inside the
+    /// silhouette on its narrower axis rather than reach past either edge on its wider one. Still
+    /// worth a play session before it is treated as settled; a circle is an approximation of a
+    /// ship shaped nothing like one, and this only fixes how far wrong the approximation was.
     /// </remarks>
     public static ShipProfile Profile { get; } = new(
         Handling,
@@ -79,5 +83,11 @@ public static class DisgracedShip
         Durability: 100,
         CargoSlots: 16,
         Loadout: [],
-        HullRadius: 8);
+        HullRadius: HullRadius);
+
+    /// <summary>
+    /// Half the shorter axis of the ship's actual visible art, in world units — see the remarks
+    /// on <see cref="Profile"/> for how the numbers behind this were measured.
+    /// </summary>
+    const double HullRadius = ShipView.LengthInWorldUnits * 832 / 1024 / 2;
 }

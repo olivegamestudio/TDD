@@ -37,6 +37,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   ship now check the ship travelled a stretch of open water short of the field's first obstruction.
   Whether the field itself should be thinned out for a clearer route is tracked separately as a
   content decision.
+
+  **The hull and one obstacle sprite's radius are measured against the art now, not reasoned by
+  eye.** A play session against the real game — the point of collecting this before treating it as
+  settled — found the ship visibly overlapping rocks well before anything registered a hit.
+  `ship1.png`'s art turned out to fill most of its canvas rather than a fraction of it, so the
+  ship's true visible size was roughly three times the guessed hull radius; `DisgracedShip
+  .HullRadius` is now half the shorter axis of the sprite's own alpha-channel bounding box, not a
+  number chosen for reading well in a comment. `asteroid1.png` had the opposite problem — real
+  transparent padding a full-canvas guess did not account for — and `RegionObstacles` now measures
+  that one too. The rocks needed nothing: their canvases turned out to have no padding at all.
   ([#184](https://github.com/olivegamestudio/TDD/issues/184))
 
 - **The game screen is framed, and the sky behind it has come down.** The backdrop was authored as
