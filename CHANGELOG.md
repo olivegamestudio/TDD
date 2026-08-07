@@ -308,6 +308,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Thrust and drag are Aether.Physics2D, not a closed-form formula.** `ShipMovement` builds a
+  one-body, gravity-free Aether `World` and applies thrust as a force against the body's linear
+  damping every physics step, in place of the exact exponential integration the model used before.
+  Frame independence — a ship covers the same ground at any frame rate — is now held by a
+  fixed-step accumulator (1000 Hz) rather than by the integration being exact: Aether's damping is
+  a per-step approximation of the same decay, so it converges towards the old model's terminal
+  speed rather than landing on it exactly. Turning is untouched — the helm was never modelled with
+  inertia, only a rate the pilot commands, so `Heading` is still the same hand-rolled kinematic
+  update. `ShipMovement`'s public surface (`Heading`, `Velocity`, `Update`, `Reset`) did not change,
+  so `Ship`, `GameScreen` and `QuestProximityWatcher` needed nothing. Collision detection is a
+  natural follow-on now the ship is a rigid body, and is not part of this change.
+  ([#181](https://github.com/olivegamestudio/TDD/issues/181))
+
 - **The desktop devices are pushed rather than pulled, and no longer arbitrate.** The `IShipInput`
   implementations the MonoGame host bound in [#9](https://github.com/olivegamestudio/TDD/issues/9)
   — `KeyboardShipInput` and `GamePadShipInput` — are now `DesktopKeyboard` and `DesktopGamePad`,

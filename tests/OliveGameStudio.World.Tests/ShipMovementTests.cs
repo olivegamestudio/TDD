@@ -94,9 +94,17 @@ public sealed class ShipMovementTests
     [Fact]
     public void SustainedThrust_SettlesAtTheShipsMaximumSpeed()
     {
+        // Aether's damping is a per-step approximation of the exact decay the ship used to
+        // integrate in closed form, not the exact answer — it converges towards
+        // Handling.MaximumSpeed as the physics step shrinks, but a real step rate leaves a small,
+        // permanent gap rather than the exact figure a formula would land on. Close is the
+        // guarantee now; exact was only ever a property of the model this replaces.
         Fly(thrust: 1, turn: 0, seconds: 30, frames: 1500);
 
-        Assert.Equal(Handling.MaximumSpeed, _ship.Velocity.Speed, 6);
+        Assert.True(_ship.Velocity.Speed <= Handling.MaximumSpeed + 1e-6,
+            $"the ship exceeded its maximum of {Handling.MaximumSpeed}, reaching {_ship.Velocity.Speed}");
+        Assert.True(_ship.Velocity.Speed >= Handling.MaximumSpeed * 0.99,
+            $"the ship settled at {_ship.Velocity.Speed}, too far under its maximum of {Handling.MaximumSpeed}");
     }
 
     [Fact]
@@ -211,6 +219,14 @@ public sealed class ShipMovementTests
         // the definition of done: a second of flight is a second of flight, however it is sliced.
         // The frame rates below all divide a second into whole ticks, so what is being compared is
         // the physics and not TimeSpan's rounding.
+        //
+        // The fixed-step accumulator gives every slicing the same number of Aether steps over one
+        // second of game time, so the result is not merely close, it is the same computation run —
+        // but the ship's own position is zeroed and re-read every Update call (see ShipMovement's
+        // remarks on why), so a frame rate that calls Update more often also rounds that many more
+        // times through Aether's float32 position before Player's double accumulates it. 3 decimal
+        // places is comfortably past what a pilot could ever feel and still catches a model that
+        // has stopped being frame-rate independent at all.
         Position OneSecondOfThrust(int frames)
         {
             Player player = new();
@@ -227,9 +243,9 @@ public sealed class ShipMovementTests
 
         Position whole = OneSecondOfThrust(1);
 
-        Assert.Equal(whole.Y, OneSecondOfThrust(40).Y, 6);
-        Assert.Equal(whole.Y, OneSecondOfThrust(80).Y, 6);
-        Assert.Equal(whole.Y, OneSecondOfThrust(160).Y, 6);
+        Assert.Equal(whole.Y, OneSecondOfThrust(40).Y, 3);
+        Assert.Equal(whole.Y, OneSecondOfThrust(80).Y, 3);
+        Assert.Equal(whole.Y, OneSecondOfThrust(160).Y, 3);
     }
 
     [Fact]
