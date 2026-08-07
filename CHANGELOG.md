@@ -277,6 +277,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A countdown can no longer be ticked backwards, which silently un-elapsed a finished timer.**
+  `Countdown.Tick` took its interval on trust, so a negative `TimeSpan` added time back rather than
+  taking it away. That is not a slow countdown, it is a rearmed one: `IsElapsed` is meant to go one
+  way and only `Reset` is meant to bring it back, and a negative tick undid that transition behind
+  the back of the screen that owns it — a logo that had finished playing starting over.
+
+  `Tick` now throws `ArgumentOutOfRangeException` on a negative interval, the same refusal
+  `Meter.Reduce` makes and for the same reason: a duration that came out backwards is an error, not
+  time returned. Zero is still allowed, because a frame that took no measurable time is a real frame
+  and refusing it would make the game loop check the clock before it was allowed to report it. The
+  only consumer, `CompanyScreen.Update`, is unaffected — its interval is the frame time from the
+  game loop, which never runs backwards. This finishes the guard the constructor started: the
+  countdown's duration and its ticks are now both held to the same rule.
+  ([#175](https://github.com/olivegamestudio/TDD/issues/175))
+
 - **A countdown can no longer be built with a negative duration, which produced a timer that could
   never be rearmed.** `Countdown` was the last numeric type in the engine to take its input on
   trust — `Meter`, `QuestTrigger`, `LootMagnet`, `ShieldStats` and the rest all refuse values that
