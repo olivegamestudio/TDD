@@ -21,7 +21,8 @@ public sealed class CharacterPickupTests
                 Health: 100,
                 Durability: 100,
                 CargoSlots: cargoSlots,
-                Loadout: []),
+                Loadout: [],
+                HullRadius: 1),
             "test-location",
             []);
 

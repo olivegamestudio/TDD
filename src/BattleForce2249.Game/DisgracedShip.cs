@@ -64,11 +64,20 @@ public static class DisgracedShip
     ///
     /// Nothing is fitted. The Disgraced starts with eight empty slots, which is what the design
     /// asks for — "critically low on everything" is a ship with the slots and nothing in them.
+    ///
+    /// <b>The hull radius is reasoned, not measured, and is not tuned either.</b> <see cref="ShipView.LengthInWorldUnits"/>
+    /// says the ship is 30 units nose to engines, but that is the sprite's authored length, not its
+    /// width — a square texture with a narrower silhouette drawn inside it, and nothing here reads
+    /// pixels to find where the hull actually ends. Eight is a fraction of the length that reads as
+    /// "narrower than it is long" without anything to check it against; the debris field is the
+    /// first thing this hull collides with, and it is a number a human flying through one should
+    /// settle rather than this comment.
     /// </remarks>
     public static ShipProfile Profile { get; } = new(
         Handling,
         Health: 100,
         Durability: 100,
         CargoSlots: 16,
-        Loadout: []);
+        Loadout: [],
+        HullRadius: 8);
 }

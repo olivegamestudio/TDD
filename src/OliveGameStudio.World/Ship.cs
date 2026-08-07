@@ -65,7 +65,7 @@ public sealed class Ship
         // collected, and nothing has been collected yet
         Orbs = Orbs.None;
 
-        Movement = new ShipMovement(profile.Handling);
+        Movement = new ShipMovement(profile.Handling, profile.HullRadius);
     }
 
     /// <summary>

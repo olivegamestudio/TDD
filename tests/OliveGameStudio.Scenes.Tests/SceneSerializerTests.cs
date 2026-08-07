@@ -12,7 +12,7 @@ public sealed class SceneSerializerTests
     static SceneDefinition Sample() => new(
         "debris-field",
         [
-            new SceneBody("rock1", "rock1", 1.5, -2.5, 30, 1, 1, "Environment", 0),
+            new SceneBody("rock1", "rock1", 1.5, -2.5, 30, 1, 1, "Environment", 0, Solid: true),
             new SceneBody("glow", "glow", 0, 0, 0, 3, 4, "Default", 1),
         ],
         [
@@ -50,6 +50,37 @@ public sealed class SceneSerializerTests
 
         Assert.Equal("quest-1", read.Markers[0].Reference);
         Assert.Equal("QuestStart", read.Markers[0].Kind);
+    }
+
+    [Fact]
+    public void TheSolidFlag_SurvivesTheRoundTrip()
+    {
+        SceneDefinition read = SceneSerializer.Deserialize(SceneSerializer.Serialize(Sample()));
+
+        Assert.True(read.Bodies[0].Solid);
+        Assert.False(read.Bodies[1].Solid);
+    }
+
+    [Fact]
+    public void ABodyWithNoSolidFlagInTheFile_DefaultsToNotSolid()
+    {
+        // Every region authored before Solid existed has no "solid" key at all — this is what
+        // keeps that content reading as pure scenery rather than refusing to load, or worse,
+        // silently blocking the ship on every body a human never marked collidable.
+        const string json = """
+            {
+              "id": "legacy",
+              "bodies": [
+                { "name": "rock1", "sprite": "rock1", "x": 0, "y": 0, "rotationDegrees": 0,
+                  "scaleX": 1, "scaleY": 1, "layer": "Environment", "order": 0 }
+              ],
+              "markers": []
+            }
+            """;
+
+        SceneDefinition read = SceneSerializer.Deserialize(json);
+
+        Assert.False(read.Bodies[0].Solid);
     }
 
     [Theory]

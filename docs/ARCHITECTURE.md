@@ -131,14 +131,62 @@ engine — the helm was never modelled with inertia, only a rate the pilot comma
 still the hand-rolled kinematic update it always was, and only translation needed a rigid body under
 it. Aether steps at a fixed 1000 Hz behind an accumulator rather than at whatever `Update`'s
 `frameTime` happens to be, which is what makes the result frame-rate independent — a variable-length
-step is exactly what an iterative solver's answer would otherwise depend on. The body's own
-`Position` is zeroed at the start of every `Update` and only ever holds that one frame's travel:
-Aether positions are `float`, and a ship flying an unbounded world would eventually outrun single
-precision, so `Player.Position` stays the `double` record of where the ship actually is and the body
-exists only to say how far it just moved. A consequence worth naming: Aether's damping is a per-step
-approximation of the exact decay the old closed-form model integrated, so it converges towards the
-same terminal speed rather than landing on it exactly — close is what the physics engine guarantees,
-where exact was only ever a property of the model it replaced.
+step is exactly what an iterative solver's answer would otherwise depend on. A consequence worth
+naming: Aether's damping is a per-step approximation of the exact decay the old closed-form model
+integrated, so it converges towards the same terminal speed rather than landing on it exactly — close
+is what the physics engine guarantees, where exact was only ever a property of the model it replaced.
+
+**The ship carries a hull fixture, so it has something to collide with.** `AddObstacle` puts a
+static circular obstacle into the ship's own `World` — a rock, a wreck, anything content wants the
+hull to stop against — and the ship's body is given a matching circle at construction, sized from
+`ShipProfile.HullRadius`. `FixedRotation` is set on it, because rotation is still `Heading`'s own
+kinematic update and nothing here wants a collision's own momentum spinning the body Aether tracks
+underneath it; it has to be set *before* `Mass` is asserted, not after, because setting it recomputes
+mass data from the fixture's own area and density and would otherwise discard the override.
+
+**The body's position is synced from `Player.Position` at the start of every flying `Update`, not
+accumulated in the body itself.** Collision needs the ship and whatever it might hit to actually
+occupy the same coordinates, which a body that never held more than one frame's travel could not
+give an obstacle placed at its true position. The narrowing to `float` that costs is the same one
+`Player.Position` already takes at the camera and at the edge of what a save can resume — applied
+one layer earlier rather than a new kind of risk. `Player.Position` itself stays exact: what physics
+hands back is the *delta* the step produced, the body's position before stepping subtracted from its
+position after, and it is that delta which is added to the player's own double-precision record.
+
+**An idle ship — neutral controls, no velocity — is never synced or stepped at all.**
+`Player.Position` is not always moved by flying: a save being resumed, a test walking the player by
+hand. Syncing an idle body to wherever that lands would let Aether discover an overlap with an
+obstacle on a frame nobody asked the ship to fly, and correct it as though it had — which is exactly
+what broke `GameScreenTests.MovingForwardAcrossFrames_CompletesQuest1`, a test that moves the player
+by `Position.MoveBy` and never touches the pilot, once the debris field's rocks became solid enough
+for that hand-walked path to cross one. A ship still coasting from real thrust is not idle and is not
+skipped; only one with neutral controls and no velocity is.
+
+**Scenery becomes an obstacle through one flag and the game's own knowledge of its sprites, not the
+engine's.** `SceneBody.Solid` is `false` by default, so a scene authored before it existed loses
+nothing; `debris-field.json` sets it on the bodies actually meant to block the ship — every `rock1`,
+`rock2` and `rock3`, and the `asteroid1` entries on the `Environment` layer, never the ones painted
+on the `Default` layer as backdrop. `RegionObstacles.Seed` reads a loaded scene's solid bodies and
+calls `ShipMovement.AddObstacle` for each, sizing the circle from the body's authored scale and the
+sprite's own measured pixel dimensions — the same conversion `RegionView` already uses to draw it,
+so a rock authored twice as large collides twice as large. It is deliberately game content
+(`BattleForce2249.Game`), not engine: knowing that `rock1.png` is 985×562 pixels is exactly the kind
+of fact the engine/game split exists to keep out of `OliveGameStudio.*`. `GameScreen` seeds a game's
+obstacles once it has both a ship and a loaded region — the two are not ready on the same frame, a
+ship's `Update` guards on `session.IsReady` and a region loads synchronously in `Enter` — tracked by
+comparing the current `session.Ship` against the one last seeded, so starting a second game seeds a
+second ship's physics rather than trusting a bool.
+
+**The debris field is denser than a straight line can get through, and that is content, not a
+defect.** Once the rocks were solid, `GameScreenTests`' straight-line "flies to the exit marker"
+test no longer could — not because collision is wrong, but because there is no comfortable route
+along the direct line for a hull the size the ship's is, and a check confirmed the field has none at
+all below a hair's width of clearance anywhere nearby either. The test now asserts what is actually
+true — a ship holding one heading gets blocked, and the quest stays open — and the acceptance tests
+that used "completes quest 1" only as a convenient proof that a key or a stick reaches the ship now
+check that the ship travelled a stretch of open water short of the field's first obstruction instead,
+which is what they were actually testing. Whether the field should be thinned out for a clearer route
+is a content call for a human at a screen, not one this change makes on its own.
 
 **How much you can carry is the ship's; what you own is the character's.** `ShipProfile.CargoSlots`
 is the hull's built-in capacity, and `Character.Inventory` is sized from it — a fighter carries less

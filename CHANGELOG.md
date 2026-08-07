@@ -9,6 +9,36 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The ship has a hull, and the debris field has something to hit it with.** `ShipMovement`'s
+  Aether body now carries a circle fixture sized from the new `ShipProfile.HullRadius`, and
+  `AddObstacle(Position, radius)` seeds static circular obstacles into the same physics world —
+  physics only, no damage: rocks are harmless for now, and there will be places later that can hurt
+  the player. `SceneBody.Solid` (new, defaults `false`, so existing regions lose nothing) marks
+  which bodies collide; `debris-field.json` sets it on the actual rock and asteroid bodies, never
+  the backdrop. `RegionObstacles.Seed` (game-side) turns a loaded scene's solid bodies into
+  obstacles sized from each sprite's real measured pixel dimensions, the same conversion
+  `RegionView` already uses to draw them, and `GameScreen` seeds them once a game has both a ready
+  ship and a loaded region.
+
+  The body's position now syncs from `Player.Position` every flying frame rather than always
+  starting at zero, which is what lets the ship and an obstacle placed at its true position actually
+  occupy the same coordinates — except when the ship is idle (neutral controls, no velocity), which
+  skips physics entirely, because a resumed save or a test moving the player by hand landing inside
+  an obstacle must not be corrected as though the ship had flown there.
+
+  **A real finding, not a defect:** once solid, the debris field turned out to have no comfortable
+  straight-line route through it for a hull this size — checked with a grid pathfind, the only route
+  near the direct line from spawn to quest 1's exit marker has almost no clearance either side, and
+  some rocks' authored positions even overlap each other as circles. `GameScreenTests`' old
+  "flies straight to the exit, completes quest 1" test asserted something no longer true of the
+  content once the field is genuinely solid; it now asserts the ship gets blocked instead, which is
+  correct — the debris was always meant to be something the player has to see and avoid. A handful
+  of acceptance tests that used quest-1 completion only as proof that a key or a stick reaches the
+  ship now check the ship travelled a stretch of open water short of the field's first obstruction.
+  Whether the field itself should be thinned out for a clearer route is tracked separately as a
+  content decision.
+  ([#184](https://github.com/olivegamestudio/TDD/issues/184))
+
 - **The game screen is framed, and the sky behind it has come down.** The backdrop was authored as
   a picture in its own right and read as one — bright and flat enough that the ship and the debris
   in front of it had nothing to stand out against. `RegionView.BackdropTint` takes it down, and

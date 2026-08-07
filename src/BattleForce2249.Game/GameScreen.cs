@@ -119,6 +119,12 @@ public sealed class GameScreen(
         camera.PixelsPerUnit = Zoom;
         _cameraSettled = false;
 
+        // A ship built for a game already entered has whatever obstacles that game's region put
+        // in it; a ship this Enter is about to build has none, and needs the field it flies into
+        // seeded again. Cleared here rather than inferred from the ship changing, because the
+        // check that infers it runs every frame and only needs to be right, not cheap to read.
+        _obstacleShip = null;
+
         Started = session.Continue();
         return EnterResult.Stay;
     }
@@ -141,7 +147,20 @@ public sealed class GameScreen(
 
         // read per frame rather than held, because starting or resuming the game replaces the ship;
         // a screen holding the one it was built with would go on flying a ship nobody is in
-        ShipMovement ship = session.Ship.Movement;
+        Ship shipEntity = session.Ship;
+        ShipMovement ship = shipEntity.Movement;
+
+        // The region is loaded synchronously in Enter, but the ship is not ready until session
+        // .Continue finishes — off the frame loop, on its own time — so seeding waits for the
+        // first frame both exist together rather than trying to do it in Enter itself. Compared
+        // by reference against the ship rather than a bool: starting a new game after resuming
+        // one, or the other way round, builds a second ship the first one's obstacles say nothing
+        // about.
+        if (!ReferenceEquals(_obstacleShip, shipEntity))
+        {
+            RegionObstacles.Seed(region.Scene, ship);
+            _obstacleShip = shipEntity;
+        }
 
         // the ship flies first, so the quests are measured against where the player got to this
         // frame rather than where they were at the end of the last one
@@ -190,6 +209,13 @@ public sealed class GameScreen(
     /// swinging round to find it.
     /// </summary>
     bool _cameraSettled;
+
+    /// <summary>
+    /// Which ship <see cref="RegionObstacles"/> has already been seeded into this game, so a ship
+    /// already flying a field of obstacles is not handed a second copy of the same field every
+    /// frame. <c>null</c> means the current ship, once there is one, has not been seeded yet.
+    /// </summary>
+    Ship? _obstacleShip;
 
     /// <summary>
     /// Eases one angle towards another, taking the short way round.

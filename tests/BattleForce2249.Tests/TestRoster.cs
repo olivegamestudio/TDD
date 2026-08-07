@@ -33,7 +33,8 @@ sealed class TestRoster : ICharacterRoster
         Health: 100,
         Durability: 100,
         CargoSlots: 16,
-        Loadout: []);
+        Loadout: [],
+        HullRadius: DisgracedShip.Profile.HullRadius);
 
     /// <inheritdoc />
     public IReadOnlyList<CharacterTemplate> Templates => [Starting];

@@ -5,10 +5,12 @@ namespace OliveGameStudio;
 /// </summary>
 /// <remarks>
 /// <para>
-/// A body has no behaviour and nothing refers to it. It is drawn, and that is all it does — a rock,
-/// a glow, a sheet of torn hull plating. Anything that has to be <em>reacted</em> to is a
-/// <see cref="SceneMarker"/> instead, and keeping the two apart is what lets a scene be drawn
-/// without anything being simulated, and simulated without everything being drawn.
+/// A body has no behaviour of its own. It is drawn, and — for the ones marked
+/// <see cref="Solid"/> — it can be flown into; neither is something this type does, only something
+/// it is read for by whoever draws or seeds physics from a scene. Anything that has to be
+/// <em>reacted</em> to at a distance, rather than collided with, is a <see cref="SceneMarker"/>
+/// instead, and keeping the two apart is what lets a scene be drawn without everything in it being
+/// simulated, and simulated without everything in it being drawn.
 /// </para>
 /// <para>
 /// <see cref="Sprite"/> is an asset key, not text. It is never translated, for the reason every
@@ -45,6 +47,12 @@ namespace OliveGameStudio;
 /// past at the speed the ship is flying, <c>0</c> is fixed to the screen and does not move at all,
 /// and anything between lags by its share.
 /// </param>
+/// <param name="Solid">
+/// Whether the ship can collide with it. False for everything by default, which is what keeps a
+/// body a drawing instruction and nothing more until an author says otherwise — a glow or a sheet
+/// of hull plating is not something a ship stops against, and content that never sets this still
+/// reads as pure scenery.
+/// </param>
 public sealed record SceneBody(
     string Name,
     string Sprite,
@@ -55,4 +63,5 @@ public sealed record SceneBody(
     double ScaleY,
     string Layer,
     int Order,
-    double Parallax = 1);
+    double Parallax = 1,
+    bool Solid = false);

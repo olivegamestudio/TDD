@@ -81,4 +81,25 @@ public sealed class DebrisFieldRegionTests
 
         Assert.Equal(started, completed);
     }
+
+    [Fact]
+    public void TheRocksAndAsteroidsAreSolid_AndNothingElseIs()
+    {
+        // Only what the ship should actually collide with — a rock, or an asteroid scattered in
+        // the field rather than painted on the sky behind it. Glow, hull plating and the
+        // background asteroid picture stay pure scenery.
+        SceneDefinition region = Region();
+
+        foreach (SceneBody body in region.Bodies)
+        {
+            bool expectedSolid = body.Sprite is "rock1" or "rock2" or "rock3"
+                || (body.Sprite == "asteroid1" && body.Layer == "Environment");
+
+            Assert.True(
+                body.Solid == expectedSolid,
+                $"{body.Name} ({body.Sprite}, layer {body.Layer}): expected Solid={expectedSolid}, was {body.Solid}");
+        }
+
+        Assert.Equal(107, region.Bodies.Count(body => body.Solid));
+    }
 }
