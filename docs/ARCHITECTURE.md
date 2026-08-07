@@ -124,6 +124,22 @@ and the owned ship could be given two different sets of numbers, and nothing wou
 removes a reset: entering the game screen used to call `ShipMovement.Reset()` so a resumed game
 began stationary, and now a new game simply builds a new ship, which has never been anywhere.
 
+**`ShipMovement` is a one-body Aether.Physics2D world, not a formula.** Thrust is a force applied
+to the body every physics step and drag is its linear damping; `Ship` and everything downstream of
+`Movement.Velocity`/`Movement.Heading` never sees Aether at all. Turning stays outside the physics
+engine — the helm was never modelled with inertia, only a rate the pilot commands, so `Heading` is
+still the hand-rolled kinematic update it always was, and only translation needed a rigid body under
+it. Aether steps at a fixed 1000 Hz behind an accumulator rather than at whatever `Update`'s
+`frameTime` happens to be, which is what makes the result frame-rate independent — a variable-length
+step is exactly what an iterative solver's answer would otherwise depend on. The body's own
+`Position` is zeroed at the start of every `Update` and only ever holds that one frame's travel:
+Aether positions are `float`, and a ship flying an unbounded world would eventually outrun single
+precision, so `Player.Position` stays the `double` record of where the ship actually is and the body
+exists only to say how far it just moved. A consequence worth naming: Aether's damping is a per-step
+approximation of the exact decay the old closed-form model integrated, so it converges towards the
+same terminal speed rather than landing on it exactly — close is what the physics engine guarantees,
+where exact was only ever a property of the model it replaced.
+
 **How much you can carry is the ship's; what you own is the character's.** `ShipProfile.CargoSlots`
 is the hull's built-in capacity, and `Character.Inventory` is sized from it — a fighter carries less
 than a hauler *because it is a fighter*, so the number is a role stat rather than a rank. The items
