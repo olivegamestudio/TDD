@@ -9,6 +9,30 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The engine can see fingers, and knows what two circles on the screen mean.** `InputFrame` now
+  carries a `TouchFrame`: every finger that is down, each a `TouchPoint` with the platform's
+  identifier and a position in window pixels. The identifier is the part that matters — two
+  coordinates cannot say whether the finger reading 640 this frame is the thumb that read 600 last
+  frame or a second one that landed nearby, and a control that follows a finger cannot be built
+  without knowing. A host that has no touch screen says nothing and reports none, so the desktop
+  host is not made to name a device it does not have.
+
+  `TouchOverlay` is the mobile control scheme: a stick on the left that flies the ship, a button on
+  the right that fires, both drawn over the same HUD rather than as a second mobile screen. It
+  answers a `ShipControls` the physics cannot tell apart from a stick's. **The helm captures its
+  finger and the fire button does not** — a virtual stick has no physical stop, so a player pushing
+  for full ahead slides off the circle without feeling it, and a helm that let go there would cut
+  the engine at the exact moment they asked for all of it. It follows the finger that took it until
+  it lifts, and a second finger landing on the circle cannot snatch it mid-turn. Firing is a button
+  and a finger sliding off one has stopped pressing it. There is no dead zone and none is wanted: a
+  finger is where it is put, and when lifted is not there at all.
+
+  Not yet wired, and said plainly rather than implied: **nothing routes touch** — a tap cannot lock
+  the device because the UI navigates by focus and holds no positions to hit-test against, which is
+  a design call rather than a gap; **nothing draws the circles**, which need sprite assets; and
+  **nothing consumes the firing half**, because the engine has no weapons. It is reported rather
+  than dropped, so the right-hand circle reads as a control whose other end is unbuilt.
+
 - **A hold has a size, and items stack in it.** `Inventory` is now a bounded set of slots rather
   than an unbounded list. `ItemStats` — the stats type this brings in, alongside `ShipHandling`,
   `ShieldStats` and `OrbStats` — says how high an item stacks and which slot it fits; items of a
