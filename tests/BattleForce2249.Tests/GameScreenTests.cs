@@ -72,7 +72,8 @@ public sealed class GameScreenTests : HostTestBase
         IShipView view,
         IGameSession? session = null,
         IShipInput? pilot = null,
-        RegionView? region = null) =>
+        RegionView? region = null,
+        CollisionDebugView? collisionDebug = null) =>
         new(session ?? new StubGameSession(),
             pilot ?? new NeutralShipInput(),
             new QuestProximityWatcher(new BattleForceWorld()),
@@ -81,7 +82,11 @@ public sealed class GameScreenTests : HostTestBase
             new StarField(camera),
             region ?? new RegionView(camera),
             new RegionLoader(Path.Combine(AppContext.BaseDirectory, RegionLoader.FolderName)),
-            new Vignette());
+            new Vignette(),
+            // Disabled unless a test is specifically about it: these tests assert on draw order
+            // and draw count, and a developer overlay defaulting to drawn would be extra sprites
+            // neither was written expecting.
+            collisionDebug ?? new CollisionDebugView(camera) { Enabled = false });
 
     [Fact]
     public void Render_DrawsTheShip()

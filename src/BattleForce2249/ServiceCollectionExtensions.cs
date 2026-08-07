@@ -85,6 +85,10 @@ public static class BattleForceServiceCollectionExtensions
             // Likewise registered as itself: it reads the viewport and nothing else, and nothing
             // outside the drawing has anything to say to it.
             .AddSingleton<Vignette>()
+
+            // A developer aid, not a shipped feature — see CollisionDebugView's own remarks.
+            .AddSingleton<CollisionDebugView>()
+
             .AddSingleton<IHost, BattleForceHost>();
 
         return services;

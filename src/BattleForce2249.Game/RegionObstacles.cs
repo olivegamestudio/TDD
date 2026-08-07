@@ -54,6 +54,35 @@ public static class RegionObstacles
         (pixelWidth + pixelHeight) / (4 * RegionView.AuthoredPixelsPerUnit);
 
     /// <summary>
+    /// Works out the collision radius a solid body would be seeded at, without seeding it.
+    /// </summary>
+    /// <param name="body">The body to measure.</param>
+    /// <returns>The radius, in world units.</returns>
+    /// <exception cref="InvalidOperationException">
+    /// The body's sprite has no known collision size — see <see cref="Seed"/> for why that refuses
+    /// rather than answering with a guess.
+    /// </exception>
+    /// <remarks>
+    /// <see cref="Seed"/> and anything drawing a collision shape to check one against the eye —
+    /// <c>CollisionDebugView</c>, today — read the same number through this rather than each
+    /// keeping their own copy of how a scale and a sprite become a size.
+    /// </remarks>
+    public static double RadiusOf(SceneBody body)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+
+        if (!RadiusPerUnitOfScale.TryGetValue(body.Sprite, out double perUnit))
+        {
+            throw new InvalidOperationException(
+                $"'{body.Name}' ({body.Sprite}) is marked solid but has no known collision size.");
+        }
+
+        double authoredScale = (body.ScaleX + body.ScaleY) / 2;
+
+        return authoredScale * perUnit;
+    }
+
+    /// <summary>
     /// Adds every solid body in the scene to the ship's physics as a static obstacle.
     /// </summary>
     /// <param name="scene">The region already loaded.</param>
@@ -62,10 +91,10 @@ public static class RegionObstacles
     /// <paramref name="scene"/> or <paramref name="ship"/> is <c>null</c>.
     /// </exception>
     /// <exception cref="InvalidOperationException">
-    /// A body is marked <see cref="SceneBody.Solid"/> for a sprite <see cref="RadiusPerUnitOfScale"/>
-    /// has no entry for. A rock nobody measured the size of would otherwise ship as scenery the
-    /// ship silently flies straight through — the opposite of what marking it solid asked for, and
-    /// a mistake worth failing loudly on rather than discovering by flying into it.
+    /// A body is marked <see cref="SceneBody.Solid"/> for a sprite with no known collision size. A
+    /// rock nobody measured the size of would otherwise ship as scenery the ship silently flies
+    /// straight through — the opposite of what marking it solid asked for, and a mistake worth
+    /// failing loudly on rather than discovering by flying into it.
     /// </exception>
     public static void Seed(SceneDefinition scene, ShipMovement ship)
     {
@@ -79,15 +108,7 @@ public static class RegionObstacles
                 continue;
             }
 
-            if (!RadiusPerUnitOfScale.TryGetValue(body.Sprite, out double perUnit))
-            {
-                throw new InvalidOperationException(
-                    $"'{body.Name}' ({body.Sprite}) is marked solid but has no known collision size.");
-            }
-
-            double authoredScale = (body.ScaleX + body.ScaleY) / 2;
-
-            ship.AddObstacle(new Position(body.X, body.Y), authoredScale * perUnit);
+            ship.AddObstacle(new Position(body.X, body.Y), RadiusOf(body));
         }
     }
 }

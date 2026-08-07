@@ -18,6 +18,7 @@ namespace BattleForce2249;
 /// <param name="region">The scenery of the place being flown through.</param>
 /// <param name="regions">Where an authored region is read from.</param>
 /// <param name="frame">The overlay the play area is framed with.</param>
+/// <param name="collisionDebug">The developer overlay that draws collision shapes over everything.</param>
 public sealed class GameScreen(
     IGameSession session,
     IShipInput pilot,
@@ -27,7 +28,8 @@ public sealed class GameScreen(
     StarField stars,
     RegionView region,
     RegionLoader regions,
-    Vignette frame)
+    Vignette frame,
+    CollisionDebugView collisionDebug)
     : IGameScreen, IActivatable, IRenderable
 {
     /// <summary>
@@ -278,10 +280,18 @@ public sealed class GameScreen(
 
         view.Render(renderer);
 
-        // Last of all, so the frame is over the game rather than in it: the ship and the debris
-        // pass beneath the dark corners instead of behind them. It draws and nothing else, so
-        // nothing under it loses a press to it.
+        // So the frame is over the game rather than in it: the ship and the debris pass beneath
+        // the dark corners instead of behind them. It draws and nothing else, so nothing under it
+        // loses a press to it.
         frame.Render(renderer);
+
+        // Last of all and over the frame too, deliberately: a collision worth checking near the
+        // edge of the screen is not one that should be dimmed to find. See CollisionDebugView's
+        // own remarks for why this exists and when it should stop defaulting to drawn.
+        collisionDebug.ShipPosition = view.Pose.Position;
+        collisionDebug.HullRadius = session.Ship.Profile.HullRadius;
+        collisionDebug.Bodies = region.Scene.Bodies;
+        collisionDebug.Render(renderer);
     }
 
     /// <summary>

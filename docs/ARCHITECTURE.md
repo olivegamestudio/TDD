@@ -188,6 +188,28 @@ check that the ship travelled a stretch of open water short of the field's first
 which is what they were actually testing. Whether the field should be thinned out for a clearer route
 is a content call for a human at a screen, not one this change makes on its own.
 
+**Collision sizes are measured against the shipped art, not reasoned by eye — a first pass got this
+wrong.** `ship1.png`'s own opaque pixels turned out to fill most of its 1024×1024 canvas rather than
+a fraction of it, so an initial, reasoned `HullRadius` of 8 was under half the ship's actual visible
+size — a ship a player could watch overlap a rock for several units before the physics agreed
+anything had happened. `DisgracedShip.HullRadius` is now half the shorter axis of the sprite's own
+alpha-channel bounding box; `RegionObstacles`'s `asteroid1` entry got the same correction the other
+way, for real transparent padding a full-canvas guess did not know was there. `rock1`/`rock2`/`rock3`
+needed nothing — their canvases have no padding to have gotten wrong.
+
+**`CollisionDebugView` draws what the physics actually collides at, because nothing else on screen
+does.** A ring around the ship's hull and one around every solid body, at the exact radius
+`RegionObstacles.RadiusOf` and `ShipProfile.HullRadius` feed the physics — read from there rather
+than kept as a second copy, so what is drawn cannot quietly disagree with what collides. It is a
+developer aid rather than a shipped feature: `Enabled` defaults to `true` while the gap between "the
+physics is right" and "the physics looks right" is still being closed, and `GameScreenTests`'
+`ScreenFor` constructs its own instance with it off, because those tests assert on draw order and
+count and were not written expecting an overlay. There is no primitive-shape drawing anywhere in
+this renderer, so a ring is faked the standard `SpriteBatch` way — short straight segments, each a
+single opaque pixel (`pixel.png`, added for exactly this) stretched to a segment's length and
+rotated to its angle. Drawn last, after even the vignette: a collision worth checking near the edge
+of the screen is not one that should be dimmed to find.
+
 **How much you can carry is the ship's; what you own is the character's.** `ShipProfile.CargoSlots`
 is the hull's built-in capacity, and `Character.Inventory` is sized from it — a fighter carries less
 than a hauler *because it is a fighter*, so the number is a role stat rather than a rank. The items

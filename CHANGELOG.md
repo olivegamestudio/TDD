@@ -47,6 +47,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   number chosen for reading well in a comment. `asteroid1.png` had the opposite problem — real
   transparent padding a full-canvas guess did not account for — and `RegionObstacles` now measures
   that one too. The rocks needed nothing: their canvases turned out to have no padding at all.
+
+  **`CollisionDebugView` draws a ring around the hull and around every solid body, at the exact
+  radius the physics actually collides at** — reading `RegionObstacles.RadiusOf` and
+  `ShipProfile.HullRadius` rather than keeping a second copy that could quietly disagree with what
+  is seeded. A developer aid, not a shipped feature: `Enabled` defaults to `true` while the gap
+  between "the physics is right" and "the physics looks right" is still being closed, and drawn
+  last, after even the vignette, so a collision worth checking near the screen's edge is not dimmed
+  to find. There is no primitive-shape drawing anywhere in this renderer, so a ring is faked the
+  standard way — short segments of `pixel.png`, one new opaque pixel asset, stretched and rotated.
   ([#184](https://github.com/olivegamestudio/TDD/issues/184))
 
 - **The game screen is framed, and the sky behind it has come down.** The backdrop was authored as
