@@ -9,7 +9,7 @@ public sealed class ShipTests
     static readonly ShipHandling Handling = new(Acceleration: 100, Drag: 0.5, TurnRate: 2);
 
     static ShipProfile ProfileWith(IReadOnlyList<Item>? loadout = null) =>
-        new(Handling, Health: 80, Durability: 40, loadout ?? []);
+        new(Handling, Health: 80, Durability: 40, CargoSlots: 16, loadout ?? []);
 
     [Fact]
     public void AShip_FliesOnTheHandlingItsProfileAuthored()
@@ -128,11 +128,50 @@ public sealed class ShipTests
     [Fact]
     public void AShip_IsFittedWithWhatItsProfileCameWith()
     {
-        Item cell = new("power-cell");
+        Item cannon = new("weapon.cannon", new ItemStats(EquipSlot.Weapon, StackLimit: 1));
 
-        Ship ship = new(ProfileWith([cell]));
+        Ship ship = new(ProfileWith([cannon]));
 
-        Assert.Equal([cell], ship.Loadout.Items);
+        Assert.Equal([cannon], ship.Loadout.Weapons);
+    }
+
+    [Fact]
+    public void ANewHull_ComesOutOfTheYardWithEverySlotEmpty()
+    {
+        Ship ship = new(ProfileWith());
+
+        Assert.Equal(0, ship.Loadout.Count);
+        Assert.Equal(4, ship.Loadout.FreeIn(EquipSlot.Weapon));
+        Assert.Equal(2, ship.Loadout.FreeIn(EquipSlot.Shield));
+        Assert.Equal(2, ship.Loadout.FreeIn(EquipSlot.Additional));
+    }
+
+    [Fact]
+    public void AHullFittedWithMoreThanItsSlotsHold_IsRejectedWhereItIsBuilt()
+    {
+        // fitting what fits and dropping the rest would give the player a ship quietly short of what
+        // it was written to be, and there is nowhere to put the overflow before the character exists
+        Item deflector = new("shield.deflector", new ItemStats(EquipSlot.Shield, StackLimit: 1));
+
+        Assert.Throws<ArgumentException>(
+            () => new Ship(ProfileWith([deflector, deflector, deflector])));
+    }
+
+    [Fact]
+    public void AHullFittedWithSomethingThatFitsNoSlot_IsRejectedWhereItIsBuilt()
+    {
+        Item ore = new("ore.iron", new ItemStats(EquipSlot.None, StackLimit: 20));
+
+        Assert.Throws<ArgumentException>(() => new Ship(ProfileWith([ore])));
+    }
+
+    [Fact]
+    public void AHullWithAHoldOfNegativeSize_IsRejectedWhereItIsAuthored()
+    {
+        // every question asked of it — "is there room?", "how much is left?" — would come back a
+        // nonsense the player is shown
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new ShipProfile(Handling, Health: 80, Durability: 40, CargoSlots: -1, Loadout: []));
     }
 
     [Fact]
@@ -166,6 +205,7 @@ public sealed class ShipTests
             new ShipHandling(Acceleration: 0, Drag: 0.5, TurnRate: 2),
             Health: 80,
             Durability: 40,
+            CargoSlots: 16,
             Loadout: []);
 
         Assert.Throws<ArgumentOutOfRangeException>(() => new Ship(unflyable));
@@ -178,6 +218,7 @@ public sealed class ShipTests
             Handling,
             Health: double.PositiveInfinity,
             Durability: 40,
+            CargoSlots: 16,
             Loadout: []);
 
         Assert.Throws<ArgumentOutOfRangeException>(() => new Ship(indestructible));

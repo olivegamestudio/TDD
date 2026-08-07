@@ -10,7 +10,7 @@ public sealed class ShipDamageTests
 
     static Ship ShipWith(Shielding? shielding = null)
     {
-        Ship ship = new(new ShipProfile(Handling, Health: 80, Durability: 40, Loadout: []));
+        Ship ship = new(new ShipProfile(Handling, Health: 80, Durability: 40, CargoSlots: 16, Loadout: []));
 
         if (shielding is not null)
         {

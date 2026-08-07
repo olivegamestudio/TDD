@@ -41,7 +41,12 @@ public sealed class Character
 
         Template = template;
         Quests = quests;
-        Inventory = new Inventory(template.StartingInventory);
+
+        // sized from the hull they start in, because how much can be carried is a ship stat while
+        // what is carried is theirs. The two only have to be reconciled when the ship changes, and
+        // nothing changes ship yet — the design's answer when it does is that the swap is refused
+        // unless what they are carrying already fits, so the hold is never resized under the player.
+        Inventory = new Inventory(template.Ship.CargoSlots, template.StartingInventory);
     }
 
     /// <summary>
@@ -94,6 +99,47 @@ public sealed class Character
         ArgumentNullException.ThrowIfNull(ship);
 
         Ship = ship;
+    }
+
+    /// <summary>
+    /// Takes a collected item, fitting it straight into a free slot of its kind when the ship has
+    /// one.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is the pickup rule in one place, and it is here rather than on the ship because both
+    /// halves of it are the character's: an item is <em>owned</em> before it is fitted, and a
+    /// loadout is fitted out of possessions. A ship that equipped straight from the world would give
+    /// the player gear that vanished with the hull.
+    /// </para>
+    /// <para>
+    /// Fitting does not take the item out of the inventory. What the player owns is one list and
+    /// what is bolted to the hull is a view onto it — so losing the ship loses the fitting and not
+    /// the item, which is the whole reason possessions live here.
+    /// </para>
+    /// <para>
+    /// A full hold refuses the pickup rather than making room by fitting the item, even when a slot
+    /// is free. Equipping is not storage, and a rule that let a full inventory keep taking weapons
+    /// as long as the ship had somewhere to bolt them would quietly make the hold's size a lie.
+    /// </para>
+    /// </remarks>
+    /// <param name="item">What was picked up.</param>
+    /// <returns>
+    /// <c>true</c> when it was taken. <c>false</c> when there was no room for it, in which case
+    /// nothing was taken and it is still wherever it was.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="item"/> is <c>null</c>.</exception>
+    public bool Collect(Item item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+
+        if (!Inventory.Add(item))
+        {
+            return false;
+        }
+
+        Ship?.Loadout.TryEquip(item);
+        return true;
     }
 
     /// <summary>
