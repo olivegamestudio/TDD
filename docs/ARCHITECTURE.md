@@ -22,11 +22,11 @@ to know about ships, quests or credits is on the wrong side of this line.
 | Project | Holds |
 | ------- | ----- |
 | `OliveGameStudio` | Engine composition and service registration. |
-| `OliveGameStudio.Abstractions` | `IHost`, `IScreen`, `IScreenDirector`, `ISaveProgressService`, and the shapes a platform host reports its devices in — `InputFrame`, `KeyboardFrame`, `GamePadFrame`, `ControlDevice`, `IInputRouter`. |
+| `OliveGameStudio.Abstractions` | `IHost`, `IScreen`, `IScreenDirector`, `ISaveProgressService`, and the shapes a platform host reports its devices in — `InputFrame`, `KeyboardFrame`, `GamePadFrame`, `TouchFrame`, `TouchPoint`, `ControlDevice`, `IInputRouter`. |
 | `OliveGameStudio.Screen` | `ScreenDirector`, `LifecycleScreenDirector`. |
 | `OliveGameStudio.UI`, `.UI.Abstractions` | Menu and button navigation. Not ship control. |
 | `OliveGameStudio.FrameRate` | Frame time filtering, so a paused or slowed game holds still while frames keep arriving. |
-| `OliveGameStudio.Input` | `InputRouter` — where a frame of input goes, and which device the game is being played on. |
+| `OliveGameStudio.Input` | `InputRouter` — where a frame of input goes, and which device the game is being played on. Also `TouchOverlay`, `TouchCircle` and `TouchControls`: the two circles a touch screen is played with, and what the fingers on them are asking for. |
 | `OliveGameStudio.Progress` | `LocalSaveProgressService`, persisting save text to a file. |
 | `OliveGameStudio.World` | `Position`, `Player`. The spatial model, plus the ship's physics and `IShipInput` — what an input means, never which device produced it. Also `Ship`, `ShipProfile`, `Meter`, `Item`, `ItemStats`, `EquipSlot`, `ItemStack`, `Inventory` and `Loadout`: a hull, the condition it is in, the things that can be held, and the slots they are held and fitted in. And what a hit costs it: `ShieldType`, `ShieldStats`, `Shielding`, `DamageOutcome`. And what flies alongside it: `OrbBehaviour`, `OrbStats`, `Orbs`. And how a dropped thing reaches its owner: `LootMagnet`, `LootDrop`, `Loot` — the mechanic only; what drops out of what is content. |
 | `OliveGameStudio.Rendering` | `Camera2D` — the world-to-screen transform, and the only place the world's axes and the screen's are reconciled. |
@@ -299,9 +299,10 @@ spending and the two have to be told apart wherever anything reports what a job 
   in a shield slot does not by itself give the ship a shield layer. Durability is not modelled at
   all, and the full item category list is still open.
 - **Nothing moves an item between slots.** `Loadout.TryEquip` is the auto-slot rule and
-  `Loadout.Unequip` takes something back out; the drag-and-drop that serves mouse and touch has
-  nothing to be built on, because the engine reads no pointer — `InputFrame` is a keyboard and a
-  gamepad.
+  `Loadout.Unequip` takes something back out; the drag-and-drop that serves mouse and touch still
+  has nothing to be built on. `InputFrame` now carries a `TouchFrame`, so a finger has a position
+  the engine can read — but there is still no mouse, and no screen holds the positions a drag would
+  have to be dropped onto.
 - **Cargo bays are not modelled.** `ShipProfile.CargoSlots` is the hull's built-in capacity and the
   whole of it. Bays that couple to the pilot, the vendor swap and the ceiling they stop at are
   economy work.
@@ -766,6 +767,44 @@ The snapshot is device-shaped but meaning-level. `KeyboardFrame` says *ahead*, *
 carries the stick raw, with the platform's own dead zone turned off, plus whether a pad is plugged
 in at all: a disconnected pad and a pad being held still are the same numbers and are not the same
 thing.
+
+`TouchFrame` is the exception to *meaning-level*, and has to be: it carries every finger that is
+down as a `TouchPoint` — an identifier and a position in window pixels — because where a finger is
+has no meaning until something says what is drawn there. The identifier is carried for the same
+reason the pad carries `Connected`: two coordinates cannot say whether the finger that read 640
+this frame is the thumb that read 600 last frame or a second one that landed nearby, and a control
+that follows a finger cannot be built without knowing.
+
+### Touch is two circles, and only the reading half exists
+
+`TouchOverlay` is the mobile control scheme: a stick on the left that flies the ship and a button
+on the right that fires, drawn over the same HUD rather than as a second mobile screen. It is
+handed the two `TouchCircle`s — placement is layout and belongs to whoever draws the screen — and
+turns a frame of fingers into a `TouchControls`: a `ShipControls` the physics cannot distinguish
+from a stick's, plus whether the fire circle is held.
+
+**The helm captures its finger; the fire button does not.** A virtual stick has no physical stop,
+so a player pushing for full ahead slides off the circle without feeling it — the helm follows the
+finger that took it, wherever it goes, until it lifts, and a second finger landing on the circle
+cannot snatch it mid-turn. Deflection is still measured from the circle's centre and scaled by its
+radius, so the circle drawn on screen says what the numbers mean; past the rim the pair is scaled
+back onto it rather than clamped axis by axis, because clamping each axis alone would turn a ship
+that was asked to fly straight. Firing is a button: a finger sliding off it has stopped pressing it.
+
+**No dead zone, deliberately.** The pad needs one because a used stick does not return to centre and
+would fly the ship by itself. A finger is where it is put and, when lifted, is not there at all.
+
+What does **not** exist yet, and none of it is hidden behind this:
+
+- **Nothing routes touch.** `InputRouter` reads the keyboard and the pad; `ControlDevice` names
+  those two. A touch cannot lock the device because it cannot press the menu — the UI navigates by
+  focus and holds no positions, so there is nothing to hit-test a tap against. Deciding what a tap
+  on a focused menu means is the next step, and it is a design call rather than a gap in the code.
+- **Nothing draws the circles.** There is no HUD, and the renderer draws sprites: the overlay needs
+  sprite assets before it appears on screen.
+- **Nothing consumes `Firing`.** The engine has no weapons. It is reported rather than dropped, so
+  the right-hand circle reads as a control whose other end is unbuilt rather than as one that does
+  not work.
 
 ### Routing is UI first, and the device is locked
 
