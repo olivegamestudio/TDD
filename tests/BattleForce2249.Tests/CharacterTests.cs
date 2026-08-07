@@ -15,7 +15,7 @@ public sealed class CharacterTests
         new(
             "test-character",
             "A test character",
-            new ShipProfile(DisgracedShip.Handling, Health: 100, Durability: 100, CargoSlots: 16, Loadout: []),
+            new ShipProfile(DisgracedShip.Handling, Health: 100, Durability: 100, CargoSlots: 16, Loadout: [], HullRadius: 1),
             "test-location",
             inventory ?? []);
 

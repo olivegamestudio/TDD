@@ -9,7 +9,7 @@ public sealed class ShipTests
     static readonly ShipHandling Handling = new(Acceleration: 100, Drag: 0.5, TurnRate: 2);
 
     static ShipProfile ProfileWith(IReadOnlyList<Item>? loadout = null) =>
-        new(Handling, Health: 80, Durability: 40, CargoSlots: 16, loadout ?? []);
+        new(Handling, Health: 80, Durability: 40, CargoSlots: 16, loadout ?? [], HullRadius: 1);
 
     [Fact]
     public void AShip_FliesOnTheHandlingItsProfileAuthored()
@@ -171,7 +171,7 @@ public sealed class ShipTests
         // every question asked of it — "is there room?", "how much is left?" — would come back a
         // nonsense the player is shown
         Assert.Throws<ArgumentOutOfRangeException>(
-            () => new ShipProfile(Handling, Health: 80, Durability: 40, CargoSlots: -1, Loadout: []));
+            () => new ShipProfile(Handling, Health: 80, Durability: 40, CargoSlots: -1, Loadout: [], HullRadius: 1));
     }
 
     [Fact]
@@ -206,7 +206,8 @@ public sealed class ShipTests
             Health: 80,
             Durability: 40,
             CargoSlots: 16,
-            Loadout: []);
+            Loadout: [],
+            HullRadius: 1);
 
         Assert.Throws<ArgumentOutOfRangeException>(() => new Ship(unflyable));
     }
@@ -219,7 +220,8 @@ public sealed class ShipTests
             Health: double.PositiveInfinity,
             Durability: 40,
             CargoSlots: 16,
-            Loadout: []);
+            Loadout: [],
+            HullRadius: 1);
 
         Assert.Throws<ArgumentOutOfRangeException>(() => new Ship(indestructible));
     }

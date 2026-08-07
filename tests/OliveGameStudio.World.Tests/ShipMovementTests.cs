@@ -13,9 +13,15 @@ public sealed class ShipMovementTests
     /// </summary>
     static readonly ShipHandling Handling = new(Acceleration: 100, Drag: 1, TurnRate: Math.PI);
 
+    /// <summary>
+    /// A hull small enough that none of the flights below graze an obstacle by accident. Collision
+    /// itself is covered separately, below.
+    /// </summary>
+    const double HullRadius = 1;
+
     readonly Player _player = new();
 
-    readonly ShipMovement _ship = new(Handling);
+    readonly ShipMovement _ship = new(Handling, HullRadius);
 
     /// <summary>
     /// Flies the ship on the given controls for a stretch of time, delivered as whole frames.
@@ -86,7 +92,7 @@ public sealed class ShipMovementTests
         double half = _player.Position.Y;
 
         Player other = new();
-        new ShipMovement(Handling).Update(other, new ShipControls(1, 0), TimeSpan.FromSeconds(1));
+        new ShipMovement(Handling, HullRadius).Update(other, new ShipControls(1, 0), TimeSpan.FromSeconds(1));
 
         Assert.True(half < other.Position.Y, "half thrust did not fly slower than full thrust");
     }
@@ -222,15 +228,15 @@ public sealed class ShipMovementTests
         //
         // The fixed-step accumulator gives every slicing the same number of Aether steps over one
         // second of game time, so the result is not merely close, it is the same computation run —
-        // but the ship's own position is zeroed and re-read every Update call (see ShipMovement's
-        // remarks on why), so a frame rate that calls Update more often also rounds that many more
-        // times through Aether's float32 position before Player's double accumulates it. 3 decimal
-        // places is comfortably past what a pilot could ever feel and still catches a model that
-        // has stopped being frame-rate independent at all.
+        // but the ship's body is re-synced from Player's position every Update call (see
+        // ShipMovement's remarks on why), so a frame rate that calls Update more often also rounds
+        // that many more times through Aether's float32 position before Player's double accumulates
+        // the delta. 3 decimal places is comfortably past what a pilot could ever feel and still
+        // catches a model that has stopped being frame-rate independent at all.
         Position OneSecondOfThrust(int frames)
         {
             Player player = new();
-            ShipMovement ship = new(Handling);
+            ShipMovement ship = new(Handling, HullRadius);
             TimeSpan frameTime = TimeSpan.FromTicks(TimeSpan.TicksPerSecond / frames);
 
             for (int frame = 0; frame < frames; frame++)
@@ -297,6 +303,115 @@ public sealed class ShipMovementTests
         Assert.Equal(reached, _player.Position);
     }
 
+    // ---- obstacles ----
+
+    [Fact]
+    public void AnObstacleInTheWay_BlocksTheShip()
+    {
+        // the ship starts at the origin facing forward (+Y), so this sits squarely in its path
+        _ship.AddObstacle(new Position(0, 50), width: 10, height: 10, rotation: 0);
+
+        // unobstructed, five seconds at up to the ship's own top speed of 100 covers several
+        // hundred units — comfortably enough to have flown straight through an obstacle at 50
+        // if the hull did not actually collide with it
+        Fly(thrust: 1, turn: 0, seconds: 5, frames: 5000);
+
+        Assert.True(_player.Position.Y < 45,
+            $"the ship passed the obstacle, reaching {_player.Position.Y}");
+        Assert.True(_player.Position.Y > 30,
+            $"the ship did not reach the obstacle at all, stopping at {_player.Position.Y}");
+    }
+
+    [Fact]
+    public void AnObstacleNotInTheWay_DoesNotAffectTheShip()
+    {
+        // off to the side rather than ahead: the ship flying straight forward should never come
+        // near it, so nothing here should read any differently to a ship with no obstacles at all
+        _ship.AddObstacle(new Position(200, 25), width: 10, height: 10, rotation: 0);
+
+        Fly(thrust: 1, turn: 0, seconds: 1);
+
+        Assert.True(_player.Position.Y > 0, "the ship did not move forward");
+        Assert.Equal(0, _player.Position.X, 6);
+    }
+
+    [Fact]
+    public void ARotatedObstacle_BlocksAlongItsTurnedAxis_NotItsOriginalOne()
+    {
+        // Short across, long up and down, off to the side of the ship's path at x=20 — unrotated,
+        // neither dimension reaches x=0, so the ship flying straight up it passes untouched.
+        // Turned a quarter circle, the long axis swings across the path instead of along it, and
+        // now it does. Same obstacle, same position; only the rotation says whether it is hit.
+        //
+        // Turned, the rectangle's near edge — its own width, 4, halved — sits 2 units below its
+        // centre, so at y=48; a hull radius of 1 stops the ship with its centre at y=47.
+        _ship.AddObstacle(new Position(20, 50), width: 4, height: 60, rotation: Math.PI / 2);
+
+        Fly(thrust: 1, turn: 0, seconds: 5, frames: 5000);
+
+        Assert.True(_player.Position.Y < 47.5,
+            $"a rectangle turned across the flight path did not block it, reaching {_player.Position.Y}");
+        Assert.True(_player.Position.Y > 30,
+            $"the ship did not reach the obstacle at all, stopping at {_player.Position.Y}");
+    }
+
+    [Fact]
+    public void AnUnrotatedObstacle_OffToOneSide_DoesNotBlockTheShip()
+    {
+        // the same obstacle as the turned one above, at rotation zero: its long axis runs
+        // alongside the flight path rather than across it, so the ship never reaches it
+        _ship.AddObstacle(new Position(20, 50), width: 4, height: 60, rotation: 0);
+
+        Fly(thrust: 1, turn: 0, seconds: 1);
+
+        Assert.True(_player.Position.Y > 0, "the ship did not move forward");
+        Assert.Equal(0, _player.Position.X, 6);
+    }
+
+    [Fact]
+    public void AnIdlePlayerInsideAnObstacle_IsNotPushedOut()
+    {
+        // Player.Position can be set by something other than flying — a save being resumed, a
+        // test moving it by hand — and this is what that looks like when it happens to land
+        // inside an obstacle. An idle frame must not go looking for the nearest way to correct
+        // that on the player's behalf; the ship was never asked to fly, so it does not move them.
+        _ship.AddObstacle(Position.Origin, width: 20, height: 20, rotation: 0);
+
+        _ship.Update(_player, ShipControls.Neutral, TimeSpan.FromSeconds(1));
+
+        Assert.Equal(Position.Origin, _player.Position);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    public void AddObstacle_RejectsANonPositiveWidthOrHeight(double size)
+    {
+        // an obstacle with no size blocks nothing, which is a silent no-op content almost
+        // certainly did not intend when it asked for one
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => _ship.AddObstacle(Position.Origin, width: size, height: 10, rotation: 0));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => _ship.AddObstacle(Position.Origin, width: 10, height: size, rotation: 0));
+    }
+
+    [Theory]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    [InlineData(double.NaN)]
+    public void AddObstacle_RejectsAWidthHeightOrRotationThatIsNotAFiniteNumber(double value)
+    {
+        // an infinite size blocks everywhere rather than just where it was placed, and a rotation
+        // that is not a number places every corner nowhere, in full, the same trap a heading falls
+        // into for the same reason
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => _ship.AddObstacle(Position.Origin, width: value, height: 10, rotation: 0));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => _ship.AddObstacle(Position.Origin, width: 10, height: value, rotation: 0));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => _ship.AddObstacle(Position.Origin, width: 10, height: 10, rotation: value));
+    }
+
     // ---- handling that cannot be flown ----
 
     [Theory]
@@ -305,7 +420,7 @@ public sealed class ShipMovementTests
     public void RejectsAShipThatCannotAccelerate(double acceleration)
     {
         Assert.Throws<ArgumentOutOfRangeException>(
-            () => new ShipMovement(Handling with { Acceleration = acceleration }));
+            () => new ShipMovement(Handling with { Acceleration = acceleration }, HullRadius));
     }
 
     [Theory]
@@ -314,13 +429,13 @@ public sealed class ShipMovementTests
     public void RejectsAShipWithNoDrag(double drag)
     {
         // without drag there is no top speed, and the ship accelerates until the numbers give out
-        Assert.Throws<ArgumentOutOfRangeException>(() => new ShipMovement(Handling with { Drag = drag }));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ShipMovement(Handling with { Drag = drag }, HullRadius));
     }
 
     [Fact]
     public void RejectsANegativeTurnRate()
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => new ShipMovement(Handling with { TurnRate = -1 }));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ShipMovement(Handling with { TurnRate = -1 }, HullRadius));
     }
 
     [Theory]
@@ -332,7 +447,7 @@ public sealed class ShipMovementTests
         // infinite acceleration gives an infinite top speed: the ship leaves the world within a
         // frame or two, and the position it leaves behind names neither the ship nor the frame
         Assert.Throws<ArgumentOutOfRangeException>(
-            () => new ShipMovement(Handling with { Acceleration = acceleration }));
+            () => new ShipMovement(Handling with { Acceleration = acceleration }, HullRadius));
     }
 
     [Theory]
@@ -343,7 +458,7 @@ public sealed class ShipMovementTests
     {
         // infinite drag is the opposite failure to no drag at all: a top speed of zero, so full
         // thrust moves the ship nowhere and the controls read as broken rather than as content
-        Assert.Throws<ArgumentOutOfRangeException>(() => new ShipMovement(Handling with { Drag = drag }));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ShipMovement(Handling with { Drag = drag }, HullRadius));
     }
 
     [Theory]
@@ -355,7 +470,7 @@ public sealed class ShipMovementTests
         // an infinite turn rate wraps the heading to whatever the modulus of infinity leaves, and
         // NaN spreads from the heading into every position the ship reports afterwards
         Assert.Throws<ArgumentOutOfRangeException>(
-            () => new ShipMovement(Handling with { TurnRate = turnRate }));
+            () => new ShipMovement(Handling with { TurnRate = turnRate }, HullRadius));
     }
 
     [Fact]
@@ -364,7 +479,7 @@ public sealed class ShipMovementTests
         // the ship is built from content: an exception that says only "handling" leaves whoever
         // authored the profile reading three numbers to find out which one it meant
         ArgumentOutOfRangeException refused = Assert.Throws<ArgumentOutOfRangeException>(
-            () => new ShipMovement(Handling with { Drag = double.PositiveInfinity }));
+            () => new ShipMovement(Handling with { Drag = double.PositiveInfinity }, HullRadius));
 
         Assert.Equal("handling.Drag", refused.ParamName);
     }

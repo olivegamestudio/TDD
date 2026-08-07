@@ -131,14 +131,105 @@ engine — the helm was never modelled with inertia, only a rate the pilot comma
 still the hand-rolled kinematic update it always was, and only translation needed a rigid body under
 it. Aether steps at a fixed 1000 Hz behind an accumulator rather than at whatever `Update`'s
 `frameTime` happens to be, which is what makes the result frame-rate independent — a variable-length
-step is exactly what an iterative solver's answer would otherwise depend on. The body's own
-`Position` is zeroed at the start of every `Update` and only ever holds that one frame's travel:
-Aether positions are `float`, and a ship flying an unbounded world would eventually outrun single
-precision, so `Player.Position` stays the `double` record of where the ship actually is and the body
-exists only to say how far it just moved. A consequence worth naming: Aether's damping is a per-step
-approximation of the exact decay the old closed-form model integrated, so it converges towards the
-same terminal speed rather than landing on it exactly — close is what the physics engine guarantees,
-where exact was only ever a property of the model it replaced.
+step is exactly what an iterative solver's answer would otherwise depend on. A consequence worth
+naming: Aether's damping is a per-step approximation of the exact decay the old closed-form model
+integrated, so it converges towards the same terminal speed rather than landing on it exactly — close
+is what the physics engine guarantees, where exact was only ever a property of the model it replaced.
+
+**The ship carries a hull fixture, so it has something to collide with.** The ship's own hull stays
+a circle, given to its body at construction, sized from `ShipProfile.HullRadius`. `FixedRotation` is
+set on it, because rotation is still `Heading`'s own kinematic update and nothing here wants a
+collision's own momentum spinning the body Aether tracks underneath it; it has to be set *before*
+`Mass` is asserted, not after, because setting it recomputes mass data from the fixture's own area
+and density and would otherwise discard the override.
+
+**Everything the hull can hit is a rotated rectangle, not a circle — a first pass tried a circle and
+a playtest showed why that reads wrong.** `AddObstacle(Position, width, height, rotation)` puts a
+static rectangular obstacle into the ship's own `World`, built as a four-corner polygon fixture
+rather than `CreateCircle`. Averaging a shape's width and height into one radius, tried first, reads
+badly on anything long and thin — a rock wall's own collision circle reaching out over open space
+well past where the wall is actually drawn, or falling short of a corner still well within it. A
+rectangle is still wrong against an irregular rock outline, but by a margin rather than by a shape.
+The rotation is computed by hand from the four corners, on a body whose own Aether rotation stays
+zero — the same reason `Heading` is never read from Aether's `Body.Rotation` either: this
+convention is clockwise from positive Y, and nothing here wants to find out by trial and error
+whether Aether's own matches it before trusting a wall to be facing the way it was drawn.
+
+**The body's position is synced from `Player.Position` at the start of every flying `Update`, not
+accumulated in the body itself.** Collision needs the ship and whatever it might hit to actually
+occupy the same coordinates, which a body that never held more than one frame's travel could not
+give an obstacle placed at its true position. The narrowing to `float` that costs is the same one
+`Player.Position` already takes at the camera and at the edge of what a save can resume — applied
+one layer earlier rather than a new kind of risk. `Player.Position` itself stays exact: what physics
+hands back is the *delta* the step produced, the body's position before stepping subtracted from its
+position after, and it is that delta which is added to the player's own double-precision record.
+
+**An idle ship — neutral controls, no velocity — is never synced or stepped at all.**
+`Player.Position` is not always moved by flying: a save being resumed, a test walking the player by
+hand. Syncing an idle body to wherever that lands would let Aether discover an overlap with an
+obstacle on a frame nobody asked the ship to fly, and correct it as though it had — which is exactly
+what broke `GameScreenTests.MovingForwardAcrossFrames_CompletesQuest1`, a test that moves the player
+by `Position.MoveBy` and never touches the pilot, once the debris field's rocks became solid enough
+for that hand-walked path to cross one. A ship still coasting from real thrust is not idle and is not
+skipped; only one with neutral controls and no velocity is.
+
+**Scenery becomes an obstacle through one flag and the game's own knowledge of its sprites, not the
+engine's.** `SceneBody.Solid` is `false` by default, so a scene authored before it existed loses
+nothing; `debris-field.json` sets it on the bodies actually meant to block the ship — every `rock1`,
+`rock2`, `rock3`, `asteroid1` and `asteroid2`, on any layer. A first pass solid-marked `asteroid1`
+only on the `Environment` layer, reasoning the `Default`-layer ones were a background picture; a
+playtest found one sitting in the open, drawn exactly like a real obstacle, with nothing behind it
+to read as backdrop, so every `asteroid1` counts now regardless of layer. `asteroid2` was a level
+further wrong: not merely mis-classified but absent from `RegionObstacles` entirely, and its one
+instance sits at `(0, 0)` — the ship's own spawn point — where a playtest found it drawn solid with
+no collision at all. `RegionObstacles.Seed` reads a loaded
+scene's solid bodies and calls `ShipMovement.AddObstacle` for each, sizing the rectangle from the
+body's authored scale — width from `ScaleX`, height from `ScaleY`, independently, matching how
+`RegionView` scales the same body — and the sprite's own measured pixel dimensions, and turning it
+by the same `-RotationDegrees * π / 180` conversion `RegionView` already draws it with, so a rock
+authored twice as large collides twice as large, facing the way it was drawn. It is deliberately
+game content (`BattleForce2249.Game`), not engine: knowing that `rock1.png` is 985×562 pixels is
+exactly the kind of fact the engine/game split exists to keep out of `OliveGameStudio.*`.
+`GameScreen` seeds a game's obstacles once it has both a ship and a loaded region — the two are not
+ready on the same frame, a ship's `Update` guards on `session.IsReady` and a region loads
+synchronously in `Enter` — tracked by comparing the current `session.Ship` against the one last
+seeded, so starting a second game seeds a second ship's physics rather than trusting a bool.
+
+**The debris field is denser than a straight line can get through, and that is content, not a
+defect.** Once the rocks were solid, `GameScreenTests`' straight-line "flies to the exit marker"
+test no longer could — not because collision is wrong, but because there is no comfortable route
+along the direct line for a hull the size the ship's is, and a check confirmed the field has none at
+all below a hair's width of clearance anywhere nearby either. The test now asserts what is actually
+true — a ship holding one heading gets blocked, and the quest stays open — and the acceptance tests
+that used "completes quest 1" only as a convenient proof that a key or a stick reaches the ship now
+check that the ship travelled a stretch of open water short of the field's first obstruction instead,
+which is what they were actually testing. Whether the field should be thinned out for a clearer route
+is a content call for a human at a screen, not one this change makes on its own.
+
+**Collision sizes are measured against the shipped art, not reasoned by eye — a first pass got this
+wrong.** `ship1.png`'s own opaque pixels turned out to fill most of its 1024×1024 canvas rather than
+a fraction of it, so an initial, reasoned `HullRadius` of 8 was under half the ship's actual visible
+size — a ship a player could watch overlap a rock for several units before the physics agreed
+anything had happened. `DisgracedShip.HullRadius` is now half the shorter axis of the sprite's own
+alpha-channel bounding box; `RegionObstacles`'s `asteroid1` entry got the same correction the other
+way, for real transparent padding a full-canvas guess did not know was there. `rock1`/`rock2`/`rock3`
+needed nothing — their canvases have no padding to have gotten wrong.
+
+**`CollisionDebugView` draws what the physics actually collides at, because nothing else on screen
+does.** A ring around the ship's hull and a rectangle around every solid body, at the exact size and
+rotation `RegionObstacles.SizeOf`/`RotationOf` and `ShipProfile.HullRadius` feed the physics — read
+from there rather than kept as a second copy, so what is drawn cannot quietly disagree with what
+collides. The obstacle shape followed the physics from circle to rectangle for the same reason:
+a circular ring around an elongated rock wall was visibly wrong against the art in a way a rotated
+rectangle is not. It is a developer aid rather than a shipped feature: `Enabled` defaults to `true`
+while the gap between "the physics is right" and "the physics looks right" is still being closed,
+and `GameScreenTests`' `ScreenFor` constructs its own instance with it off, because those tests
+assert on draw order and count and were not written expecting an overlay. There is no
+primitive-shape drawing anywhere in this renderer, so both shapes are faked the standard
+`SpriteBatch` way — short straight segments, each a single opaque pixel (`pixel.png`, added for
+exactly this) stretched to a segment's length and
+rotated to its angle. Drawn last, after even the vignette: a collision worth checking near the edge
+of the screen is not one that should be dimmed to find.
 
 **How much you can carry is the ship's; what you own is the character's.** `ShipProfile.CargoSlots`
 is the hull's built-in capacity, and `Character.Inventory` is sized from it — a fighter carries less

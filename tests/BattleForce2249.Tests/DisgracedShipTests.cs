@@ -57,7 +57,7 @@ public sealed class DisgracedShipTests
     public void ReachesQuest1sExitMarker_AtFullThrust_InAPlayableTime()
     {
         Player player = new();
-        ShipMovement ship = new(Handling);
+        ShipMovement ship = new(Handling, DisgracedShip.Profile.HullRadius);
         Position exit = Quest1Markers.End;
 
         int frames = 0;

@@ -146,13 +146,19 @@ public sealed class BattleForceHostTests : HostTestBase
     /// Asserts the ship reached the screen, and reached it over the stars rather than behind one.
     /// </summary>
     /// <remarks>
-    /// Second from last rather than last: the frame the play area is vignetted with is drawn over
-    /// everything, the ship included.
+    /// Found by its texture rather than assumed to sit at a fixed offset from the end: the frame
+    /// the play area is vignetted with draws over everything including the ship, and the
+    /// collision debug overlay draws over the frame — both legitimately drawn after it, and
+    /// neither this test's concern. What it protects is that the ship is drawn at all, and after
+    /// the stars rather than before them.
     /// </remarks>
     static void AssertTheShipIsDrawn(RecordingRenderer renderer)
     {
-        Assert.NotEmpty(renderer.Drawn);
-        Assert.Equal(512, renderer.Drawn[^2].Texture.Width);
+        int shipIndex = renderer.Drawn.ToList().FindIndex(sprite => sprite.Texture.Width == 512);
+        int starIndex = renderer.Drawn.ToList().FindIndex(sprite => sprite.Texture.Width == 16);
+
+        Assert.True(shipIndex >= 0, "the ship was never drawn");
+        Assert.True(shipIndex > starIndex, "the ship was drawn before the stars behind it");
     }
 
     [Fact]

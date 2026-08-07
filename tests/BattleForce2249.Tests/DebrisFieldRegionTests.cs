@@ -81,4 +81,29 @@ public sealed class DebrisFieldRegionTests
 
         Assert.Equal(started, completed);
     }
+
+    [Fact]
+    public void TheRocksAndAsteroidsAreSolid_AndNothingElseIs()
+    {
+        // Only what the ship should actually collide with — a rock, or an asteroid, wherever it
+        // stands in the field. Every asteroid1 counts: an earlier pass solid-marked only the ones
+        // on the Environment layer, reasoning the rest were a background picture — a play session
+        // found one sitting in the open, drawn exactly like a real obstacle, with nothing behind
+        // it to make it read as backdrop. asteroid2 is the same story a level up: it was not in
+        // RegionObstacles' known sprites at all, and its one instance sits at the origin — the
+        // ship's own spawn point — where a play session found it drawn solid with nothing to stop
+        // the ship flying straight through. Glow and hull plating stay pure scenery.
+        SceneDefinition region = Region();
+
+        foreach (SceneBody body in region.Bodies)
+        {
+            bool expectedSolid = body.Sprite is "rock1" or "rock2" or "rock3" or "asteroid1" or "asteroid2";
+
+            Assert.True(
+                body.Solid == expectedSolid,
+                $"{body.Name} ({body.Sprite}, layer {body.Layer}): expected Solid={expectedSolid}, was {body.Solid}");
+        }
+
+        Assert.Equal(119, region.Bodies.Count(body => body.Solid));
+    }
 }

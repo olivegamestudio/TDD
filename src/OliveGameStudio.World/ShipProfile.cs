@@ -34,12 +34,18 @@ namespace OliveGameStudio;
 /// <see cref="OliveGameStudio.Loadout"/>. Empty is a perfectly good answer, and it is the one every
 /// hull gives today.
 /// </param>
+/// <param name="HullRadius">
+/// How much of a circle the hull fills, for colliding with the world — not how big it is drawn,
+/// which is a rendering concern this never reaches. Must be a positive, finite number: a hull with
+/// no size collides with nothing, and the ship would fly through everything in the world unharmed.
+/// </param>
 public sealed record ShipProfile(
     ShipHandling Handling,
     double Health,
     double Durability,
     int CargoSlots,
-    IReadOnlyList<Item> Loadout)
+    IReadOnlyList<Item> Loadout,
+    double HullRadius)
 {
     /// <summary>
     /// How much the hull can carry, counted in inventory slots.

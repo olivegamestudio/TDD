@@ -18,6 +18,7 @@ namespace BattleForce2249;
 /// <param name="region">The scenery of the place being flown through.</param>
 /// <param name="regions">Where an authored region is read from.</param>
 /// <param name="frame">The overlay the play area is framed with.</param>
+/// <param name="collisionDebug">The developer overlay that draws collision shapes over everything.</param>
 public sealed class GameScreen(
     IGameSession session,
     IShipInput pilot,
@@ -27,7 +28,8 @@ public sealed class GameScreen(
     StarField stars,
     RegionView region,
     RegionLoader regions,
-    Vignette frame)
+    Vignette frame,
+    CollisionDebugView collisionDebug)
     : IGameScreen, IActivatable, IRenderable
 {
     /// <summary>
@@ -119,6 +121,12 @@ public sealed class GameScreen(
         camera.PixelsPerUnit = Zoom;
         _cameraSettled = false;
 
+        // A ship built for a game already entered has whatever obstacles that game's region put
+        // in it; a ship this Enter is about to build has none, and needs the field it flies into
+        // seeded again. Cleared here rather than inferred from the ship changing, because the
+        // check that infers it runs every frame and only needs to be right, not cheap to read.
+        _obstacleShip = null;
+
         Started = session.Continue();
         return EnterResult.Stay;
     }
@@ -141,7 +149,20 @@ public sealed class GameScreen(
 
         // read per frame rather than held, because starting or resuming the game replaces the ship;
         // a screen holding the one it was built with would go on flying a ship nobody is in
-        ShipMovement ship = session.Ship.Movement;
+        Ship shipEntity = session.Ship;
+        ShipMovement ship = shipEntity.Movement;
+
+        // The region is loaded synchronously in Enter, but the ship is not ready until session
+        // .Continue finishes — off the frame loop, on its own time — so seeding waits for the
+        // first frame both exist together rather than trying to do it in Enter itself. Compared
+        // by reference against the ship rather than a bool: starting a new game after resuming
+        // one, or the other way round, builds a second ship the first one's obstacles say nothing
+        // about.
+        if (!ReferenceEquals(_obstacleShip, shipEntity))
+        {
+            RegionObstacles.Seed(region.Scene, ship);
+            _obstacleShip = shipEntity;
+        }
 
         // the ship flies first, so the quests are measured against where the player got to this
         // frame rather than where they were at the end of the last one
@@ -190,6 +211,13 @@ public sealed class GameScreen(
     /// swinging round to find it.
     /// </summary>
     bool _cameraSettled;
+
+    /// <summary>
+    /// Which ship <see cref="RegionObstacles"/> has already been seeded into this game, so a ship
+    /// already flying a field of obstacles is not handed a second copy of the same field every
+    /// frame. <c>null</c> means the current ship, once there is one, has not been seeded yet.
+    /// </summary>
+    Ship? _obstacleShip;
 
     /// <summary>
     /// Eases one angle towards another, taking the short way round.
@@ -252,10 +280,18 @@ public sealed class GameScreen(
 
         view.Render(renderer);
 
-        // Last of all, so the frame is over the game rather than in it: the ship and the debris
-        // pass beneath the dark corners instead of behind them. It draws and nothing else, so
-        // nothing under it loses a press to it.
+        // So the frame is over the game rather than in it: the ship and the debris pass beneath
+        // the dark corners instead of behind them. It draws and nothing else, so nothing under it
+        // loses a press to it.
         frame.Render(renderer);
+
+        // Last of all and over the frame too, deliberately: a collision worth checking near the
+        // edge of the screen is not one that should be dimmed to find. See CollisionDebugView's
+        // own remarks for why this exists and when it should stop defaulting to drawn.
+        collisionDebug.ShipPosition = view.Pose.Position;
+        collisionDebug.HullRadius = session.Ship.Profile.HullRadius;
+        collisionDebug.Bodies = region.Scene.Bodies;
+        collisionDebug.Render(renderer);
     }
 
     /// <summary>
