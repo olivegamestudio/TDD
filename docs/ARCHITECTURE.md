@@ -176,10 +176,13 @@ skipped; only one with neutral controls and no velocity is.
 **Scenery becomes an obstacle through one flag and the game's own knowledge of its sprites, not the
 engine's.** `SceneBody.Solid` is `false` by default, so a scene authored before it existed loses
 nothing; `debris-field.json` sets it on the bodies actually meant to block the ship — every `rock1`,
-`rock2`, `rock3` and `asteroid1`, on any layer. A first pass solid-marked `asteroid1` only on the
-`Environment` layer, reasoning the `Default`-layer ones were a background picture; a playtest found
-one sitting in the open, drawn exactly like a real obstacle, with nothing behind it to read as
-backdrop, so every `asteroid1` counts now regardless of layer. `RegionObstacles.Seed` reads a loaded
+`rock2`, `rock3`, `asteroid1` and `asteroid2`, on any layer. A first pass solid-marked `asteroid1`
+only on the `Environment` layer, reasoning the `Default`-layer ones were a background picture; a
+playtest found one sitting in the open, drawn exactly like a real obstacle, with nothing behind it
+to read as backdrop, so every `asteroid1` counts now regardless of layer. `asteroid2` was a level
+further wrong: not merely mis-classified but absent from `RegionObstacles` entirely, and its one
+instance sits at `(0, 0)` — the ship's own spawn point — where a playtest found it drawn solid with
+no collision at all. `RegionObstacles.Seed` reads a loaded
 scene's solid bodies and calls `ShipMovement.AddObstacle` for each, sizing the rectangle from the
 body's authored scale — width from `ScaleX`, height from `ScaleY`, independently, matching how
 `RegionView` scales the same body — and the sprite's own measured pixel dimensions, and turning it

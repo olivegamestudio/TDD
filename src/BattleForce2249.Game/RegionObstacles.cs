@@ -11,7 +11,7 @@ namespace BattleForce2249;
 /// nothing about how big a rock actually is exists until a texture is loaded, and this runs ahead
 /// of that. So the size a body collides at is worked out the same way <see cref="RegionView"/>
 /// works out the size it is <em>drawn</em> at: the sprite's real pixel dimensions, converted
-/// through <see cref="RegionView.AuthoredPixelsPerUnit"/>. <see cref="PixelSizeOf"/> is that
+/// through <see cref="RegionView.AuthoredPixelsPerUnit"/>. <see cref="SizeOf"/> is that
 /// conversion, one entry per collidable sprite, and the pixel sizes behind it are measured from
 /// the shipped textures rather than guessed — a rock authored twice as large collides twice as
 /// large, and a sprite this has no entry for is refused rather than silently made harmless.
@@ -41,10 +41,11 @@ public static class RegionObstacles
     /// Every collidable sprite's real pixel dimensions, measured from the shipped PNGs' own alpha
     /// channel rather than chosen by eye. <c>rock1.png</c>, <c>rock2.png</c> and <c>rock3.png</c>
     /// have no transparent margin at all, so their canvas size and their visible size are the same
-    /// number: 985×562, 977×586, 974×657. <c>asteroid1.png</c> does — a 512×512 canvas with the
-    /// asteroid itself occupying 69..442 by 36..476 of it, 373×440 — and using the full canvas
-    /// there before this was measured had every solid asteroid colliding several units out from
-    /// where it is actually drawn.
+    /// number: 985×562, 977×586, 974×657. <c>asteroid1.png</c> and <c>asteroid2.png</c> do — both
+    /// 512×512 canvases, with the asteroid itself occupying 69..442 by 36..476 (373×440) and
+    /// 59..448 by 47..454 (389×407) of them respectively — and using the full canvas before this
+    /// was measured had every solid asteroid colliding several units out from where it is actually
+    /// drawn.
     /// </summary>
     static readonly IReadOnlyDictionary<string, PixelSize> PixelSizePerSprite =
         new Dictionary<string, PixelSize>(StringComparer.Ordinal)
@@ -53,6 +54,7 @@ public static class RegionObstacles
             ["rock2"] = new PixelSize(977, 586),
             ["rock3"] = new PixelSize(974, 657),
             ["asteroid1"] = new PixelSize(373, 440),
+            ["asteroid2"] = new PixelSize(389, 407),
         };
 
     /// <summary>

@@ -35,7 +35,8 @@
       "scaleY": 1.0,
       "layer": "Default",
       "order": 0,
-      "parallax": 0
+      "parallax": 0,
+      "solid": true
     },
     {
       "name": "FrontEngine",

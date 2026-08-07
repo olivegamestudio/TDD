@@ -36,6 +36,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   sitting in the open, drawn exactly like a real obstacle, with nothing behind it to read as
   backdrop. All 14 `asteroid1` instances in `debris-field.json` are solid now, regardless of layer.
 
+  **`asteroid2` was missing altogether — not in `RegionObstacles`'s known sprites, not marked
+  solid, and its one instance sits at `(0, 0)`, the ship's own spawn point.** A play session put a
+  ship right up against it with no collision ring at all, the same symptom as the `asteroid1`
+  finding above at one level up: this sprite had never been accounted for, not merely
+  mis-classified. Measured the same way as the others — a 512×512 canvas, 389×407 of it opaque —
+  added to `RegionObstacles`, and marked solid.
+
   The body's position now syncs from `Player.Position` every flying frame rather than always
   starting at zero, which is what lets the ship and an obstacle placed at its true position actually
   occupy the same coordinates — except when the ship is idle (neutral controls, no velocity), which
