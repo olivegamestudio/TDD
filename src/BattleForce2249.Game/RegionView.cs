@@ -35,6 +35,26 @@ public sealed class RegionView(ICamera camera) : IRenderable
 
     readonly Dictionary<string, ITexture> _textures = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// Gets or sets the colour the bodies painted on the sky are drawn through. Opaque white —
+    /// what a region is drawn with until something says otherwise — draws them exactly as they
+    /// were authored.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// It reaches the backdrop and nothing else. What is painted on the sky is scenery the player
+    /// looks past; what stands in the world is scenery the player flies into, and dimming that
+    /// costs them the warning they get of what they are about to hit. So this darkens the picture
+    /// behind the game without touching how legible the game is.
+    /// </para>
+    /// <para>
+    /// A tint here rather than a second set of authored artwork, because how dark the sky should
+    /// be is a decision about this screen and not about the region: a region flown through at
+    /// another time of day is the same content lit differently.
+    /// </para>
+    /// </remarks>
+    public Colour BackdropTint { get; set; } = Colour.White;
+
     SceneDefinition _scene = SceneDefinition.Empty;
     IReadOnlyList<SceneBody> _ordered = [];
 
@@ -121,7 +141,11 @@ public sealed class RegionView(ICamera camera) : IRenderable
                 Position: screen,
                 Rotation: rotation,
                 Origin: new Vector2(texture.Width, texture.Height) / 2f,
-                Scale: scale));
+                Scale: scale)
+            {
+                // The sky takes the tint; everything standing in the world is drawn as authored.
+                Colour = fixedToScreen ? BackdropTint : Colour.White,
+            });
         }
     }
 

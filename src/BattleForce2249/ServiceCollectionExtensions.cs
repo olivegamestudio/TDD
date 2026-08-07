@@ -81,6 +81,10 @@ public static class BattleForceServiceCollectionExtensions
             // is in is the session's business, not the drawing's.
             .AddSingleton<RegionView>()
             .AddSingleton<RegionLoader>()
+
+            // Likewise registered as itself: it reads the viewport and nothing else, and nothing
+            // outside the drawing has anything to say to it.
+            .AddSingleton<Vignette>()
             .AddSingleton<IHost, BattleForceHost>();
 
         return services;
