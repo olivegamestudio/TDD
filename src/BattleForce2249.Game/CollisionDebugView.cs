@@ -4,30 +4,33 @@ using OliveGameStudio;
 namespace BattleForce2249;
 
 /// <summary>
-/// Draws the collision shapes nothing else on screen shows: a ring around the ship's hull, and one
-/// around every solid body in the region, at the exact radius the physics actually collides at.
+/// Draws the collision shapes nothing else on screen shows: a ring around the ship's hull, and a
+/// rectangle around every solid body in the region, at the exact size and rotation the physics
+/// actually collides at.
 /// </summary>
 /// <remarks>
 /// <para>
 /// A developer aid rather than a shipped feature, for the gap between "the physics is right" and
-/// "the physics looks right": a hull or an obstacle sized wrong is invisible in the ordinary
-/// render, because nothing else on screen is drawn at a collision radius rather than a sprite's
-/// own size — a ship that visibly overlaps a rock for several units before anything registers a
-/// hit looks the same as one that does not, right up until it is measured against something.
-/// <see cref="Enabled"/> defaults to <c>true</c> while that gap is still being closed, and should
-/// default to <c>false</c> once it is settled, not stay on as a permanent feature nobody asked for.
+/// "the physics looks right": a hull or an obstacle sized or turned wrong is invisible in the
+/// ordinary render, because nothing else on screen is drawn at a collision shape rather than a
+/// sprite's own size — a ship that visibly overlaps a rock for several units before anything
+/// registers a hit looks the same as one that does not, right up until it is measured against
+/// something. <see cref="Enabled"/> defaults to <c>true</c> while that gap is still being closed,
+/// and should default to <c>false</c> once it is settled, not stay on as a permanent feature nobody
+/// asked for.
 /// </para>
 /// <para>
-/// It reads <see cref="RegionObstacles.RadiusOf"/> for every solid body rather than keeping its own
-/// copy of how a scale and a sprite become a size — the whole point is showing the number the
-/// physics was actually seeded with, not a second guess at it that could quietly drift from the
-/// first.
+/// It reads <see cref="RegionObstacles.SizeOf"/> and <see cref="RegionObstacles.RotationOf"/> for
+/// every solid body rather than keeping its own copy of how a scale and a sprite become a shape —
+/// the whole point is showing the shape the physics was actually seeded with, not a second guess at
+/// it that could quietly drift from the first.
 /// </para>
 /// <para>
-/// There is no primitive-shape drawing anywhere in this engine, so a ring is approximated as short
-/// straight segments between points around a circle, each one a 1×1 pixel texture stretched to the
-/// segment's length and rotated to its angle — the standard way to fake a line out of a sprite
-/// batch. <c>pixel.png</c> is a single opaque white texel that exists for exactly this.
+/// There is no primitive-shape drawing anywhere in this engine, so both shapes are approximated as
+/// short straight segments — forty around a circle for the hull ring, four along the sides for an
+/// obstacle's rectangle — each one a 1×1 pixel texture stretched to the segment's length and
+/// rotated to its angle, the standard way to fake a line out of a sprite batch. <c>pixel.png</c> is
+/// a single opaque white texel that exists for exactly this.
 /// </para>
 /// </remarks>
 /// <param name="camera">The camera the world is drawn through — the same one everything else uses.</param>
@@ -99,11 +102,15 @@ public sealed class CollisionDebugView(ICamera camera) : IRenderable
                 continue;
             }
 
-            DrawRing(
+            RegionObstacles.ObstacleSize size = RegionObstacles.SizeOf(body);
+
+            DrawRectangle(
                 renderer,
                 pixel,
                 new Vector2((float)body.X, (float)body.Y),
-                RegionObstacles.RadiusOf(body),
+                size.Width,
+                size.Height,
+                RegionObstacles.RotationOf(body),
                 ObstacleColour);
         }
     }
@@ -124,6 +131,43 @@ public sealed class CollisionDebugView(ICamera camera) : IRenderable
             DrawLine(renderer, pixel, previous, next, colour);
             previous = next;
         }
+    }
+
+    /// <summary>
+    /// Draws a rectangle's outline, turned by <paramref name="rotation"/> in the same convention as
+    /// <c>ShipMovement.AddObstacle</c> — zero along positive Y, increasing clockwise towards
+    /// positive X — so the outline drawn here always matches the shape actually seeded into the
+    /// physics for the same body.
+    /// </summary>
+    void DrawRectangle(
+        IRenderer renderer,
+        ITexture pixel,
+        Vector2 worldCentre,
+        double width,
+        double height,
+        double rotation,
+        Colour colour)
+    {
+        float halfWidth = (float)(width / 2);
+        float halfHeight = (float)(height / 2);
+        float sin = MathF.Sin((float)rotation);
+        float cos = MathF.Cos((float)rotation);
+
+        Vector2 Corner(float localX, float localY)
+        {
+            Vector2 offset = new((localX * cos) + (localY * sin), (localY * cos) - (localX * sin));
+            return camera.WorldToScreen(worldCentre + offset, renderer.ViewportSize);
+        }
+
+        Vector2 topLeft = Corner(-halfWidth, -halfHeight);
+        Vector2 topRight = Corner(halfWidth, -halfHeight);
+        Vector2 bottomRight = Corner(halfWidth, halfHeight);
+        Vector2 bottomLeft = Corner(-halfWidth, halfHeight);
+
+        DrawLine(renderer, pixel, topLeft, topRight, colour);
+        DrawLine(renderer, pixel, topRight, bottomRight, colour);
+        DrawLine(renderer, pixel, bottomRight, bottomLeft, colour);
+        DrawLine(renderer, pixel, bottomLeft, topLeft, colour);
     }
 
     void DrawLine(IRenderer renderer, ITexture pixel, Vector2 from, Vector2 to, Colour colour)

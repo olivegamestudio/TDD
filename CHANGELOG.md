@@ -11,14 +11,30 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - **The ship has a hull, and the debris field has something to hit it with.** `ShipMovement`'s
   Aether body now carries a circle fixture sized from the new `ShipProfile.HullRadius`, and
-  `AddObstacle(Position, radius)` seeds static circular obstacles into the same physics world —
-  physics only, no damage: rocks are harmless for now, and there will be places later that can hurt
-  the player. `SceneBody.Solid` (new, defaults `false`, so existing regions lose nothing) marks
-  which bodies collide; `debris-field.json` sets it on the actual rock and asteroid bodies, never
-  the backdrop. `RegionObstacles.Seed` (game-side) turns a loaded scene's solid bodies into
-  obstacles sized from each sprite's real measured pixel dimensions, the same conversion
+  `AddObstacle(Position, width, height, rotation)` seeds static rectangular obstacles into the same
+  physics world — physics only, no damage: rocks are harmless for now, and there will be places
+  later that can hurt the player. `SceneBody.Solid` (new, defaults `false`, so existing regions lose
+  nothing) marks which bodies collide; `debris-field.json` sets it on the actual rock and asteroid
+  bodies, never the backdrop. `RegionObstacles.Seed` (game-side) turns a loaded scene's solid bodies
+  into obstacles sized from each sprite's real measured pixel dimensions, the same conversion
   `RegionView` already uses to draw them, and `GameScreen` seeds them once a game has both a ready
   ship and a loaded region.
+
+  **Rectangular, not circular — a playtest showed why.** The first cut averaged each sprite's width
+  and height into one collision radius; against the actual debris field that read badly on anything
+  long and thin, a rock wall's own collision circle reaching well past where the wall is drawn in
+  some places and falling short of a corner in others. `AddObstacle` now takes a width, a height and
+  a rotation, and builds a four-corner polygon fixture turned by hand to match — the same convention
+  `Heading` already uses, clockwise from positive Y, rather than trusting Aether's own rotation to
+  agree with it untested. `RegionObstacles` derives width from a body's `ScaleX` and height from its
+  `ScaleY` independently, and turns the rectangle by the same `-RotationDegrees * π / 180`
+  conversion `RegionView` already draws the sprite with, so the collision shape sits exactly under
+  the art it is standing in for.
+
+  **Every `asteroid1`, not just the ones on the `Environment` layer.** The original heuristic marked
+  `asteroid1` solid only there, reasoning the rest were background picture; a play session found one
+  sitting in the open, drawn exactly like a real obstacle, with nothing behind it to read as
+  backdrop. All 14 `asteroid1` instances in `debris-field.json` are solid now, regardless of layer.
 
   The body's position now syncs from `Player.Position` every flying frame rather than always
   starting at zero, which is what lets the ship and an obstacle placed at its true position actually
@@ -48,14 +64,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   transparent padding a full-canvas guess did not account for — and `RegionObstacles` now measures
   that one too. The rocks needed nothing: their canvases turned out to have no padding at all.
 
-  **`CollisionDebugView` draws a ring around the hull and around every solid body, at the exact
-  radius the physics actually collides at** — reading `RegionObstacles.RadiusOf` and
-  `ShipProfile.HullRadius` rather than keeping a second copy that could quietly disagree with what
-  is seeded. A developer aid, not a shipped feature: `Enabled` defaults to `true` while the gap
-  between "the physics is right" and "the physics looks right" is still being closed, and drawn
-  last, after even the vignette, so a collision worth checking near the screen's edge is not dimmed
-  to find. There is no primitive-shape drawing anywhere in this renderer, so a ring is faked the
-  standard way — short segments of `pixel.png`, one new opaque pixel asset, stretched and rotated.
+  **`CollisionDebugView` draws a ring around the hull and a rectangle around every solid body, at
+  the exact size and rotation the physics actually collides at** — reading
+  `RegionObstacles.SizeOf`/`RotationOf` and `ShipProfile.HullRadius` rather than keeping a second
+  copy that could quietly disagree with what is seeded. The rectangle followed the physics off the
+  circle for the same reason a playtest gave for the collision shape itself: a red ring around an
+  elongated rock wall was visibly the wrong shape once it was on screen next to the art. A developer
+  aid, not a shipped feature: `Enabled` defaults to `true` while the gap between "the physics is
+  right" and "the physics looks right" is still being closed, and drawn last, after even the
+  vignette, so a collision worth checking near the screen's edge is not dimmed to find. There is no
+  primitive-shape drawing anywhere in this renderer, so both shapes are faked the standard way —
+  short segments of `pixel.png`, one new opaque pixel asset, stretched and rotated.
   ([#184](https://github.com/olivegamestudio/TDD/issues/184))
 
 - **The game screen is framed, and the sky behind it has come down.** The backdrop was authored as

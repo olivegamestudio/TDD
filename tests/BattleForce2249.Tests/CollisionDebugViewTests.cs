@@ -3,11 +3,18 @@ using OliveGameStudio;
 namespace BattleForce2249.Tests;
 
 /// <summary>
-/// Covers <see cref="CollisionDebugView"/>: that it draws a ring for the hull and one for every
-/// solid body, that a non-solid body draws nothing, and that turning it off draws nothing at all.
+/// Covers <see cref="CollisionDebugView"/>: that it draws a ring for the hull and a rectangle for
+/// every solid body, that a non-solid body draws nothing, and that turning it off draws nothing at
+/// all.
 /// </summary>
 public sealed class CollisionDebugViewTests
 {
+    /// <summary>
+    /// A rectangle is drawn as four line segments, one per side — see
+    /// <c>CollisionDebugView.DrawRectangle</c>.
+    /// </summary>
+    const int SegmentsPerObstacle = 4;
+
     static SceneBody Rock(string name, double x, double y, bool solid) =>
         new(name, "rock1", x, y, RotationDegrees: 0, ScaleX: 1, ScaleY: 1, Layer: "Environment", Order: 0, Solid: solid);
 
@@ -40,7 +47,7 @@ public sealed class CollisionDebugViewTests
     }
 
     [Fact]
-    public void ASolidBody_AddsARing_ButANonSolidBodyDoesNot()
+    public void ASolidBody_AddsARectangle_ButANonSolidBodyDoesNot()
     {
         CollisionDebugView debug = new(new Camera2D()) { Enabled = true, HullRadius = 10 };
         RecordingRenderer hullOnly = new();
@@ -51,7 +58,7 @@ public sealed class CollisionDebugViewTests
         RecordingRenderer withSolid = new();
         debug.Render(withSolid);
 
-        Assert.Equal(hullSegments * 2, withSolid.Drawn.Count);
+        Assert.Equal(hullSegments + SegmentsPerObstacle, withSolid.Drawn.Count);
 
         debug.Bodies = [Rock("solid-rock", 100, 0, solid: true), Rock("decoration", -100, 0, solid: false)];
         RecordingRenderer withDecoration = new();

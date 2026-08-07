@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using nkast.Aether.Physics2D.Dynamics;
 using AetherVector2 = nkast.Aether.Physics2D.Common.Vector2;
+using Vertices = nkast.Aether.Physics2D.Common.Vertices;
 
 namespace OliveGameStudio;
 
@@ -190,27 +191,75 @@ public sealed class ShipMovement
     }
 
     /// <summary>
-    /// Puts a fixed, circular obstacle into the ship's physics — a rock, a hull, anything the ship
-    /// should not be able to fly through. It never moves once placed.
+    /// Puts a fixed, rectangular obstacle into the ship's physics — a rock, a hull, anything the
+    /// ship should not be able to fly through. It never moves once placed.
     /// </summary>
     /// <param name="position">Where the obstacle stands in the world.</param>
-    /// <param name="radius">How big a circle it fills. Must be a positive, finite number.</param>
+    /// <param name="width">How wide it is along its own unrotated axis. Must be positive, finite.</param>
+    /// <param name="height">How tall it is along its own unrotated axis. Must be positive, finite.</param>
+    /// <param name="rotation">
+    /// How far it is turned, in radians, in the same convention as <see cref="Heading"/>: zero
+    /// along the positive Y axis, increasing clockwise towards positive X.
+    /// </param>
     /// <exception cref="ArgumentOutOfRangeException">
-    /// <paramref name="radius"/> is not a positive, finite number — an obstacle with no size blocks
-    /// nothing, and one of infinite size blocks everywhere.
+    /// <paramref name="width"/> or <paramref name="height"/> is not a positive, finite number — an
+    /// obstacle with no size blocks nothing, and one of infinite size blocks everywhere.
+    /// <paramref name="rotation"/> that is not finite is refused for the same reason a heading is:
+    /// it would place every corner nowhere, in full, without raising anything.
     /// </exception>
     /// <remarks>
-    /// This knows nothing about what the obstacle represents — a rock, a wreck, a wall — because
-    /// that is content, and content is the game's to supply. It only ever adds; nothing here removes
-    /// one, because nothing yet asks to.
+    /// <para>
+    /// A rectangle rather than a circle, because most of what this collides with is not round.
+    /// Averaging a shape's width and height into one radius was tried first and reads badly on
+    /// anything long and thin — a rock wall's own collision circle reaching out over open space
+    /// well past where the wall is actually drawn, or falling short of a corner still well within
+    /// it. A rectangle does not fit an irregular rock outline exactly either, but it is wrong by a
+    /// margin rather than by a shape.
+    /// </para>
+    /// <para>
+    /// <b>The rotation is applied here, by hand, rather than left to the body's own.</b> A fixture
+    /// is built from four corners already turned by <paramref name="rotation"/> in this type's own
+    /// convention, on a body whose own rotation stays zero — the same reason <see cref="Heading"/>
+    /// is never read from Aether's <c>Body.Rotation</c> either: this convention is clockwise from
+    /// positive Y, and nothing here wants to find out by trial and error whether Aether's matches
+    /// it before trusting a wall to be facing the way it was drawn.
+    /// </para>
     /// </remarks>
-    public void AddObstacle(Position position, double radius)
+    public void AddObstacle(Position position, double width, double height, double rotation)
     {
-        ThrowIfNotFinite(radius);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(radius);
+        ThrowIfNotFinite(width);
+        ThrowIfNotFinite(height);
+        ThrowIfNotFinite(rotation);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
 
         Body obstacle = _world.CreateBody(ToAether(position), rotation: 0f, BodyType.Static);
-        obstacle.CreateCircle((float)radius, density: 1f);
+        obstacle.CreatePolygon(RotatedRectangle(width, height, rotation), density: 1f);
+    }
+
+    /// <summary>
+    /// The four corners of a rectangle centred on the origin, turned by <paramref name="rotation"/>
+    /// in this type's own convention. Left in counter-clockwise order, which is the order Aether
+    /// asks a polygon's vertices to already be in — a rotation that only turns every corner by the
+    /// same angle cannot itself reorder them.
+    /// </summary>
+    static Vertices RotatedRectangle(double width, double height, double rotation)
+    {
+        double halfWidth = width / 2;
+        double halfHeight = height / 2;
+        double sin = Math.Sin(rotation);
+        double cos = Math.Cos(rotation);
+
+        AetherVector2 Corner(double localX, double localY) => new(
+            (float)((localX * cos) + (localY * sin)),
+            (float)((localY * cos) - (localX * sin)));
+
+        return new Vertices([
+            Corner(-halfWidth, -halfHeight),
+            Corner(halfWidth, -halfHeight),
+            Corner(halfWidth, halfHeight),
+            Corner(-halfWidth, halfHeight),
+        ]);
     }
 
     /// <summary>

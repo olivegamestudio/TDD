@@ -309,7 +309,7 @@ public sealed class ShipMovementTests
     public void AnObstacleInTheWay_BlocksTheShip()
     {
         // the ship starts at the origin facing forward (+Y), so this sits squarely in its path
-        _ship.AddObstacle(new Position(0, 50), radius: 5);
+        _ship.AddObstacle(new Position(0, 50), width: 10, height: 10, rotation: 0);
 
         // unobstructed, five seconds at up to the ship's own top speed of 100 covers several
         // hundred units — comfortably enough to have flown straight through an obstacle at 50
@@ -327,7 +327,40 @@ public sealed class ShipMovementTests
     {
         // off to the side rather than ahead: the ship flying straight forward should never come
         // near it, so nothing here should read any differently to a ship with no obstacles at all
-        _ship.AddObstacle(new Position(200, 25), radius: 5);
+        _ship.AddObstacle(new Position(200, 25), width: 10, height: 10, rotation: 0);
+
+        Fly(thrust: 1, turn: 0, seconds: 1);
+
+        Assert.True(_player.Position.Y > 0, "the ship did not move forward");
+        Assert.Equal(0, _player.Position.X, 6);
+    }
+
+    [Fact]
+    public void ARotatedObstacle_BlocksAlongItsTurnedAxis_NotItsOriginalOne()
+    {
+        // Short across, long up and down, off to the side of the ship's path at x=20 — unrotated,
+        // neither dimension reaches x=0, so the ship flying straight up it passes untouched.
+        // Turned a quarter circle, the long axis swings across the path instead of along it, and
+        // now it does. Same obstacle, same position; only the rotation says whether it is hit.
+        //
+        // Turned, the rectangle's near edge — its own width, 4, halved — sits 2 units below its
+        // centre, so at y=48; a hull radius of 1 stops the ship with its centre at y=47.
+        _ship.AddObstacle(new Position(20, 50), width: 4, height: 60, rotation: Math.PI / 2);
+
+        Fly(thrust: 1, turn: 0, seconds: 5, frames: 5000);
+
+        Assert.True(_player.Position.Y < 47.5,
+            $"a rectangle turned across the flight path did not block it, reaching {_player.Position.Y}");
+        Assert.True(_player.Position.Y > 30,
+            $"the ship did not reach the obstacle at all, stopping at {_player.Position.Y}");
+    }
+
+    [Fact]
+    public void AnUnrotatedObstacle_OffToOneSide_DoesNotBlockTheShip()
+    {
+        // the same obstacle as the turned one above, at rotation zero: its long axis runs
+        // alongside the flight path rather than across it, so the ship never reaches it
+        _ship.AddObstacle(new Position(20, 50), width: 4, height: 60, rotation: 0);
 
         Fly(thrust: 1, turn: 0, seconds: 1);
 
@@ -342,7 +375,7 @@ public sealed class ShipMovementTests
         // test moving it by hand — and this is what that looks like when it happens to land
         // inside an obstacle. An idle frame must not go looking for the nearest way to correct
         // that on the player's behalf; the ship was never asked to fly, so it does not move them.
-        _ship.AddObstacle(Position.Origin, radius: 10);
+        _ship.AddObstacle(Position.Origin, width: 20, height: 20, rotation: 0);
 
         _ship.Update(_player, ShipControls.Neutral, TimeSpan.FromSeconds(1));
 
@@ -352,22 +385,31 @@ public sealed class ShipMovementTests
     [Theory]
     [InlineData(0)]
     [InlineData(-5)]
-    public void AddObstacle_RejectsANonPositiveRadius(double radius)
+    public void AddObstacle_RejectsANonPositiveWidthOrHeight(double size)
     {
         // an obstacle with no size blocks nothing, which is a silent no-op content almost
         // certainly did not intend when it asked for one
-        Assert.Throws<ArgumentOutOfRangeException>(() => _ship.AddObstacle(Position.Origin, radius));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => _ship.AddObstacle(Position.Origin, width: size, height: 10, rotation: 0));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => _ship.AddObstacle(Position.Origin, width: 10, height: size, rotation: 0));
     }
 
     [Theory]
     [InlineData(double.PositiveInfinity)]
     [InlineData(double.NegativeInfinity)]
     [InlineData(double.NaN)]
-    public void AddObstacle_RejectsARadiusThatIsNotAFiniteNumber(double radius)
+    public void AddObstacle_RejectsAWidthHeightOrRotationThatIsNotAFiniteNumber(double value)
     {
-        // the opposite failure: an obstacle of infinite size blocks everywhere, not just where it
-        // was placed
-        Assert.Throws<ArgumentOutOfRangeException>(() => _ship.AddObstacle(Position.Origin, radius));
+        // an infinite size blocks everywhere rather than just where it was placed, and a rotation
+        // that is not a number places every corner nowhere, in full, the same trap a heading falls
+        // into for the same reason
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => _ship.AddObstacle(Position.Origin, width: value, height: 10, rotation: 0));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => _ship.AddObstacle(Position.Origin, width: 10, height: value, rotation: 0));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => _ship.AddObstacle(Position.Origin, width: 10, height: 10, rotation: value));
     }
 
     // ---- handling that cannot be flown ----
