@@ -277,6 +277,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A countdown can no longer be built with a negative duration, which produced a timer that could
+  never be rearmed.** `Countdown` was the last numeric type in the engine to take its input on
+  trust — `Meter`, `QuestTrigger`, `LootMagnet`, `ShieldStats` and the rest all refuse values that
+  would make the object behave wrongly. A negative duration started the countdown already elapsed,
+  and because `Reset` puts the constructed duration back, it stayed elapsed through every reset
+  after that: the one promise the type makes about resetting, broken silently and for good.
+
+  The constructor now throws `ArgumentOutOfRangeException`, at the point where the wrong number is
+  still legible as the wrong number. Zero is deliberately still allowed — a countdown given no time
+  to run is finished the moment it is made, which is a coherent answer and is how a splash screen
+  configured to last no time skips itself. The only consumer, `CompanyScreen`, is unaffected: its
+  duration comes from options that already reject a negative on resolve.
+  ([#174](https://github.com/olivegamestudio/TDD/issues/174))
+
 - **A pair of shields too large to add up now leaves a ship enormously well shielded instead of
   crashing the fit.** `Shielding` summed the capacity of its fitted shields without asking whether
   the total was still a number a pool could hold. Two `ShieldStats.Absorbing` shields that each
