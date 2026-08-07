@@ -32,6 +32,7 @@ sealed class TestRoster : ICharacterRoster
         DisgracedShip.Handling,
         Health: 100,
         Durability: 100,
+        CargoSlots: 16,
         Loadout: []);
 
     /// <inheritdoc />

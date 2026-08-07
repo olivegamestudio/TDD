@@ -7,8 +7,8 @@ namespace OliveGameStudio.World.Tests;
 /// </summary>
 public sealed class LootTests
 {
-    static readonly Item Salvage = new("salvage.plating");
-    static readonly Item Ore = new("ore.iron");
+    static readonly Item Salvage = new("salvage.plating", new ItemStats(EquipSlot.None, StackLimit: 10));
+    static readonly Item Ore = new("ore.iron", new ItemStats(EquipSlot.None, StackLimit: 10));
 
     static Loot AMagnet(double reach = 50, double driftSpeed = 10) =>
         new(new LootMagnet(reach, driftSpeed));
@@ -41,7 +41,7 @@ public sealed class LootTests
     public void ADropThePlayerNeverComesNear_StaysWhereItIs()
     {
         Loot loot = AMagnet(reach: 50);
-        Inventory held = new();
+        Inventory held = new(slots: 8);
 
         LootDrop drop = loot.Drop(Salvage, new Position(0, 500));
         loot.Update(Position.Origin, new Position(0, 100), elapsedSeconds: 1, held);
@@ -56,7 +56,7 @@ public sealed class LootTests
     public void ADropThePlayerComesWithinReachOf_IsDrawnInWithoutAButton()
     {
         Loot loot = AMagnet(reach: 50, driftSpeed: 10);
-        Inventory held = new();
+        Inventory held = new(slots: 8);
 
         LootDrop drop = loot.Drop(Salvage, new Position(0, 20));
         loot.Update(Position.Origin, Position.Origin, elapsedSeconds: 1, held);
@@ -68,7 +68,7 @@ public sealed class LootTests
     public void ADropDrawnIn_DriftsTowardThePlayerRatherThanJumpingToThem()
     {
         Loot loot = AMagnet(reach: 50, driftSpeed: 10);
-        Inventory held = new();
+        Inventory held = new(slots: 8);
 
         LootDrop drop = loot.Drop(Salvage, new Position(0, 20));
 
@@ -84,7 +84,7 @@ public sealed class LootTests
     public void ADropThatReachesThePlayer_IsCollectedAndLeavesTheWorld()
     {
         Loot loot = AMagnet(reach: 50, driftSpeed: 10);
-        Inventory held = new();
+        Inventory held = new(slots: 8);
 
         loot.Drop(Salvage, new Position(0, 20));
 
@@ -102,7 +102,7 @@ public sealed class LootTests
         // a tuning detail. The drop is a single unit from the line the frame covered and nowhere
         // near either end of it, so sampling the point the frame finished at would miss it.
         Loot loot = AMagnet(reach: 5, driftSpeed: 10);
-        Inventory held = new();
+        Inventory held = new(slots: 8);
 
         LootDrop drop = loot.Drop(Salvage, new Position(1, 500));
         loot.Update(Position.Origin, new Position(0, 1000), elapsedSeconds: 1, held);
@@ -117,7 +117,7 @@ public sealed class LootTests
         // that gave up on them. One that has been drawn in keeps coming and arrives when they
         // slow down.
         Loot loot = AMagnet(reach: 50, driftSpeed: 10);
-        Inventory held = new();
+        Inventory held = new(slots: 8);
 
         LootDrop drop = loot.Drop(Salvage, new Position(0, 20));
         loot.Update(Position.Origin, Position.Origin, elapsedSeconds: 1, held);
@@ -136,7 +136,7 @@ public sealed class LootTests
     public void SeveralDropsCollectedInOneFrame_ArriveInTheOrderTheyFell()
     {
         Loot loot = AMagnet(reach: 50, driftSpeed: 100);
-        Inventory held = new();
+        Inventory held = new(slots: 8);
 
         loot.Drop(Salvage, new Position(0, 10));
         loot.Drop(Ore, new Position(0, 20));
@@ -151,7 +151,7 @@ public sealed class LootTests
     public void AGuaranteedDrop_IsCollectedTheInstantItFallsWhereverThePlayerIs()
     {
         Loot loot = AMagnet(reach: 1, driftSpeed: 1);
-        Inventory held = new();
+        Inventory held = new(slots: 8);
 
         loot.DropGuaranteed(Salvage, held);
 
@@ -178,7 +178,7 @@ public sealed class LootTests
     public void AFrameThatCannotBeMeasured_LeavesADropWhereItIsRatherThanLosingIt()
     {
         Loot loot = AMagnet(reach: 50, driftSpeed: 10);
-        Inventory held = new();
+        Inventory held = new(slots: 8);
 
         LootDrop drop = loot.Drop(Salvage, new Position(0, 20));
         loot.Update(Position.Origin, Position.Origin, elapsedSeconds: 1, held);
@@ -202,7 +202,7 @@ public sealed class LootTests
     public void ATimeNoDropCouldDriftFor_IsRefusedWhereTheFrameIsApplied(double elapsedSeconds)
     {
         Loot loot = AMagnet();
-        Inventory held = new();
+        Inventory held = new(slots: 8);
 
         loot.Drop(Salvage, new Position(0, 10));
 
@@ -218,7 +218,7 @@ public sealed class LootTests
     public void AnItemOrAnInventoryThatIsNothing_IsRefusedWhereItIsHandedOver()
     {
         Loot loot = AMagnet();
-        Inventory held = new();
+        Inventory held = new(slots: 8);
 
         Assert.Throws<ArgumentNullException>(() => loot.Drop(null!, Position.Origin));
         Assert.Throws<ArgumentNullException>(() => loot.DropGuaranteed(null!, held));

@@ -34,7 +34,24 @@ public sealed class Ship
         ArgumentNullException.ThrowIfNull(profile);
 
         Profile = profile;
-        Loadout = new Inventory(profile.Loadout);
+
+        Loadout = new Loadout();
+        foreach (Item item in profile.Loadout)
+        {
+            ArgumentNullException.ThrowIfNull(item, nameof(profile));
+
+            if (!Loadout.TryEquip(item))
+            {
+                // A hull authored with five weapons, or with something that fits no slot at all, is
+                // a content mistake with no good runtime answer: fitting what fits and dropping the
+                // rest would give the player a ship quietly short of what it was written to be, and
+                // there is nowhere to put the overflow before the character exists.
+                throw new ArgumentException(
+                    $"The hull is fitted with '{item.Id}', which does not fit its slots.",
+                    nameof(profile));
+            }
+        }
+
         Health = new Meter(profile.Health);
         Durability = new Meter(profile.Durability);
 
@@ -62,18 +79,18 @@ public sealed class Ship
     public ShipHandling Handling => Profile.Handling;
 
     /// <summary>
-    /// Gets what the ship is fitted with. Items are equipped from the character's inventory; which
-    /// slots exist and what may go in them is an open decision, so today this is what is fitted and
-    /// nothing more.
+    /// Gets the ship's equip slots and what is fitted in them — four weapons, two shields and two
+    /// additional, all empty on a new hull. Items are equipped from the character's possessions.
     /// </summary>
     /// <remarks>
-    /// The shield slots are <see cref="Shielding"/> rather than part of this, and they hold stats
-    /// rather than items. An <see cref="Item"/> is still only an identifier — what turns one into
-    /// the numbers it is worth is the item model, which is open. Fitting shields by their stats is
-    /// what lets the shields work now without inventing that answer early; when it arrives, reading
-    /// a shield item's stats is what <see cref="Fit"/> is handed.
+    /// This is the record of <em>what</em> is fitted. What that is worth is still held beside it:
+    /// <see cref="Shielding"/> carries the shield numbers and <see cref="Orbs"/> the orbs', because
+    /// an <see cref="Item"/> names the slot it fits and does not yet carry the stats it is worth.
+    /// Joining the two — reading a shield item's <see cref="ShieldStats"/> and handing it to
+    /// <see cref="Fit(Shielding)"/> — is the next step and deliberately not this one; a weapon has
+    /// no stats type to join to at all yet, since nothing fires one.
     /// </remarks>
-    public Inventory Loadout { get; }
+    public Loadout Loadout { get; }
 
     /// <summary>
     /// Gets the hull's own health, and what is left of it.

@@ -103,13 +103,27 @@ public sealed class Loot
     /// </remarks>
     /// <param name="item">The item dropped.</param>
     /// <param name="into">The inventory it is collected into.</param>
+    /// <returns>
+    /// <c>true</c> when it was collected. <c>false</c> when there was no room for it, in which case
+    /// nothing was taken.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// A full hold is the one thing this cannot guarantee its way past, and it says so rather than
+    /// pretending. Dropping the item into the world instead would put the guarantee back exactly
+    /// where the caller asked for it not to be — reachable, and therefore missable — and quietly
+    /// discarding it is the failure this method exists to prevent. So the caller is told, and a
+    /// quest that hands over something the player has no room for is a moment the game has to
+    /// handle rather than one the model can hide.
+    /// </para>
+    /// </remarks>
     /// <exception cref="ArgumentNullException">Either argument is <c>null</c>.</exception>
-    public void DropGuaranteed(Item item, Inventory into)
+    public bool DropGuaranteed(Item item, Inventory into)
     {
         ArgumentNullException.ThrowIfNull(item);
         ArgumentNullException.ThrowIfNull(into);
 
-        into.Add(item);
+        return into.Add(item);
     }
 
     /// <summary>
@@ -117,8 +131,15 @@ public sealed class Loot
     /// what arrives. Called once per frame, after the ship has flown.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// A drop drawn in this frame drifts this frame too, so a player who stops on top of a pile
     /// does not wait a frame for it to start moving.
+    /// </para>
+    /// <para>
+    /// What arrives at a hold with no room for it is left in the world rather than collected, and
+    /// stays drawn in — so it is taken on the first frame after the player makes room, and never on
+    /// no frame at all.
+    /// </para>
     /// </remarks>
     /// <param name="from">Where the player was when the frame began.</param>
     /// <param name="to">Where the player is now the frame has ended.</param>
@@ -172,8 +193,15 @@ public sealed class Loot
 
         foreach (LootDrop drop in collected)
         {
-            _drops.Remove(drop);
-            into.Add(drop.Item);
+            // A drop that arrives at a full hold stays in the world rather than evaporating on
+            // contact. It has already been drawn in, so it sits on the player and is collected the
+            // moment room is made — which is the answer the design asks for anyway: the player
+            // decides what to keep, sell or leave behind, and nothing is destroyed on their behalf
+            // while they decide.
+            if (into.Add(drop.Item))
+            {
+                _drops.Remove(drop);
+            }
         }
     }
 }

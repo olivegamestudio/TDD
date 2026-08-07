@@ -28,7 +28,7 @@ to know about ships, quests or credits is on the wrong side of this line.
 | `OliveGameStudio.FrameRate` | Frame time filtering, so a paused or slowed game holds still while frames keep arriving. |
 | `OliveGameStudio.Input` | `InputRouter` — where a frame of input goes, and which device the game is being played on. |
 | `OliveGameStudio.Progress` | `LocalSaveProgressService`, persisting save text to a file. |
-| `OliveGameStudio.World` | `Position`, `Player`. The spatial model, plus the ship's physics and `IShipInput` — what an input means, never which device produced it. Also `Ship`, `ShipProfile`, `Meter`, `Item` and `Inventory`: a hull, the condition it is in, and the things that can be held. And what a hit costs it: `ShieldType`, `ShieldStats`, `Shielding`, `DamageOutcome`. And what flies alongside it: `OrbBehaviour`, `OrbStats`, `Orbs`. And how a dropped thing reaches its owner: `LootMagnet`, `LootDrop`, `Loot` — the mechanic only; what drops out of what is content. |
+| `OliveGameStudio.World` | `Position`, `Player`. The spatial model, plus the ship's physics and `IShipInput` — what an input means, never which device produced it. Also `Ship`, `ShipProfile`, `Meter`, `Item`, `ItemStats`, `EquipSlot`, `ItemStack`, `Inventory` and `Loadout`: a hull, the condition it is in, the things that can be held, and the slots they are held and fitted in. And what a hit costs it: `ShieldType`, `ShieldStats`, `Shielding`, `DamageOutcome`. And what flies alongside it: `OrbBehaviour`, `OrbStats`, `Orbs`. And how a dropped thing reaches its owner: `LootMagnet`, `LootDrop`, `Loot` — the mechanic only; what drops out of what is content. |
 | `OliveGameStudio.Rendering` | `Camera2D` — the world-to-screen transform, and the only place the world's axes and the screen's are reconciled. |
 | `OliveGameStudio.Localisation` | `ITextProvider`, `JsonTextProvider`, `MissingTextException`. |
 | `Pilgrimage` | The quest system. No project references at all, by design. |
@@ -110,7 +110,7 @@ ship.
 | Content (authored, never changes) | Instance (played, changes) |
 | --- | --- |
 | `CharacterTemplate` — id, translated name, hull, start location, starting inventory | `Character` — template, `Progression`, credits, `Reputation`, `Inventory`, `QuestLog`, current `Ship` |
-| `ShipProfile` — handling, health, durability, loadout | `Ship` — `Handling`, `Loadout`, `Shielding`, `Health`, `Shield`, `Durability`, `Movement` |
+| `ShipProfile` — handling, health, durability, cargo slots, fitted items | `Ship` — `Handling`, `Loadout`, `Shielding`, `Orbs`, `Health`, `Shield`, `Durability`, `Movement` |
 
 `ICharacterRoster` / `BattleForceRoster` is the seam the game supplies characters through, exactly
 as `ICampaign` supplies quests: the roster is a singleton and builds its templates on each read,
@@ -123,6 +123,48 @@ what `AddSingleton(DisgracedShip.Handling)` and `AddSingleton<ShipMovement>()` w
 and the owned ship could be given two different sets of numbers, and nothing would say so. It also
 removes a reset: entering the game screen used to call `ShipMovement.Reset()` so a resumed game
 began stationary, and now a new game simply builds a new ship, which has never been anywhere.
+
+**How much you can carry is the ship's; what you own is the character's.** `ShipProfile.CargoSlots`
+is the hull's built-in capacity, and `Character.Inventory` is sized from it — a fighter carries less
+than a hauler *because it is a fighter*, so the number is a role stat rather than a rank. The items
+themselves hang off the character, which is what keeps pillar 4 intact: a hold living on the ship
+would have to be captured into the save and restored into the newly-built hull, and anything missed
+there discards the player's goods silently.
+
+**Capacity is slots, never weight.** A slot is the only unit and what an item weighs is not
+modelled, so "have I got room?" is a question the player answers by looking. Items of a kind share a
+slot up to `ItemStats.StackLimit`, which is authored per item and capped at 99 — carrying pressure is
+a designed constraint, and one item type stacking to a thousand is a hole straight through it.
+
+**Being full is an answer, not a failure.** `Inventory.Add` returns `false` and takes nothing rather
+than throwing or dropping the overflow. Running out of room is an ordinary moment in the game, so
+every caller has somewhere better to put the item than the floor: loot that arrives at a full hold
+stays in the world and is collected on the first frame after room is made, and `Loot.DropGuaranteed`
+reports that a guarantee could not be kept rather than losing the item to keep its promise tidy. The
+one place a full hold throws is content authoring — a `CharacterTemplate` stocking more than the hull
+holds is a mistake with no good runtime answer, so it is refused where it is written.
+
+**The loadout is eight fixed slots: four weapons, two shields, two additional.** Every hull has the
+same eight, so a loadout is something the player fills rather than something the hull they happen to
+be flying decides for them. `Loadout.SlotsFor` reads the shield and additional counts from
+`Shielding.Slots` and `Orbs.Slots` rather than writing them down twice, so the item slots and the
+stats slots cannot drift into a ship with two shield slots that fits three shields. Letting the
+counts vary by hull is a later decision, and these are the numbers that would then come from the
+hull.
+
+**A collected item auto-slots, and pickup goes through the character.** `Character.Collect` owns the
+whole rule: the item is owned first, then fitted into a free slot of its kind if the ship has one.
+It is here rather than on the ship because both halves are the character's — a ship that equipped
+straight from the world would give the player gear that vanished with the hull. Fitting does not take
+the item out of the inventory; what the player owns is one list and what is bolted to the hull is a
+view onto it. A full hold refuses the pickup even when a slot is free, because equipping is not
+storage and a rule that said otherwise would quietly make the hold's size a lie.
+
+**An item is its identifier.** `Item` equality is the id alone, deliberately, so an item read back
+from a save is the item the game shipped and a save can carry ids and nothing else. `ItemStats`
+travels with the item because every holder needs it, but it does not decide which item this is — an
+id authored twice with two sets of numbers is one item described wrongly, and `Inventory.Add` throws
+where the two first meet rather than letting them become a second stack held under the wrong limit.
 
 **Shield slots add up, and that is the whole stacking rule.** A ship carries `Shielding` — up to
 `Shielding.Slots` (two) `ShieldStats`, each authored as one of the two things a shield can do:
@@ -251,9 +293,18 @@ spending and the two have to be told apart wherever anything reports what a job 
 - **No curve, no combat, no wear.** `Progression.Advance` is called with the points a level is
   worth rather than working them out; nothing damages a ship or wears one out. Numbers invented here
   would be numbers the design then has to argue with.
-- **`Item` is an identifier and nothing else**, and `Inventory` serves both what a character owns
-  and what a ship is fitted with. Slots, categories, stacking and what happens at zero durability
-  are open decisions, and a shape invented ahead of them is a shape to migrate away from.
+- **An item still has no numbers of its own.** `ItemStats` says how high an item stacks and which
+  slot it fits, which is what holding and fitting one needs. What an item is *worth* — a shield's
+  absorption, an orb's orbit, a weapon's damage — is not joined to it yet, so a shield item sitting
+  in a shield slot does not by itself give the ship a shield layer. Durability is not modelled at
+  all, and the full item category list is still open.
+- **Nothing moves an item between slots.** `Loadout.TryEquip` is the auto-slot rule and
+  `Loadout.Unequip` takes something back out; the drag-and-drop that serves mouse and touch has
+  nothing to be built on, because the engine reads no pointer — `InputFrame` is a keyboard and a
+  gamepad.
+- **Cargo bays are not modelled.** `ShipProfile.CargoSlots` is the hull's built-in capacity and the
+  whole of it. Bays that couple to the pilot, the vendor swap and the ceiling they stop at are
+  economy work.
 - **`DisgracedShip.Profile`'s health and durability are placeholders.** The handling beside them is
   not — that is the tuning quest 1 was checked against.
 

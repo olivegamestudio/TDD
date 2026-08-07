@@ -24,9 +24,38 @@ namespace OliveGameStudio;
 /// How much wear the hull can take. Distinct from health: health is what a fight costs and
 /// durability is what time and use cost.
 /// </param>
-/// <param name="Loadout">What the hull comes fitted with. Empty is a perfectly good answer.</param>
+/// <param name="CargoSlots">
+/// How much the hull can carry, counted in inventory slots. A fighter carries less than a hauler
+/// <em>because it is a fighter</em>, so this is a role stat rather than a rank: it says what the
+/// ship is for, not how far the player has come.
+/// </param>
+/// <param name="Loadout">
+/// What the hull comes fitted with, as items to be slotted into the ship's
+/// <see cref="OliveGameStudio.Loadout"/>. Empty is a perfectly good answer, and it is the one every
+/// hull gives today.
+/// </param>
 public sealed record ShipProfile(
     ShipHandling Handling,
     double Health,
     double Durability,
-    IReadOnlyList<Item> Loadout);
+    int CargoSlots,
+    IReadOnlyList<Item> Loadout)
+{
+    /// <summary>
+    /// How much the hull can carry, counted in inventory slots.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// The count is negative. Zero is allowed — a hull with no hold is a thing content may
+    /// legitimately author — but a negative one is a hold whose free space is a debt, and every
+    /// question asked of it ("is there room?", "how much is left?") comes back a nonsense the
+    /// player is shown.
+    /// </exception>
+    public int CargoSlots { get; } = Validated(CargoSlots);
+
+    static int Validated(int cargoSlots)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(cargoSlots, nameof(cargoSlots));
+
+        return cargoSlots;
+    }
+}

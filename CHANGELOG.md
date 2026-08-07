@@ -9,6 +9,43 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A hold has a size, and items stack in it.** `Inventory` is now a bounded set of slots rather
+  than an unbounded list. `ItemStats` — the stats type this brings in, alongside `ShipHandling`,
+  `ShieldStats` and `OrbStats` — says how high an item stacks and which slot it fits; items of a
+  kind share a slot up to that limit, and the one after it opens another. The limit is capped at
+  99, because carrying pressure is a designed constraint the player is meant to keep feeling, and
+  one item type stacking to a thousand is a hole straight through it.
+
+  Capacity is counted in slots and never in weight, so "have I got room?" is a question the player
+  answers by looking. How many slots there are is a ship stat — `ShipProfile.CargoSlots`, 16 on the
+  starting hull and untuned — while what is in them belongs to the character, which is what keeps
+  possessions out of the transient hull that a save would have to rebuild them into.
+
+  **Being full is an answer rather than a failure.** `Inventory.Add` reports that there was no room
+  and takes nothing, so nothing is ever destroyed on the player's behalf. Loot that arrives at a
+  full hold now stays in the world instead of evaporating on contact, and is collected on the first
+  frame after room is made; `Loot.DropGuaranteed` says a guarantee could not be kept rather than
+  losing the item to keep its promise tidy. The one place a full hold throws is authoring — content
+  stocking a character with more than the hull holds is a mistake with no good runtime answer.
+
+- **A ship has eight equip slots and a collected item finds its own.** `Loadout` is four weapon
+  slots, two shield slots and two additional slots, all empty on a new hull, and `EquipSlot` is what
+  an item says to name the one it fits. `Character.Collect` is the pickup rule in one place: the
+  item is owned first, then fitted into a free slot of its kind when the ship has one — because a
+  player who collects their first weapon and flies on unarmed has been given no reason to think a
+  screen exists that they have to open. Fitting does not take the item out of the inventory, so
+  losing the ship loses the fitting and not the item.
+
+  The shield and additional counts are read from `Shielding.Slots` and `Orbs.Slots` rather than
+  written down twice, so the item slots and the stats slots cannot drift apart into a ship with two
+  shield slots that fits three shields.
+
+  **An item is its identifier and only its identifier.** Equality is the id alone, so an item read
+  back from a save is the item the game shipped and a save can carry ids and nothing else. An id
+  authored twice with two sets of numbers is one item described wrongly rather than two items, and
+  it is refused where the two first meet instead of quietly becoming a second stack held under the
+  wrong limit.
+
 - **Loot reaches the player without a button.** `Loot` holds what has been dropped into the world
   and not yet picked up. `Drop(item, position)` leaves an item where it fell; `Update(from, to,
   elapsedSeconds, into)` draws in whatever the frame came near, moves what is already coming, and

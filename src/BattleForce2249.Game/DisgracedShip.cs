@@ -57,12 +57,18 @@ public static class DisgracedShip
     /// made. The handling beside them is not a placeholder — it is the tuning quest 1 was checked
     /// against.
     ///
-    /// Nothing is fitted. Which slots a hull has and what may go in them is still an open decision,
-    /// so a loadout authored now would be authored against a shape that does not exist.
+    /// <b>Sixteen cargo slots is the design's indicative starter number and is not tuned either.</b>
+    /// Nothing is bought, sold or crafted yet, so there is nothing to run out of room against; what
+    /// the number does today is make the hold a real, countable size rather than an unbounded list.
+    /// The bays that extend it are a later purchase and are not modelled.
+    ///
+    /// Nothing is fitted. The Disgraced starts with eight empty slots, which is what the design
+    /// asks for — "critically low on everything" is a ship with the slots and nothing in them.
     /// </remarks>
     public static ShipProfile Profile { get; } = new(
         Handling,
         Health: 100,
         Durability: 100,
+        CargoSlots: 16,
         Loadout: []);
 }

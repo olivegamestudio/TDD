@@ -9,13 +9,13 @@ namespace BattleForce2249.Tests;
 /// </summary>
 public sealed class CharacterTests
 {
-    static readonly Item Cell = new("power-cell");
+    static readonly Item Cell = new("power-cell", ItemStats.Single);
 
     static CharacterTemplate TemplateWith(IReadOnlyList<Item>? inventory = null) =>
         new(
             "test-character",
             "A test character",
-            new ShipProfile(DisgracedShip.Handling, Health: 100, Durability: 100, Loadout: []),
+            new ShipProfile(DisgracedShip.Handling, Health: 100, Durability: 100, CargoSlots: 16, Loadout: []),
             "test-location",
             inventory ?? []);
 
@@ -49,7 +49,7 @@ public sealed class CharacterTests
         CharacterTemplate template = TemplateWith([Cell]);
         Character character = new(template, new QuestLog());
 
-        character.Inventory.Add(new Item("scrap"));
+        character.Inventory.Add(new Item("scrap", ItemStats.Single));
 
         Assert.Equal([Cell], template.StartingInventory);
     }
