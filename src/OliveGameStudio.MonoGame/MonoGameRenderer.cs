@@ -60,7 +60,10 @@ public sealed class MonoGameRenderer : IRenderer, IDisposable
             ToXna(sprite.Colour),
             sprite.Rotation,
             new XnaVector2(sprite.Origin.X, sprite.Origin.Y),
-            sprite.Scale,
+            // Two factors rather than one, because a sprite sized to the window cannot keep the
+            // texture's shape. Multiplied here rather than by the caller so that Sprite.Scale
+            // still means what it says on the sprites that do keep it.
+            new XnaVector2(sprite.Scale * sprite.Stretch.X, sprite.Scale * sprite.Stretch.Y),
             SpriteEffects.None,
             layerDepth: 0f);
     }

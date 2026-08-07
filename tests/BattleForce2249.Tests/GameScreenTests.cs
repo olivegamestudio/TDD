@@ -71,15 +71,17 @@ public sealed class GameScreenTests : HostTestBase
         ICamera camera,
         IShipView view,
         IGameSession? session = null,
-        IShipInput? pilot = null) =>
+        IShipInput? pilot = null,
+        RegionView? region = null) =>
         new(session ?? new StubGameSession(),
             pilot ?? new NeutralShipInput(),
             new QuestProximityWatcher(new BattleForceWorld()),
             camera,
             view,
             new StarField(camera),
-            new RegionView(camera),
-            new RegionLoader(Path.Combine(AppContext.BaseDirectory, RegionLoader.FolderName)));
+            region ?? new RegionView(camera),
+            new RegionLoader(Path.Combine(AppContext.BaseDirectory, RegionLoader.FolderName)),
+            new Vignette());
 
     [Fact]
     public void Render_DrawsTheShip()
@@ -132,8 +134,67 @@ public sealed class GameScreenTests : HostTestBase
 
         screen.Render(renderer);
 
-        // last, because the ship is drawn over the stars
-        Assert.Equal(renderer.ViewportCentre, renderer.Drawn[^1].Position);
+        // Second from last: the ship is drawn over the stars and the scenery, and the frame is
+        // drawn over the ship.
+        Assert.Equal(renderer.ViewportCentre, renderer.Drawn[^2].Position);
+    }
+
+    [Fact]
+    public void Render_FramesThePlayArea_OverEverythingElse()
+    {
+        // The frame is the last thing drawn, so the game passes beneath its dark corners rather
+        // than behind them. Drawn earlier it would be scenery, and the ship would fly over it.
+        GameScreen screen = ScreenFor(new Camera2D(), new StubShipView());
+        RecordingRenderer renderer = new();
+        renderer.Textures.SetSize(Vignette.AssetKey, 256, 256);
+
+        screen.Render(renderer);
+
+        Sprite frame = renderer.Drawn[^1];
+
+        Assert.Equal(renderer.Textures.Load(Vignette.AssetKey), frame.Texture);
+        Assert.Equal(renderer.ViewportCentre, frame.Position);
+        Assert.Equal(renderer.ViewportSize.X, frame.Scale * frame.Stretch.X * 256f, precision: 3);
+        Assert.Equal(renderer.ViewportSize.Y, frame.Scale * frame.Stretch.Y * 256f, precision: 3);
+    }
+
+    [Fact]
+    public void Entering_TakesTheSkyDown_WithoutDimmingWhatIsFlownThrough()
+    {
+        // The backdrop read as a picture the game was happening in front of. What stands in the
+        // world keeps its authored brightness, because the player has to see it in time.
+        RegionView region = new(new Camera2D());
+        GameScreen screen = ScreenFor(new Camera2D(), new StubShipView(), region: region);
+
+        screen.Enter();
+
+        Assert.Equal(
+            new Colour(
+                BattleForce2249.GameScreen.BackdropBrightness,
+                BattleForce2249.GameScreen.BackdropBrightness,
+                BattleForce2249.GameScreen.BackdropBrightness,
+                1f),
+            region.BackdropTint);
+    }
+
+    [Fact]
+    public void TheFrame_TakesNothingFromWhatIsUnderIt()
+    {
+        // The overlay is non-interactive: a frame with it drawn flies exactly the ship a frame
+        // without it flies. It cannot be otherwise — a Vignette answers only Render — but the
+        // requirement is the player's, so it is asserted from the player's end rather than from
+        // the type's.
+        FixedShipInput pilot = new() { Controls = new ShipControls(thrust: 1, turn: 0) };
+
+        GameScreen framed = ScreenFor(new Camera2D(), new StubShipView(), pilot: pilot);
+        GameScreen bare = ScreenFor(new Camera2D(), new StubShipView(), pilot: pilot);
+
+        framed.Render(new RecordingRenderer());
+        framed.Update(TimeSpan.FromSeconds(1));
+        bare.Update(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(bare.Session.Player.Position.Y, framed.Session.Player.Position.Y, precision: 6);
+        Assert.NotEqual(0d, framed.Session.Player.Position.Y);
     }
 
     [Fact]
@@ -237,14 +298,16 @@ public sealed class GameScreenTests : HostTestBase
         RecordingRenderer renderer = new();
         screen.Render(renderer);
 
-        Assert.NotEqual(0f, renderer.Drawn[^1].Rotation);
+        // Second from last: the frame is drawn over the ship, and a frame has no lean to read.
+        Assert.NotEqual(0f, renderer.Drawn[^2].Rotation);
     }
 
     [Fact]
     public void Render_PutsTheStarsBehindTheShip()
     {
-        // sprites stack in the order they are drawn, so the ship goes last. The other way round
-        // and the player flies behind their own background.
+        // sprites stack in the order they are drawn, so the ship goes over the stars. The other way
+        // round and the player flies behind their own background. The frame is drawn over both,
+        // which is why the ship is second from last rather than last.
         Camera2D camera = new();
         ShipView ship = new(camera);
         GameScreen screen = ScreenFor(camera, ship);
@@ -257,8 +320,8 @@ public sealed class GameScreenTests : HostTestBase
         Assert.True(
             renderer.Drawn.Count > 1,
             "The ship was the only thing drawn — the stars are missing.");
-        Assert.Equal(512, renderer.Drawn[^1].Texture.Width);
-        Assert.All(renderer.Drawn.SkipLast(1), sprite => Assert.Equal(16, sprite.Texture.Width));
+        Assert.Equal(512, renderer.Drawn[^2].Texture.Width);
+        Assert.All(renderer.Drawn.SkipLast(2), sprite => Assert.Equal(16, sprite.Texture.Width));
     }
 
     [Fact]

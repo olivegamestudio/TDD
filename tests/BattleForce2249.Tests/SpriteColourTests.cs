@@ -40,6 +40,35 @@ public sealed class SpriteColourTests
     }
 
     [Fact]
+    public void ASpriteKeepsItsTexturesShape_UntilSomethingStretchesIt()
+    {
+        // The default has to be one on both axes rather than the zero a struct begins at: a sprite
+        // that defaulted to no stretch at all would draw nothing, and every caller that never
+        // asked about it would have to say so.
+        RecordingRenderer renderer = new();
+        ITexture texture = renderer.Textures.Load("anything");
+
+        renderer.Draw(new Sprite(texture, Vector2.Zero, 0f, Vector2.Zero, 1f));
+
+        Assert.Equal(Vector2.One, renderer.Single().Stretch);
+    }
+
+    [Fact]
+    public void AStretchedSpriteReachesTheRendererWithItsStretch()
+    {
+        RecordingRenderer renderer = new();
+        ITexture texture = renderer.Textures.Load("anything");
+        Vector2 wide = new(16f, 9f);
+
+        renderer.Draw(new Sprite(texture, Vector2.Zero, 0f, Vector2.Zero, 1f)
+        {
+            Stretch = wide,
+        });
+
+        Assert.Equal(wide, renderer.Single().Stretch);
+    }
+
+    [Fact]
     public void TheStarsAreDrawnOpaqueWhite()
     {
         StarField field = new(new Camera2D());

@@ -143,13 +143,16 @@ public sealed class BattleForceHostTests : HostTestBase
     }
 
     /// <summary>
-    /// Asserts the ship reached the screen, and reached it last so it is over the stars rather than
-    /// behind one.
+    /// Asserts the ship reached the screen, and reached it over the stars rather than behind one.
     /// </summary>
+    /// <remarks>
+    /// Second from last rather than last: the frame the play area is vignetted with is drawn over
+    /// everything, the ship included.
+    /// </remarks>
     static void AssertTheShipIsDrawn(RecordingRenderer renderer)
     {
         Assert.NotEmpty(renderer.Drawn);
-        Assert.Equal(512, renderer.Drawn[^1].Texture.Width);
+        Assert.Equal(512, renderer.Drawn[^2].Texture.Width);
     }
 
     [Fact]

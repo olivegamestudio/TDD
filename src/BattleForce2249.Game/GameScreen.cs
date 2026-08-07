@@ -17,6 +17,7 @@ namespace BattleForce2249;
 /// <param name="stars">The stars the ship flies through.</param>
 /// <param name="region">The scenery of the place being flown through.</param>
 /// <param name="regions">Where an authored region is read from.</param>
+/// <param name="frame">The overlay the play area is framed with.</param>
 public sealed class GameScreen(
     IGameSession session,
     IShipInput pilot,
@@ -25,7 +26,8 @@ public sealed class GameScreen(
     IShipView view,
     StarField stars,
     RegionView region,
-    RegionLoader regions)
+    RegionLoader regions,
+    Vignette frame)
     : IGameScreen, IActivatable, IRenderable
 {
     /// <summary>
@@ -67,6 +69,27 @@ public sealed class GameScreen(
     public const string OpeningRegionId = "debris-field";
 
     /// <summary>
+    /// How brightly the sky behind the game is drawn, against the 1 it was authored at.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The backdrop was authored as a picture in its own right and read as one: bright and flat
+    /// enough that the ship and the debris in front of it had nothing to stand out against. Taking
+    /// it down is what puts it behind the game rather than beside it.
+    /// </para>
+    /// <para>
+    /// It reaches the backdrop only — see <see cref="RegionView.BackdropTint"/>. The stars are
+    /// untouched, because points of light on a darker sky is the contrast this is buying, and so
+    /// is the scenery in the world, which the player has to see in time to avoid.
+    /// </para>
+    /// <para>
+    /// Untuned, and said plainly: this is a number chosen by reasoning about it rather than by
+    /// looking at it, and it is a judgement only a human at a screen can settle.
+    /// </para>
+    /// </remarks>
+    public const float BackdropBrightness = 0.5f;
+
+    /// <summary>
     /// Gets the task that begins the game, so a caller can await the save being read. Loading
     /// happens off the frame loop; nothing drives the session until it has finished.
     /// </summary>
@@ -87,6 +110,12 @@ public sealed class GameScreen(
         // constructor because a region is content read from disk, and reading it is work that
         // belongs to entering a screen rather than to building the container.
         region.Scene = regions.Load(OpeningRegionId);
+
+        // Beside the zoom rather than in the region file, because both are decisions about how
+        // this screen looks rather than about what the place contains: a region is content, and
+        // content that carried its own brightness would have to be re-authored to change its mood.
+        region.BackdropTint = new Colour(BackdropBrightness, BackdropBrightness, BackdropBrightness, 1f);
+
         camera.PixelsPerUnit = Zoom;
         _cameraSettled = false;
 
@@ -222,6 +251,11 @@ public sealed class GameScreen(
         region.Render(renderer);
 
         view.Render(renderer);
+
+        // Last of all, so the frame is over the game rather than in it: the ship and the debris
+        // pass beneath the dark corners instead of behind them. It draws and nothing else, so
+        // nothing under it loses a press to it.
+        frame.Render(renderer);
     }
 
     /// <summary>

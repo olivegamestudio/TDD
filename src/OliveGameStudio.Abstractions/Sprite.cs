@@ -41,4 +41,26 @@ public readonly record struct Sprite(
     /// colour are two different instructions.
     /// </remarks>
     public Colour Colour { get; init; } = Colour.White;
+
+    /// <summary>
+    /// How far the two axes are scaled relative to each other, on top of <see cref="Scale"/>. One
+    /// on both axes — what a sprite carries until something says otherwise — draws the texture at
+    /// its authored shape.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Almost everything drawn keeps its shape, so <see cref="Scale"/> stays the single factor and
+    /// this is the exception rather than a second half of it. What needs the exception is anything
+    /// sized to the <em>window</em>: a window's aspect is whatever the player dragged it to, so an
+    /// overlay covering one cannot be square, and a uniform scale can only either leave two edges
+    /// bare or push the other two off the screen.
+    /// </para>
+    /// <para>
+    /// It sits outside the positional parameters for the reason <see cref="Colour"/> does: that is
+    /// what lets the default be one on both axes rather than the zero a struct begins at, which
+    /// would draw nothing and make every existing caller say so. It is still part of the sprite's
+    /// value — two sprites differing only in stretch are two different instructions.
+    /// </para>
+    /// </remarks>
+    public Vector2 Stretch { get; init; } = Vector2.One;
 }

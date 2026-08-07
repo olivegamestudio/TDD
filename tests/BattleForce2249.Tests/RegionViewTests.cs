@@ -75,6 +75,52 @@ public sealed class RegionViewTests
     }
 
     [Fact]
+    public void ARegion_IsDrawnAsAuthored_UntilSomethingTintsIt()
+    {
+        RegionView view = new(Camera())
+        {
+            Scene = new SceneDefinition("test",
+            [
+                new SceneBody("sky", "space", 0, 0, 0, 1, 1, "Default", 0, 0),
+                new SceneBody("rock", "rock1", 0, 0, 0, 1, 1, "Environment", 0),
+            ], []),
+        };
+
+        RecordingRenderer renderer = new();
+
+        view.Render(renderer);
+
+        Assert.Equal(2, renderer.Drawn.Count);
+        Assert.All(renderer.Drawn, sprite => Assert.Equal(Colour.White, sprite.Colour));
+    }
+
+    [Fact]
+    public void TheBackdropTakesTheTint_AndTheWorldDoesNot()
+    {
+        // The sky is scenery the player looks past; the rock is scenery the player flies into.
+        // Dimming the second one takes away the warning they get of what they are about to hit,
+        // which is why the tint stops at the sky.
+        Colour dusk = new(0.5f, 0.5f, 0.5f, 1f);
+
+        RegionView view = new(Camera())
+        {
+            Scene = new SceneDefinition("test",
+            [
+                new SceneBody("sky", "space", 0, 0, 0, 1, 1, "Default", 0, 0),
+                new SceneBody("rock", "rock1", 0, 0, 0, 1, 1, "Environment", 0),
+            ], []),
+            BackdropTint = dusk,
+        };
+
+        RecordingRenderer renderer = new();
+
+        view.Render(renderer);
+
+        Assert.Equal(dusk, renderer.Drawn[0].Colour);
+        Assert.Equal(Colour.White, renderer.Drawn[1].Colour);
+    }
+
+    [Fact]
     public void Scenery_IsDrawnFurthestLayerFirst()
     {
         RegionView view = new(Camera())
