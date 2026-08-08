@@ -199,6 +199,20 @@ public sealed class ShipTests
     }
 
     [Fact]
+    public void AHullsAuthoredLoadout_IsNotTheCallersToChangeAfterwards()
+    {
+        // "A profile is authored and never changes" is the promise the type's own remarks make, and
+        // an IReadOnlyList only stops the holder mutating it — it says nothing about whoever still
+        // holds the list it was made from.
+        List<Item> authored = [new("weapon.pulse", new ItemStats(EquipSlot.Weapon, StackLimit: 1))];
+        ShipProfile profile = new(Handling, Health: 80, Durability: 40, CargoSlots: 16, authored, HullRadius: 1);
+
+        authored.Add(new Item("weapon.rail", new ItemStats(EquipSlot.Weapon, StackLimit: 1)));
+
+        Assert.Single(profile.Loadout);
+    }
+
+    [Fact]
     public void TwoShipsOffTheSameProfile_AreTwoShips()
     {
         // a profile is authored and shared; damage is not. Two characters flying the same hull are
