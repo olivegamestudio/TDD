@@ -55,6 +55,122 @@ public sealed class RegionView(ICamera camera) : IRenderable
     /// </remarks>
     public Colour BackdropTint { get; set; } = Colour.White;
 
+    /// <summary>
+    /// The asset key the region's light sources are drawn with. An identifier, not text: it is
+    /// never translated.
+    /// </summary>
+    /// <remarks>
+    /// This is the one sprite a region authors that is a <em>light</em> rather than a thing, and
+    /// the two below are what that costs it: it is placed by where the light is rather than by
+    /// where the file's middle is, and it flickers. Named here rather than carried by the content,
+    /// because whether a sprite is a light is a fact about the artwork — a body that had to declare
+    /// it could be authored not to, and then a light in the field would quietly be a rock that
+    /// glows.
+    /// </remarks>
+    public const string LightSprite = "glow";
+
+    /// <summary>
+    /// Where the light in <see cref="LightSprite"/> actually sits down its own file, as a fraction
+    /// of the texture's height.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Not a half, because the art is not centred within its own bounds. <c>glow.png</c> is 241×183
+    /// with a stretch of near-empty canvas above the light and almost none below it: measured from
+    /// the shipped PNG, the lit part spans rows 52–171 and its alpha-weighted centre is 0.654 down
+    /// the file, which every threshold from barely-visible to nearly-opaque agrees on to within a
+    /// few hundredths. Across, it is centred to within half a percent and is left at a half.
+    /// </para>
+    /// <para>
+    /// Drawn by the file's middle instead, a light lands roughly a third of a ship's length below
+    /// the point it was placed at — which is what #188 reported as lights sitting on the debris
+    /// rather than hanging in space among it. Corrected here rather than by redrawing the asset,
+    /// for the reason <c>MenuScreen.TitleContentCentreFraction</c> is: this number describes the
+    /// file, so a redrawn light restates it rather than silently moving every light in the region.
+    /// </para>
+    /// <para>
+    /// It reaches the region's lights only. <c>ShipView</c> draws its engine glows from the same
+    /// asset and is deliberately untouched — those offsets were placed against the origin they are
+    /// drawn with, so correcting theirs would move flames that are currently where somebody put
+    /// them.
+    /// </para>
+    /// </remarks>
+    public const float LightArtworkCentreFraction = 0.65f;
+
+    /// <summary>
+    /// How dim a light gets at the bottom of its flicker, and how bright at the top, against the 1
+    /// it was authored at.
+    /// </summary>
+    /// <remarks>
+    /// The ceiling is the artwork itself: brighter than 1 is a light the author never drew, and the
+    /// device would clamp it anyway, so the flicker only ever takes brightness away. The floor is
+    /// the other half of the same thought — the lights are scattered through a debris field the
+    /// player is navigating by, and one that dipped to nothing would blink out of the scene rather
+    /// than flicker in it.
+    ///
+    /// Untuned, and said plainly: the depth and the rates below were chosen by reasoning about them
+    /// rather than by looking at them, which is a judgement only a human at a screen can settle.
+    /// </remarks>
+    public const float DimmestLight = 0.6f;
+
+    /// <inheritdoc cref="DimmestLight" />
+    public const float BrightestLight = 1f;
+
+    /// <summary>
+    /// How fast a light breathes, in radians a second, and how much faster the tremor laid over it
+    /// runs.
+    /// </summary>
+    /// <remarks>
+    /// Two rates rather than one, at a ratio that is not a whole number, so the pair does not come
+    /// back into step on any short cycle: a single sine is a pulse, and a pulse on a scattered set
+    /// of lights reads as machinery rather than as light.
+    /// </remarks>
+    public const double FlickerRadiansPerSecond = 3.1;
+
+    /// <inheritdoc cref="FlickerRadiansPerSecond" />
+    public const double FlickerTremorRatio = 2.7;
+
+    double _secondsElapsed;
+
+    /// <summary>
+    /// Gets or sets how long the region has been on screen, in seconds — the only thing the
+    /// flicker is worked out from.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The view is told the time rather than keeping it, the same way <c>Orbs.PlaceAround</c> is
+    /// handed how long has been flown: nothing here ticks and nothing accumulates, so a frame drawn
+    /// twice draws the same picture both times and the flicker cannot drift with the frame rate.
+    /// </para>
+    /// <para>
+    /// A value that is negative or not finite is refused where it is written, for the reason the
+    /// camera refuses a target that is not finite. The sine of a number that is not one is not a
+    /// number, so every light in the region would be drawn through a colour channel that is not a
+    /// number — and <see cref="Colour"/> would raise it on some later frame, naming a channel
+    /// rather than the clock that produced it.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// The value is negative, or is not a finite number.
+    /// </exception>
+    public double SecondsElapsed
+    {
+        get => _secondsElapsed;
+
+        set
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(value);
+
+            if (!double.IsFinite(value))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(value), value, "The time a region has been on screen must be a finite number.");
+            }
+
+            _secondsElapsed = value;
+        }
+    }
+
     SceneDefinition _scene = SceneDefinition.Empty;
     IReadOnlyList<SceneBody> _ordered = [];
 
@@ -136,17 +252,82 @@ public sealed class RegionView(ICamera camera) : IRenderable
                 scale = authored * camera.PixelsPerUnit / AuthoredPixelsPerUnit;
             }
 
+            // The sky takes the tint; everything standing in the world is drawn as authored.
+            Colour colour = fixedToScreen ? BackdropTint : Colour.White;
+
+            bool light = string.Equals(body.Sprite, LightSprite, StringComparison.Ordinal);
+
             renderer.Draw(new Sprite(
                 Texture: texture,
                 Position: screen,
                 Rotation: rotation,
-                Origin: new Vector2(texture.Width, texture.Height) / 2f,
+                Origin: OriginOf(texture, light),
                 Scale: scale)
             {
-                // The sky takes the tint; everything standing in the world is drawn as authored.
-                Colour = fixedToScreen ? BackdropTint : Colour.White,
+                // A light dips and comes back; a rock is drawn at whatever the tint left it. The
+                // flicker multiplies rather than replaces, so a light painted on a dimmed sky is
+                // dimmed and flickering rather than one or the other.
+                Colour = light ? Dimmed(colour, BrightnessAt(body.X, body.Y, _secondsElapsed)) : colour,
             });
         }
+    }
+
+    /// <summary>
+    /// The point within a texture that a body is placed and turned about: the middle of the file
+    /// for everything the region draws, and the middle of the <em>light</em> for a light.
+    /// </summary>
+    /// <remarks>
+    /// Only the light has been measured, so only the light is corrected — see
+    /// <see cref="LightArtworkCentreFraction"/>. That is deliberate rather than an omission: a
+    /// solid body's collision rectangle is seeded from the body's own position, and moving where
+    /// its sprite is drawn without moving what it collides at would put the two out of step.
+    /// </remarks>
+    static Vector2 OriginOf(ITexture texture, bool light) =>
+        new(texture.Width / 2f, texture.Height * (light ? LightArtworkCentreFraction : 0.5f));
+
+    /// <summary>
+    /// The same colour with its three channels taken down by the amount given, leaving how much of
+    /// it shows alone.
+    /// </summary>
+    static Colour Dimmed(Colour colour, float brightness) =>
+        new(colour.Red * brightness, colour.Green * brightness, colour.Blue * brightness, colour.Alpha);
+
+    /// <summary>
+    /// How brightly a light standing at a given point is drawn at a given moment, against the 1 it
+    /// was authored at.
+    /// </summary>
+    /// <param name="x">Where the light stands along the world's X axis.</param>
+    /// <param name="y">Where the light stands along the world's Y axis.</param>
+    /// <param name="seconds">How long the region has been on screen.</param>
+    /// <returns>
+    /// A brightness between <see cref="DimmestLight"/> and <see cref="BrightestLight"/>.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// A slow breath with a faster tremor laid over it, mixed so the two together can never leave
+    /// the range the two constants name: the parts are weighted to sum to one, so the worst case is
+    /// both at full stretch in the same direction, which is exactly the end of the range.
+    /// </para>
+    /// <para>
+    /// Where a light stands is what sets its phase. A field of lights all dipping on the same beat
+    /// reads as a power cut rather than as light, and taking the phase from the position means
+    /// nothing has to be authored per light — and that a light keeps the phase it had when the
+    /// region is loaded again, which a number handed out in draw order would not.
+    /// </para>
+    /// </remarks>
+    public static float BrightnessAt(double x, double y, double seconds)
+    {
+        // Two coefficients rather than one, and unequal, so that lights sharing a row or a column
+        // are still out of step with each other.
+        double phase = (x * 0.7) + (y * 0.31);
+
+        double breath = Math.Sin((seconds * FlickerRadiansPerSecond) + phase);
+        double tremor = Math.Sin((seconds * FlickerRadiansPerSecond * FlickerTremorRatio) + (phase * 1.7));
+
+        double midpoint = (BrightestLight + DimmestLight) / 2d;
+        double depth = (BrightestLight - DimmestLight) / 2d;
+
+        return (float)(midpoint + (depth * ((breath * 0.6) + (tremor * 0.4))));
     }
 
     /// <summary>

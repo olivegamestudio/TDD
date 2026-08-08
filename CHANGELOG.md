@@ -455,6 +455,44 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **The debris field's lights hang where they were placed, and they flicker.** Both halves were
+  reported from the same play session. `RegionView` drew every body about the middle of its own
+  texture, which is right for a rock filling its canvas and wrong for `glow.png`: the lit part of
+  that file spans rows 52–171 of 183, with near-empty canvas above it and almost none below, so its
+  alpha-weighted centre is 0.654 down the file rather than 0.5. Placed by the file's middle, each of
+  the field's 14 lights landed roughly a third of a ship's length below the point it was authored
+  at — which reads as a light resting on the debris rather than hanging in space among it.
+
+  `RegionView.LightArtworkCentreFraction` corrects it at the draw rather than by redrawing the
+  asset, for the reason `MenuScreen.TitleContentCentreFraction` does: the number describes the file,
+  so a redrawn light restates it instead of silently moving every light in the region. Only the
+  light is corrected — everything else keeps the origin it had, because a solid body's collision
+  rectangle is seeded from its authored position and a sprite moved off its own collision shape is
+  worse than one drawn off its authored point.
+
+  **And they were static.** `RegionView.SecondsElapsed` is a clock the view is *handed* rather than
+  one it keeps, the same way `Orbs.PlaceAround` is handed how long has been flown: `GameScreen`
+  accumulates it and sets it beside the camera's own state each frame, so nothing here ticks, a
+  frame drawn twice draws the same picture both times, and the flicker cannot drift with the frame
+  rate. `RegionView.BrightnessAt` is the curve — a slow breath with a faster tremor over it, at a
+  ratio that is not a whole number so the pair does not come back into step on a short cycle,
+  weighted to stay within `DimmestLight`..`BrightestLight` (0.6..1). It never exceeds 1 because
+  brighter than the artwork is a light the author never drew, and it never reaches 0 because a light
+  the player is navigating a debris field by should flicker rather than blink out. A light's phase
+  comes from where it stands, so the 14 of them are out of step without anything being authored per
+  light — a field dipping on one beat is a power cut, not a flicker.
+
+  A time that is negative or not finite is refused at the setter, for the reason the camera refuses
+  a target that is not finite: the sine of a number that is not one is not a number, and the failure
+  would otherwise surface from inside `Colour` on some later frame, naming a channel rather than the
+  clock that produced it.
+
+  **`ShipView`'s engine glows are deliberately untouched**, though they draw the same asset with the
+  same file-centred origin. Their offsets were authored against that origin, so correcting theirs
+  would move flames that are currently where somebody put them — a separate change, and one only a
+  human at a screen can judge.
+  ([#188](https://github.com/olivegamestudio/TDD/issues/188))
+
 - **`Inventory.HasRoomFor` no longer promises room for an item `Add` refuses outright.** It is
   documented as saying what `Add` would do without doing it, and callers use it exactly that way —
   loot that has to stay in the world if it cannot be taken asks before the attempt. But it answered

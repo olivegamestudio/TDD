@@ -121,6 +121,11 @@ public sealed class GameScreen(
         camera.PixelsPerUnit = Zoom;
         _cameraSettled = false;
 
+        // The region's lights are drawn from a clock rather than from anything the player did, so
+        // it starts where the region does. Coming back to the game screen is a fresh look at the
+        // place, not a resumption of one — nothing about a light is progress.
+        _secondsInRegion = 0;
+
         // A ship built for a game already entered has whatever obstacles that game's region put
         // in it; a ship this Enter is about to build has none, and needs the field it flies into
         // seeded again. Cleared here rather than inferred from the ship changing, because the
@@ -134,6 +139,11 @@ public sealed class GameScreen(
     /// <inheritdoc />
     public void Update(TimeSpan frameTime)
     {
+        // Before the guard below, deliberately: the region is loaded and drawn from the moment the
+        // screen is entered, so its lights are on screen while the save is still being read and
+        // would otherwise stand frozen until it finished.
+        _secondsInRegion += frameTime.TotalSeconds;
+
         if (!session.IsReady)
         {
             // frames arrive while the save is still being read; there is no position to draw yet,
@@ -213,6 +223,13 @@ public sealed class GameScreen(
     bool _cameraSettled;
 
     /// <summary>
+    /// How long the region has been on screen, in seconds. Held here rather than in the view for
+    /// the reason the camera's heading is: the view is handed what to draw and does not keep a
+    /// clock of its own, so a frame drawn twice draws the same picture both times.
+    /// </summary>
+    double _secondsInRegion;
+
+    /// <summary>
     /// Which ship <see cref="RegionObstacles"/> has already been seeded into this game, so a ship
     /// already flying a field of obstacles is not handed a second copy of the same field every
     /// frame. <c>null</c> means the current ship, once there is one, has not been seeded yet.
@@ -276,6 +293,10 @@ public sealed class GameScreen(
 
         // Between the stars and the ship: the scenery is in the world, so it passes in front of the
         // starfield and behind the thing flying through it.
+        //
+        // Handed the clock its lights flicker from, here beside the camera's own state, because
+        // this is where the frame's results reach the drawing side.
+        region.SecondsElapsed = _secondsInRegion;
         region.Render(renderer);
 
         view.Render(renderer);
