@@ -297,11 +297,16 @@ public sealed class ShipMovement
         // always has been — the frame's turn is one decision, not one made fresh every fixed step
         Heading = Wrap(Heading + (controls.Turn * _handling.TurnRate * frameTime.TotalSeconds));
 
-        // thrust is applied along the way the ship is pointing, so turning is how you go somewhere
+        // thrust is applied along the way the ship is pointing, so turning is how you go somewhere;
+        // strafe is applied across it — 90 degrees clockwise from forward, the ship's own starboard
+        // — so the two compose into one force rather than fighting over which one wins. Both share
+        // Handling.Acceleration: strafing was authored with no engine numbers of its own yet, so it
+        // reuses the ship's main rating rather than inventing a second one nothing has tuned.
         double thrust = controls.Thrust * _handling.Acceleration;
+        double strafe = controls.Strafe * _handling.Acceleration;
         AetherVector2 force = new(
-            (float)(Math.Sin(Heading) * thrust),
-            (float)(Math.Cos(Heading) * thrust));
+            (float)((Math.Sin(Heading) * thrust) + (Math.Cos(Heading) * strafe)),
+            (float)((Math.Cos(Heading) * thrust) - (Math.Sin(Heading) * strafe)));
 
         // read fresh from the authoritative double every frame rather than left to accumulate in
         // the body itself — see the remarks on why this still keeps Player.Position exact

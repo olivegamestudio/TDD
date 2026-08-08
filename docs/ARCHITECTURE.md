@@ -136,6 +136,29 @@ naming: Aether's damping is a per-step approximation of the exact decay the old 
 integrated, so it converges towards the same terminal speed rather than landing on it exactly — close
 is what the physics engine guarantees, where exact was only ever a property of the model it replaced.
 
+**`ShipControls.Strafe` is a third axis, composed into the same force rather than fought over with
+thrust.** Turning stayed a rate; strafing needed a direction, since it is thrust with nowhere to
+turn to — pushed sideways at whatever the ship is currently pointed, independent of `Turn`. It is
+applied 90° clockwise from `Heading`, the ship's own starboard, using the same `(sin, cos)`/`(cos,
+−sin)` pair `ShipView`'s glow offsets already turn by; thrust and strafe are summed into one force
+vector before it ever reaches Aether, so asking for both at once flies a diagonal rather than one
+axis winning. It shares `Handling.Acceleration` with thrust rather than a rating of its own —
+strafing arrived with no separate engine numbers authored for it, and reusing the main rating was
+the choice that invented nothing rather than guessed at something. `ShipControls.IsNeutral` checks
+all three axes now, not two, or a ship strafing alone with no thrust and no turn would be treated as
+idle and never stepped.
+
+**Q and E turn the ship; A and D strafe it.** The keyboard cluster used to split neatly — WASD for
+thrust and turn, mirrored by the arrows — and strafing had nowhere to go without taking a key away
+from something else. `DesktopKeyboard` moves turning off A/D onto Q/E, leaving A/D for strafe; the
+arrow keys are untouched, so Left/Right still turn and the four-key scheme they have always offered
+means exactly what it did before. A gamepad's left stick is unchanged — thrust and turn, as before —
+and its right stick, previously unread by anything, now carries strafe on its X axis;
+`ShipControls.FromStick` takes a fourth, defaulted argument for it, and applies the same dead zone
+to it as to the other two. Nothing draws a strafe-specific engine glow: the ship's six glow points
+are all authored facing forward or aft, and inventing lateral thruster art or placement was not this
+change's call to make.
+
 **The ship carries a hull fixture, so it has something to collide with.** The ship's own hull stays
 a circle, given to its body at construction, sized from `ShipProfile.HullRadius`. `FixedRotation` is
 set on it, because rotation is still `Heading`'s own kinematic update and nothing here wants a
@@ -1091,9 +1114,6 @@ says nothing gets — a default so a game composes flyable, not a measurement of
 - There are no on-screen key prompts; nothing tells the player which keys fly the ship, that Enter
   or Space starts the game, or which device the game locked to. That is `ENGINE` work and needs
   localised text.
-- **Lateral thrusters are not modelled.** `ShipControls` has two axes, so rotate, ahead and astern
-  are reachable and strafe left/right are not. #7 asked for six movements; this is the sixth and
-  seventh, and it is a change to the shipped physics that has not been decided.
 - Nothing displays a quest title. There is no HUD or quest log; that is a separate `ENGINE`
   issue. `IGameSession.SaveError` is unread for the same reason — there is nowhere to say it.
 - Nothing selects a language. Translations are reachable only through the machine's own culture.

@@ -156,10 +156,12 @@ public sealed class InputRouter : IInputRouter
             frame.Keyboard.Ahead,
             frame.Keyboard.Astern,
             frame.Keyboard.Port,
-            frame.Keyboard.Starboard),
+            frame.Keyboard.Starboard,
+            frame.Keyboard.StrafePort,
+            frame.Keyboard.StrafeStarboard),
 
         ControlDevice.GamePad => frame.GamePad.Connected
-            ? ShipControls.FromStick(frame.GamePad.Thrust, frame.GamePad.Turn, _deadZone)
+            ? ShipControls.FromStick(frame.GamePad.Thrust, frame.GamePad.Turn, _deadZone, frame.GamePad.Strafe)
             : ShipControls.Neutral,
 
         _ => ShipControls.Neutral,

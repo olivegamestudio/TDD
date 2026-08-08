@@ -31,15 +31,18 @@ public sealed class InputRouterTests
         bool astern = false,
         bool port = false,
         bool starboard = false,
-        bool confirm = false) =>
-        new(new KeyboardFrame(ahead, astern, port, starboard, confirm), GamePadFrame.None);
+        bool confirm = false,
+        bool strafePort = false,
+        bool strafeStarboard = false) =>
+        new(new KeyboardFrame(ahead, astern, port, starboard, confirm, strafePort, strafeStarboard), GamePadFrame.None);
 
     static InputFrame Stick(
         double thrust = 0,
         double turn = 0,
         bool confirm = false,
-        bool connected = true) =>
-        new(KeyboardFrame.None, new GamePadFrame(connected, thrust, turn, confirm));
+        bool connected = true,
+        double strafe = 0) =>
+        new(KeyboardFrame.None, new GamePadFrame(connected, thrust, turn, confirm, strafe));
 
     static InputFrame Both(KeyboardFrame keyboard, GamePadFrame pad) => new(keyboard, pad);
 
@@ -206,6 +209,28 @@ public sealed class InputRouterTests
         _router.Route(Stick(thrust: 1, turn: -1));
 
         Assert.Equal(ShipControls.FromStick(1, -1, InputRouter.DefaultDeadZone), _ship.Read());
+    }
+
+    [Fact]
+    public void WhenNothingIsFocused_TheStrafeKeysReachTheShip()
+    {
+        StartOnTheKeyboard();
+
+        _router.Route(Keys(strafeStarboard: true));
+
+        Assert.Equal(1, _ship.Read().Strafe);
+    }
+
+    [Fact]
+    public void WhenNothingIsFocused_TheStrafeStickReachesTheShip()
+    {
+        StartOnTheGamePad();
+
+        _router.Route(Stick(strafe: 1));
+
+        Assert.Equal(
+            ShipControls.FromStick(0, 0, InputRouter.DefaultDeadZone, strafe: 1).Strafe,
+            _ship.Read().Strafe);
     }
 
     [Fact]

@@ -74,4 +74,45 @@ public sealed class ShipControlsFromKeysTests
         Assert.Equal(1, controls.Thrust);
         Assert.Equal(-1, controls.Turn);
     }
+
+    [Theory]
+    [InlineData(true, false, -1)]
+    [InlineData(false, true, 1)]
+    public void AStrafeKey_AsksForTheFullRange(bool strafePort, bool strafeStarboard, double expected)
+    {
+        ShipControls controls = ShipControls.FromKeys(
+            ahead: false, astern: false, port: false, starboard: false, strafePort, strafeStarboard);
+
+        Assert.Equal(expected, controls.Strafe);
+    }
+
+    [Fact]
+    public void OppositeStrafeKeys_Cancel()
+    {
+        ShipControls controls = ShipControls.FromKeys(
+            ahead: false, astern: false, port: false, starboard: false, strafePort: true, strafeStarboard: true);
+
+        Assert.Equal(0, controls.Strafe);
+    }
+
+    [Fact]
+    public void NoStrafeKeysGiven_DefaultsToHandsOff()
+    {
+        // every call site written before strafing existed still asks for exactly what it did
+        // before, because the two new keys default to not held
+        ShipControls controls = ShipControls.FromKeys(ahead: false, astern: false, port: false, starboard: false);
+
+        Assert.Equal(0, controls.Strafe);
+    }
+
+    [Fact]
+    public void StrafeIsIndependent_OfThrustAndTurn()
+    {
+        ShipControls controls = ShipControls.FromKeys(
+            ahead: true, astern: false, port: true, starboard: false, strafePort: false, strafeStarboard: true);
+
+        Assert.Equal(1, controls.Thrust);
+        Assert.Equal(-1, controls.Turn);
+        Assert.Equal(1, controls.Strafe);
+    }
 }

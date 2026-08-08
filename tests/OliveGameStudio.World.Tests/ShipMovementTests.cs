@@ -31,7 +31,7 @@ public sealed class ShipMovementTests
     /// is a rounded fraction of a second would make these tests measure <see cref="TimeSpan"/>'s
     /// rounding rather than the ship's physics.
     /// </remarks>
-    void Fly(double thrust, double turn, double seconds, int frames = 1)
+    void Fly(double thrust, double turn, double seconds, int frames = 1, double strafe = 0)
     {
         long ticks = (long)Math.Round(seconds * TimeSpan.TicksPerSecond);
         Assert.True(ticks % frames == 0, $"{seconds}s does not divide into {frames} whole frames");
@@ -40,7 +40,7 @@ public sealed class ShipMovementTests
 
         for (int frame = 0; frame < frames; frame++)
         {
-            _ship.Update(_player, new ShipControls(thrust, turn), frameTime);
+            _ship.Update(_player, new ShipControls(thrust, turn, strafe), frameTime);
         }
     }
 
@@ -215,6 +215,58 @@ public sealed class ShipMovementTests
 
         Assert.Equal(Math.PI, _ship.Heading, 6);
         Assert.True(_ship.Velocity.Y > 0, "the ship lost its momentum in the turn");
+    }
+
+    // ---- strafe ----
+
+    [Fact]
+    public void FullStarboardStrafe_MovesTheShipSideways_WithoutTurningIt()
+    {
+        Fly(thrust: 0, turn: 0, seconds: 1, frames: 50, strafe: 1);
+
+        Assert.Equal(0, _ship.Heading);
+        Assert.True(_player.Position.X > 0, "the ship did not strafe to starboard");
+        Assert.Equal(0, _player.Position.Y, 6);
+    }
+
+    [Fact]
+    public void FullPortStrafe_MovesTheOtherWay()
+    {
+        Fly(thrust: 0, turn: 0, seconds: 1, frames: 50, strafe: -1);
+
+        Assert.True(_player.Position.X < 0, "the ship did not strafe to port");
+    }
+
+    [Fact]
+    public void StrafeIsAcrossTheHeading_NotAcrossTheWorld()
+    {
+        // a quarter turn to starboard, so the ship's own starboard now points along world -Y —
+        // strafing has to follow the hull round rather than staying pinned to the world's axes
+        Fly(thrust: 0, turn: 1, seconds: 0.5, frames: 25);
+
+        Fly(thrust: 0, turn: 0, seconds: 1, frames: 50, strafe: 1);
+
+        Assert.Equal(0, _player.Position.X, 6);
+        Assert.True(_player.Position.Y < 0, "strafe did not follow the ship's own starboard");
+    }
+
+    [Fact]
+    public void ThrustAndStrafe_CombineRatherThanOneWinning()
+    {
+        // full ahead and full starboard strafe together fly a diagonal, not either axis alone
+        Fly(thrust: 1, turn: 0, seconds: 1, frames: 50, strafe: 1);
+
+        Assert.True(_player.Position.X > 0, "strafe was lost when thrust was also asked for");
+        Assert.True(_player.Position.Y > 0, "thrust was lost when strafe was also asked for");
+    }
+
+    [Fact]
+    public void StrafingAlone_IsNotIdle()
+    {
+        // a ship strafing with no thrust and no turn must still be stepped, or it never moves
+        _ship.Update(_player, new ShipControls(thrust: 0, turn: 0, strafe: 1), TimeSpan.FromSeconds(1));
+
+        Assert.NotEqual(Position.Origin, _player.Position);
     }
 
     // ---- frame time ----

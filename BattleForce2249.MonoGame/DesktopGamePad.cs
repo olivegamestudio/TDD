@@ -14,10 +14,9 @@ namespace BattleForce2249;
 /// means to the ship is <c>ShipControls.FromStick</c> and is covered there, while
 /// <see cref="GamePad.GetState(PlayerIndex, GamePadDeadZone)"/> has no seam in front of it.
 /// <para>
-/// The left stick carries both axes rather than the triggers carrying thrust. Triggers are a
-/// second control scheme rather than a better one, and choosing between schemes needs a settings
-/// model and a menu that do not exist yet. One stick is the binding every pad has, and it mirrors
-/// the keyboard's four directions exactly.
+/// The left stick carries thrust and turn, mirroring the keyboard's ahead/astern/turn keys. The
+/// right stick's own X axis carries strafe — a pad has one, it was otherwise unused, and reading
+/// it costs nothing a settings model or a second control scheme would.
 /// </para>
 /// </remarks>
 public static class DesktopGamePad
@@ -56,6 +55,7 @@ public static class DesktopGamePad
             Connected: true,
             Thrust: pad.ThumbSticks.Left.Y,
             Turn: pad.ThumbSticks.Left.X,
-            Confirm: pad.Buttons.A == ButtonState.Pressed || pad.Buttons.Start == ButtonState.Pressed);
+            Confirm: pad.Buttons.A == ButtonState.Pressed || pad.Buttons.Start == ButtonState.Pressed,
+            Strafe: pad.ThumbSticks.Right.X);
     }
 }

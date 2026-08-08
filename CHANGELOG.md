@@ -9,6 +9,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The ship can strafe.** `ShipControls` gains a third axis — `Strafe`, alongside `Thrust` and
+  `Turn` — pushing the ship sideways at whatever it is currently pointed, independent of turning.
+  `ShipMovement` applies it 90° clockwise from `Heading` (the ship's own starboard) and sums it
+  into the same force thrust already applies, so both together fly a diagonal rather than one
+  cancelling the other. It shares `Handling.Acceleration` with thrust; strafing arrived with no
+  engine rating of its own authored yet.
+
+  On the keyboard, Q and E now turn the ship and A and D strafe it — the WASD cluster had nowhere
+  to put a third axis without taking a key from thrust or turn, so turning moved off A/D. The
+  arrow keys are untouched: Left/Right still turn, so that four-key scheme still means what it
+  always did. A gamepad's previously-unread right stick now carries strafe on its X axis, with the
+  same dead zone the left stick's axes get.
+
+  No new engine glow: the ship's six glow points all face forward or aft, and there is no
+  authored lateral-thruster art or placement to draw one from yet.
+
 - **The engine glow answers the keypress, and the opening's help arrows fade as the ship reaches
   them.** Two playtesting reports against the debris field.
 

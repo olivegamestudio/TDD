@@ -11,7 +11,7 @@ namespace OliveGameStudio;
 public readonly record struct ShipControls
 {
     /// <summary>
-    /// Asks the ship for the given thrust and helm.
+    /// Asks the ship for the given thrust, helm and strafe.
     /// </summary>
     /// <param name="thrust">
     /// How hard the engine is being asked to burn: 1 is full ahead, -1 is full astern, 0 coasts.
@@ -19,15 +19,21 @@ public readonly record struct ShipControls
     /// <param name="turn">
     /// Which way the ship is being turned: -1 is hard to port, 1 is hard to starboard, 0 straight.
     /// </param>
+    /// <param name="strafe">
+    /// How hard the ship is being pushed sideways, independent of where it is pointed: -1 is hard
+    /// to port, 1 is hard to starboard, 0 is none. Defaults to none, so every caller written before
+    /// strafing existed still asks for exactly what it did before.
+    /// </param>
     /// <remarks>
-    /// Both are clamped rather than rejected. A miscalibrated stick, or a device that reports its
-    /// axes in some other range, must not be able to fly the ship harder than it is rated for —
+    /// All three are clamped rather than rejected. A miscalibrated stick, or a device that reports
+    /// its axes in some other range, must not be able to fly the ship harder than it is rated for —
     /// but it also must not be able to crash the game between one frame and the next.
     /// </remarks>
-    public ShipControls(double thrust, double turn)
+    public ShipControls(double thrust, double turn, double strafe = 0)
     {
         Thrust = Axis(thrust);
         Turn = Axis(turn);
+        Strafe = Axis(strafe);
     }
 
     /// <summary>
@@ -61,36 +67,57 @@ public readonly record struct ShipControls
     public double Turn { get; }
 
     /// <summary>
-    /// Gets whether nobody is flying: neither axis is asking for anything.
+    /// Gets how hard the ship is being pushed sideways, from -1 hard to port to 1 hard to
+    /// starboard, independent of <see cref="Turn"/> and of which way the ship is pointed.
+    /// </summary>
+    public double Strafe { get; }
+
+    /// <summary>
+    /// Gets whether nobody is flying: no axis is asking for anything.
     /// </summary>
     /// <remarks>
     /// An exact comparison against zero, which is safe because <see cref="Axis"/> normalises every
     /// axis at construction — there is no path, constructor or <c>default</c>, that puts a
-    /// <c>NaN</c> in either property, and <c>NaN == 0</c> is false. That guarantee is what holds
+    /// <c>NaN</c> in any property, and <c>NaN == 0</c> is false. That guarantee is what holds
     /// this up: were it removed, a device reporting an axis it could not read would claim to be
     /// the one being used and shut every device behind it out.
     /// </remarks>
-    public bool IsNeutral => Thrust == 0 && Turn == 0;
+    public bool IsNeutral => Thrust == 0 && Turn == 0 && Strafe == 0;
 
     /// <summary>
-    /// Reads the controls from four keys — the digital case, where a key is either held or it is
+    /// Reads the controls from six keys — the digital case, where a key is either held or it is
     /// not and there is no travel in between.
     /// </summary>
     /// <param name="ahead">Whether the ahead key is held.</param>
     /// <param name="astern">Whether the astern key is held.</param>
     /// <param name="port">Whether the turn-to-port key is held.</param>
     /// <param name="starboard">Whether the turn-to-starboard key is held.</param>
+    /// <param name="strafePort">
+    /// Whether the strafe-to-port key is held. Defaults to <c>false</c>, so a caller written
+    /// before strafing existed still gets exactly the turn it always asked for.
+    /// </param>
+    /// <param name="strafeStarboard">
+    /// Whether the strafe-to-starboard key is held. Defaults to <c>false</c>, for the same reason
+    /// <paramref name="strafePort"/> does.
+    /// </param>
     /// <returns>The controls those keys are asking for.</returns>
     /// <remarks>
-    /// Opposite keys are summed rather than tested in order, so a player holding both gets a
+    /// Every opposite pair is summed rather than tested in order, so a player holding both gets a
     /// straight cancel — and, more to the point, the answer does not depend on which of the two
-    /// the code happened to look at first. A hand flat on all four keys therefore reads as hands
-    /// off, and reports itself that way, so it does not win the arbitration against a device
-    /// somebody is actually using.
+    /// the code happened to look at first. A hand flat on every key therefore reads as hands off,
+    /// and reports itself that way, so it does not win the arbitration against a device somebody
+    /// is actually using.
     /// </remarks>
-    public static ShipControls FromKeys(bool ahead, bool astern, bool port, bool starboard) =>
+    public static ShipControls FromKeys(
+        bool ahead,
+        bool astern,
+        bool port,
+        bool starboard,
+        bool strafePort = false,
+        bool strafeStarboard = false) =>
         new((ahead ? 1 : 0) - (astern ? 1 : 0),
-            (starboard ? 1 : 0) - (port ? 1 : 0));
+            (starboard ? 1 : 0) - (port ? 1 : 0),
+            (strafeStarboard ? 1 : 0) - (strafePort ? 1 : 0));
 
     /// <summary>
     /// Reads the controls from an analogue stick, absorbing the drift of a stick nobody is
@@ -101,16 +128,23 @@ public readonly record struct ShipControls
     /// <param name="deadZone">
     /// How far the stick must travel before it counts as being pushed, from 0 to 1.
     /// </param>
+    /// <param name="strafe">
+    /// A second stick's sideways axis, nominally -1 to 1. Defaults to <c>0</c> — no travel to
+    /// speak of, which the dead zone would floor to nothing anyway — so a caller written before
+    /// strafing existed still reads the same two axes it always did.
+    /// </param>
     /// <returns>The controls the stick is asking for.</returns>
     /// <remarks>
     /// The dead zone is taken off the bottom of the travel and the rest is stretched back over the
     /// full range, rather than simply subtracted. Subtracting would cost the player the top of the
     /// range — they could push the stick to its stop and never quite ask for full thrust, which is
     /// the kind of bug that is felt long before it is found. Stretching also means crossing the
-    /// edge asks for a little rather than jumping straight to a fifth of the engine.
+    /// edge asks for a little rather than jumping straight to a fifth of the engine. The same dead
+    /// zone is applied to <paramref name="strafe"/> as to the other two, on the same reasoning: a
+    /// stick that has not been touched does not return to dead centre on any axis.
     /// </remarks>
-    public static ShipControls FromStick(double thrust, double turn, double deadZone) =>
-        new(PastDeadZone(thrust, deadZone), PastDeadZone(turn, deadZone));
+    public static ShipControls FromStick(double thrust, double turn, double deadZone, double strafe = 0) =>
+        new(PastDeadZone(thrust, deadZone), PastDeadZone(turn, deadZone), PastDeadZone(strafe, deadZone));
 
     /// <summary>
     /// How far one axis is past its dead zone, as a fraction of the travel that is left.

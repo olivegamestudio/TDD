@@ -7,6 +7,11 @@ namespace OliveGameStudio;
 /// <param name="Thrust">The stick's thrust axis, nominally -1 to 1, before any dead zone.</param>
 /// <param name="Turn">The stick's helm axis, nominally -1 to 1, before any dead zone.</param>
 /// <param name="Confirm">Whether the confirm button is held — the one that works a menu button.</param>
+/// <param name="Strafe">
+/// A second stick's sideways axis, nominally -1 to 1, before any dead zone. Defaults to
+/// <c>0</c>, trailing behind <paramref name="Confirm"/> rather than beside <paramref name="Turn"/>,
+/// so every positional construction written before strafing existed still compiles unchanged.
+/// </param>
 /// <remarks>
 /// The axes arrive raw, with the platform's own dead zone turned off, because the dead zone is a
 /// decision about how the game should feel rather than something a driver should be making on the
@@ -22,7 +27,8 @@ public readonly record struct GamePadFrame(
     bool Connected,
     double Thrust,
     double Turn,
-    bool Confirm)
+    bool Confirm,
+    double Strafe = 0)
 {
     /// <summary>
     /// No pad at all. What a host with nothing plugged in reports.

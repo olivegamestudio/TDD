@@ -141,4 +141,46 @@ public sealed class ShipControlsFromStickTests
     {
         Assert.Equal(expected, ShipControls.FromStick(thrust: axis, turn: 0, DeadZone).Thrust);
     }
+
+    [Fact]
+    public void NoStrafeGiven_DefaultsToHandsOff()
+    {
+        // every call site written before a second stick existed still reads the same two axes it
+        // always did
+        ShipControls controls = ShipControls.FromStick(thrust: 0, turn: 0, DeadZone);
+
+        Assert.Equal(0, controls.Strafe);
+    }
+
+    [Theory]
+    [InlineData(1, 1)]
+    [InlineData(-1, -1)]
+    public void AStrafeStickAtItsStop_AsksForTheFullRange(double pushed, double expected)
+    {
+        ShipControls controls = ShipControls.FromStick(thrust: 0, turn: 0, DeadZone, strafe: pushed);
+
+        Assert.Equal(expected, controls.Strafe);
+    }
+
+    [Theory]
+    [InlineData(0.05)]
+    [InlineData(-0.19)]
+    public void AStrafeStickInsideItsDeadZone_DoesNotStrafeTheShip(double drift)
+    {
+        // the same dead zone a worn thrust or turn stick gets — a second stick is still a stick
+        ShipControls controls = ShipControls.FromStick(thrust: 0, turn: 0, DeadZone, strafe: drift);
+
+        Assert.Equal(0, controls.Strafe);
+        Assert.True(controls.IsNeutral);
+    }
+
+    [Fact]
+    public void StrafeIsIndependent_OfThrustAndTurn()
+    {
+        ShipControls controls = ShipControls.FromStick(thrust: 1, turn: -1, DeadZone, strafe: 1);
+
+        Assert.Equal(1, controls.Thrust);
+        Assert.Equal(-1, controls.Turn);
+        Assert.Equal(1, controls.Strafe);
+    }
 }
