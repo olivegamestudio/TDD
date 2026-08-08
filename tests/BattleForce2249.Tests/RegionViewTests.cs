@@ -120,6 +120,172 @@ public sealed class RegionViewTests
         Assert.Equal(Colour.White, renderer.Drawn[1].Colour);
     }
 
+    /// <summary>
+    /// One light, standing where it was asked to stand.
+    /// </summary>
+    static SceneDefinition OneLight(double x = 0, double y = 0, string layer = "Default") =>
+        new("test", [new SceneBody("glow", RegionView.LightSprite, x, y, 0, 1, 1, layer, 0)], []);
+
+    [Fact]
+    public void ALight_IsPlacedByItsArtwork_RatherThanByItsFile()
+    {
+        // The light in glow.png does not sit in the middle of glow.png: there is a stretch of
+        // near-empty canvas above it and almost none below, so the lit part is nearer two thirds
+        // of the way down. Placed by the file's own middle, every light in the field is drawn
+        // below where it was put — which reads as a light resting on something rather than one
+        // hanging in space, and is what #188 reported.
+        RegionView view = new(Camera()) { Scene = OneLight() };
+        RecordingRenderer renderer = new();
+        renderer.Textures.SetSize(RegionView.LightSprite, 241, 183);
+
+        view.Render(renderer);
+
+        Sprite drawn = renderer.Single();
+
+        Assert.Equal(241f / 2f, drawn.Origin.X, precision: 3);
+        Assert.Equal(183f * RegionView.LightArtworkCentreFraction, drawn.Origin.Y, precision: 3);
+
+        // And it is genuinely lower down the texture than the file's middle, which is the whole
+        // of the correction — a fraction that drifted back to a half would pass everything above.
+        Assert.True(drawn.Origin.Y > 183f / 2f);
+    }
+
+    [Fact]
+    public void Scenery_ThatIsNotALight_IsStillPlacedByTheMiddleOfItsFile()
+    {
+        // Only the light has been measured. Everything else keeps the origin it always had, so
+        // this correction cannot quietly move the rocks the ship collides with — RegionObstacles
+        // seeds those from the body's position, and a sprite drawn off its own collision shape is
+        // worse than one drawn off its authored point.
+        RegionView view = new(Camera()) { Scene = OneBody(0, 0, 0) };
+        RecordingRenderer renderer = new();
+        renderer.Textures.SetSize("rock1", 985, 562);
+
+        view.Render(renderer);
+
+        Assert.Equal(new Vector2(985f / 2f, 562f / 2f), renderer.Single().Origin);
+    }
+
+    [Fact]
+    public void ALight_Flickers_RatherThanBurningFlat()
+    {
+        RegionView view = new(Camera()) { Scene = OneLight() };
+
+        Assert.NotEqual(BrightnessOf(view, seconds: 0), BrightnessOf(view, seconds: 0.9), precision: 3);
+    }
+
+    [Fact]
+    public void ALight_DrawnTwiceAtOneInstant_IsDrawnTheSameBothTimes()
+    {
+        // The flicker is worked out from the time it is handed rather than accumulated as it
+        // draws, for the reason an orb's place is: a frame drawn twice has to look the same both
+        // times, and a value that ticked inside the draw could not promise that.
+        RegionView view = new(Camera()) { Scene = OneLight() };
+
+        Assert.Equal(BrightnessOf(view, seconds: 4.25), BrightnessOf(view, seconds: 4.25));
+    }
+
+    [Fact]
+    public void TwoLights_AreNotInStepWithEachOther()
+    {
+        // A field of lights all dipping together is a power cut, not a flicker. The phase comes
+        // from where a light stands, so two lights are out of step without anything having to be
+        // authored per light — and a light keeps its phase when the region is loaded again.
+        RegionView view = new(Camera())
+        {
+            Scene = new SceneDefinition("test",
+            [
+                new SceneBody("near", RegionView.LightSprite, 0, 0, 0, 1, 1, "Default", 0),
+                new SceneBody("far", RegionView.LightSprite, 130, -95, 0, 1, 1, "Default", 1),
+            ], []),
+            SecondsElapsed = 1.5,
+        };
+
+        RecordingRenderer renderer = new();
+        view.Render(renderer);
+
+        Assert.NotEqual(renderer.Drawn[0].Colour.Red, renderer.Drawn[1].Colour.Red, precision: 3);
+    }
+
+    [Fact]
+    public void AFlickeringLight_NeverOutshinesItsArtwork_NorGoesOut()
+    {
+        // The bounds are the point of stating the curve as a midpoint and a depth. Brighter than
+        // the artwork is a light the author never drew; dark enough to lose is a light that
+        // disappears out of a scene the player is navigating by.
+        RegionView view = new(Camera()) { Scene = OneLight() };
+
+        for (int step = 0; step <= 400; step++)
+        {
+            float brightness = BrightnessOf(view, seconds: step * 0.05);
+
+            Assert.InRange(brightness, RegionView.DimmestLight, RegionView.BrightestLight);
+        }
+    }
+
+    [Fact]
+    public void Scenery_ThatIsNotALight_DoesNotFlicker()
+    {
+        RegionView view = new(Camera()) { Scene = OneBody(0, 0, 0), SecondsElapsed = 3.7 };
+        RecordingRenderer renderer = new();
+
+        view.Render(renderer);
+
+        Assert.Equal(Colour.White, renderer.Single().Colour);
+    }
+
+    [Fact]
+    public void ALightPaintedOnTheSky_TakesTheTintAndTheFlickerTogether()
+    {
+        // Nothing authors one today, and the two are independent decisions — how dark this screen
+        // draws its sky, and how a light behaves — so they compose rather than one winning.
+        RegionView view = new(Camera())
+        {
+            Scene = new SceneDefinition("test",
+            [
+                new SceneBody("sky glow", RegionView.LightSprite, 0, 0, 0, 1, 1, "Default", 0, 0),
+            ], []),
+            BackdropTint = new Colour(0.5f, 0.5f, 0.5f, 1f),
+            SecondsElapsed = 2.25,
+        };
+
+        RecordingRenderer renderer = new();
+        view.Render(renderer);
+
+        Colour drawn = renderer.Single().Colour;
+
+        Assert.Equal(0.5f * RegionView.BrightnessAt(0, 0, 2.25), drawn.Red, precision: 5);
+        Assert.Equal(1f, drawn.Alpha);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public void ATimeTheFlickerCannotBeWorkedOutFrom_IsRefusedWhereItIsSet(double seconds)
+    {
+        // Refused at the setter for the reason the camera refuses a target that is not finite: the
+        // sine of a number that is not one is not a number, every light in the region is then drawn
+        // through a colour channel that is not a number, and the failure would surface from inside
+        // Colour on some later frame naming a channel rather than the clock that produced it.
+        RegionView view = new(Camera());
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => view.SecondsElapsed = seconds);
+    }
+
+    /// <summary>
+    /// How brightly the one light in a scene is drawn at a given moment.
+    /// </summary>
+    static float BrightnessOf(RegionView view, double seconds)
+    {
+        view.SecondsElapsed = seconds;
+
+        RecordingRenderer renderer = new();
+        view.Render(renderer);
+
+        return renderer.Single().Colour.Red;
+    }
+
     [Fact]
     public void Scenery_IsDrawnFurthestLayerFirst()
     {

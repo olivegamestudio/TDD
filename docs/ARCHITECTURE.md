@@ -732,6 +732,33 @@ relative to something moving through the place has to be positioned by that thin
 carries no `Characters` bodies at all now, and a test holds it that way, because the failure is
 invisible in the data — a body at the origin looks exactly like a body anywhere else.
 
+**A light is placed by where the light is, not by where its file's middle is.** `RegionView` draws
+every body about the middle of its own texture, which is right for a rock that fills its canvas and
+wrong for `glow.png` — the lit part of that file sits nearer two thirds of the way down it, with
+near-empty canvas above and almost none below. `RegionView.LightArtworkCentreFraction` is that
+measurement (0.65, from the shipped PNG's own alpha channel), applied at the draw for the reason
+`MenuScreen.TitleContentCentreFraction` is: the number describes the file, so a redrawn light
+restates it rather than silently moving every light in the region. It reaches the light sprite
+alone. Everything else keeps the origin it had, deliberately — a solid body's collision rectangle is
+seeded from its authored position, and a sprite moved off its own collision shape is worse than one
+drawn off its authored point. `ShipView` draws its engine glows from the same asset and is untouched
+for the mirror-image reason: those offsets were placed *against* the file-centred origin, so
+correcting them would move flames that are currently where somebody put them.
+
+**A light flickers from a clock it is handed, not one it keeps.** `RegionView.SecondsElapsed` is set
+by `GameScreen` each frame from its own accumulator, beside where it sets the camera's target and
+orientation; `RegionView.BrightnessAt(x, y, seconds)` is a pure function of it. That is the same
+answer `Orbs.PlaceAround` gives and for the same reasons — nothing ticks inside the draw, a frame
+drawn twice draws the same picture both times, and the result cannot drift with the frame rate. The
+curve is a slow breath with a faster tremor over it at a ratio that is not a whole number, weighted
+so the pair can never leave `DimmestLight`..`BrightestLight`: never above 1, because brighter than
+the artwork is a light the author never drew, and never at 0, because the lights are scattered
+through a field the player is navigating by. **A light's phase comes from where it stands**, which
+is what keeps 14 lights out of step without anything authored per light — and what makes a light
+keep its phase when the region is loaded again, which a number handed out in draw order would not.
+A time that is negative or not finite is refused at the setter, on the same reasoning as the
+camera's guards above.
+
 `Vignette` is the frame over the top of it: one sprite stretched across the whole window, drawn
 after everything else, clear in the middle and closing to dark at the corners. It **intercepts
 nothing, by construction** — a sprite is a drawing instruction, and the type answers nothing but

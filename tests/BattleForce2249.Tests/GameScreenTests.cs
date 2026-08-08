@@ -183,6 +183,28 @@ public sealed class GameScreenTests : HostTestBase
     }
 
     [Fact]
+    public void TheRegionIsHandedTheClockItsLightsFlickerFrom_AndItStartsAtTheRegion()
+    {
+        // The view keeps no clock of its own, so if this stops reaching it the lights stand still
+        // and nothing else changes — a failure with no symptom other than the one #188 reported.
+        RegionView region = new(new Camera2D());
+        GameScreen screen = ScreenFor(new Camera2D(), new StubShipView(), region: region);
+
+        screen.Enter();
+        screen.Update(TimeSpan.FromSeconds(0.25));
+        screen.Update(TimeSpan.FromSeconds(0.5));
+        screen.Render(new RecordingRenderer());
+
+        Assert.Equal(0.75, region.SecondsElapsed, precision: 6);
+
+        // Coming back to the game screen is a fresh look at the place: a light is not progress.
+        screen.Enter();
+        screen.Render(new RecordingRenderer());
+
+        Assert.Equal(0, region.SecondsElapsed);
+    }
+
+    [Fact]
     public void TheFrame_TakesNothingFromWhatIsUnderIt()
     {
         // The overlay is non-interactive: a frame with it drawn flies exactly the ship a frame
