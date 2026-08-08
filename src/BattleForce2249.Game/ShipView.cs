@@ -31,9 +31,45 @@ public sealed class ShipView(ICamera camera) : IShipView
     /// </remarks>
     public const float LengthInWorldUnits = 30f;
 
+    /// <summary>
+    /// The asset key the engine glow is drawn with. An identifier, not text: it is never
+    /// translated.
+    /// </summary>
+    public const string EngineGlowAssetKey = "glow";
+
+    /// <summary>
+    /// Where the ship's engines glow, in the ship's own frame.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Six of them, front and rear, taken from the bodies the opening region was authored with —
+    /// see <see cref="ShipEngineGlow"/> for why they are no longer in the region. The values are
+    /// the authored ones, unchanged: this makes the glow follow the ship, and leaves how the glow
+    /// looks exactly as the author left it.
+    /// </para>
+    /// <para>
+    /// Held here beside <see cref="DefaultAssetKey"/> rather than in the world, because a glow
+    /// cast by the ship's engines is part of the picture of the ship in the same way its hull
+    /// sprite is. It is shared by every ship drawn through this view, which is right while there
+    /// is one ship to draw and is the thing to revisit the day a second ship has engines
+    /// somewhere else.
+    /// </para>
+    /// </remarks>
+    public static readonly IReadOnlyList<ShipEngineGlow> EngineGlows =
+    [
+        new(new Vector2(0f, 0f), 0f, 4.5f, 18f),
+        new(new Vector2(-5.625f, 0f), 20f, 2.25f, 9f),
+        new(new Vector2(5.625f, 0f), 340f, 2.25f, 9f),
+        new(new Vector2(0f, 0f), 180f, 4.5f, 18f),
+        new(new Vector2(-6.75f, 4.5f), 190f, 2.25f, 9f),
+        new(new Vector2(6.75f, 4.5f), 170f, 2.25f, 9f),
+    ];
+
     string _assetKey = DefaultAssetKey;
 
     ITexture? _texture;
+
+    ITexture? _glowTexture;
 
     /// <inheritdoc />
     public string AssetKey
@@ -66,6 +102,13 @@ public sealed class ShipView(ICamera camera) : IShipView
         // Loaded on first draw rather than up front: the graphics device the texture belongs to
         // does not exist until the platform host has a window, which is after this is built.
         _texture ??= renderer.Textures.Load(_assetKey);
+        _glowTexture ??= renderer.Textures.Load(EngineGlowAssetKey);
+
+        // The engines first, so the hull is drawn over its own glow rather than under it.
+        foreach (ShipEngineGlow glow in EngineGlows)
+        {
+            RenderGlow(renderer, _glowTexture, glow);
+        }
 
         // The origin is the middle of the sprite, so the ship turns about itself rather than
         // swinging around its top left corner.
@@ -84,5 +127,57 @@ public sealed class ShipView(ICamera camera) : IShipView
             camera.WorldToScreenRotation(Pose.Heading),
             origin,
             LengthInWorldUnits * camera.PixelsPerUnit / _texture.Height));
+    }
+
+    /// <summary>
+    /// Draws one engine glow, in the ship's frame rather than the world's.
+    /// </summary>
+    /// <remarks>
+    /// Every number the glow carries is read against the ship: its offset is turned by the
+    /// heading before it is added to the ship's position, and its own angle is added to the
+    /// heading before the camera is asked what that looks like. That pair is the whole of being
+    /// parented — a glow whose offset was added in world axes would swing round to the wrong side
+    /// of the hull as the ship came about, and one drawn at its own angle alone would go on
+    /// pointing the way it was authored while the ship turned underneath it.
+    /// </remarks>
+    void RenderGlow(IRenderer renderer, ITexture texture, ShipEngineGlow glow)
+    {
+        // Negated for the reason the scenery's rotation is: the content was authored where a
+        // positive angle turns anticlockwise, and a sprite's turns clockwise.
+        float own = -glow.RotationDegrees * MathF.PI / 180f;
+
+        renderer.Draw(new Sprite(
+            texture,
+            camera.WorldToScreen(Pose.Position + Turn(glow.Offset, Pose.Heading), renderer.ViewportSize),
+            camera.WorldToScreenRotation(Pose.Heading + own),
+            new Vector2(texture.Width, texture.Height) / 2f,
+
+            // One texture pixel to one world unit at the scale the content was authored against,
+            // with the authored stretch on top. Sized this way rather than from a length in world
+            // units, so replacing the artwork with a sprite of another size changes nothing here —
+            // the same reason the hull's scale is derived from its texture.
+            camera.PixelsPerUnit / RegionView.AuthoredPixelsPerUnit)
+        {
+            Stretch = new Vector2(glow.ScaleAcross, glow.ScaleAlong),
+        });
+    }
+
+    /// <summary>
+    /// Turns an offset in the ship's frame — X to starboard, Y forward — into the world's.
+    /// </summary>
+    /// <remarks>
+    /// A heading of zero is straight up the world's positive Y axis and the angle increases to
+    /// starboard, which is the same agreement the pose itself is written under. So forward is
+    /// (sin, cos) and starboard is (cos, −sin), and at a heading of zero this hands back exactly
+    /// what it was given.
+    /// </remarks>
+    static Vector2 Turn(Vector2 shipFrame, float heading)
+    {
+        float sin = MathF.Sin(heading);
+        float cos = MathF.Cos(heading);
+
+        return new Vector2(
+            (shipFrame.X * cos) + (shipFrame.Y * sin),
+            (shipFrame.Y * cos) - (shipFrame.X * sin));
     }
 }

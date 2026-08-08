@@ -721,6 +721,17 @@ hit. The tint lives on the view rather than in the region file because how dark 
 decision about this screen — a region flown through at another hour is the same content lit
 differently.
 
+**What belongs to the ship is drawn by the ship, not authored into the region.** The engine glow
+shipped as scenery — six `glow` bodies on the `Characters` layer, standing at the world origin
+because that is where the ship starts — and so it stayed where it was authored while the ship flew
+away from it. It is `ShipView`'s now: `ShipView.EngineGlows` holds each glow as a `ShipEngineGlow`
+in the ship's own frame, and the draw turns the offset by the heading and adds the glow's own angle
+to it, so both where a glow sits and which way it points follow the hull. The rule generalises past
+this one fault: a region describes the *place*, and anything whose position is only meaningful
+relative to something moving through the place has to be positioned by that thing. The scenery
+carries no `Characters` bodies at all now, and a test holds it that way, because the failure is
+invisible in the data — a body at the origin looks exactly like a body anywhere else.
+
 `Vignette` is the frame over the top of it: one sprite stretched across the whole window, drawn
 after everything else, clear in the middle and closing to dark at the corners. It **intercepts
 nothing, by construction** — a sprite is a drawing instruction, and the type answers nothing but

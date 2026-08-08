@@ -36,7 +36,8 @@ public sealed class SpriteColourTests
 
         view.Render(renderer);
 
-        Assert.Equal(Colour.White, renderer.Single().Colour);
+        // Everything the ship draws, hull and engine glow alike.
+        Assert.All(renderer.Drawn, sprite => Assert.Equal(Colour.White, sprite.Colour));
     }
 
     [Fact]

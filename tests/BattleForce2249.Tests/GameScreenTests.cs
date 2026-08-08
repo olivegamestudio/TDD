@@ -326,7 +326,12 @@ public sealed class GameScreenTests : HostTestBase
             renderer.Drawn.Count > 1,
             "The ship was the only thing drawn — the stars are missing.");
         Assert.Equal(512, renderer.Drawn[^2].Texture.Width);
-        Assert.All(renderer.Drawn.SkipLast(2), sprite => Assert.Equal(16, sprite.Texture.Width));
+
+        // The ship draws its engine glow beneath its hull, so what has to be stars is everything
+        // before those: the hull, the glows and the frame over them all are the tail of the frame.
+        Assert.All(
+            renderer.Drawn.SkipLast(2 + ShipView.EngineGlows.Count),
+            sprite => Assert.Equal(16, sprite.Texture.Width));
     }
 
     [Fact]

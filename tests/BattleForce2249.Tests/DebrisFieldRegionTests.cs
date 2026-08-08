@@ -83,6 +83,20 @@ public sealed class DebrisFieldRegionTests
     }
 
     [Fact]
+    public void NothingInTheField_IsPartOfTheShip()
+    {
+        // The ship's engine glow was authored into the scenery, on the layer the ship itself
+        // occupies and at the world origin — which is where the ship starts, so it looked correct
+        // until the player flew and left its own engines burning at the spawn point. The ship
+        // draws its own glow now (see ShipEngineGlowTests); the field must not draw a second one,
+        // and a re-import that brought the bodies back would put it there again with nothing else
+        // noticing.
+        SceneDefinition region = Region();
+
+        Assert.DoesNotContain(region.Bodies, body => body.Layer == "Characters");
+    }
+
+    [Fact]
     public void TheRocksAndAsteroidsAreSolid_AndNothingElseIs()
     {
         // Only what the ship should actually collide with — a rock, or an asteroid, wherever it
