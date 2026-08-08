@@ -221,17 +221,20 @@ public sealed class ShipEngineGlowTests
     }
 
     [Fact]
-    public void Render_TurnsEveryGlowAboutItsOwnMiddle()
+    public void Render_TurnsEveryGlowAboutTheLitPartOfItsFile()
     {
         // A corner origin swings a glow out from under the ship as the ship turns, which reads as
-        // the engines coming loose.
+        // the engines coming loose. And it is the *lit* part of the file this turns about, not the
+        // canvas middle — the same correction RegionView applies to every other light drawn from
+        // this asset, or the flame renders low against its own mount point.
         ShipView view = CreateView(out _);
         RecordingRenderer renderer = new();
         renderer.Textures.SetSize(ShipView.EngineGlowAssetKey, 240, 180);
 
         IReadOnlyList<Sprite> glows = AllGlows(view, renderer);
 
-        Assert.All(glows, glow => Assert.Equal(new Vector2(120f, 90f), glow.Origin));
+        Vector2 expected = new(120f, 180f * RegionView.LightArtworkCentreFraction);
+        Assert.All(glows, glow => Assert.Equal(expected, glow.Origin));
     }
 
     [Fact]

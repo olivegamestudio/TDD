@@ -97,10 +97,12 @@ public sealed class RegionView(ICamera camera) : IRenderable
     /// file, so a redrawn light restates it rather than silently moving every light in the region.
     /// </para>
     /// <para>
-    /// It reaches the region's lights only. <c>ShipView</c> draws its engine glows from the same
-    /// asset and is deliberately untouched — those offsets were placed against the origin they are
-    /// drawn with, so correcting theirs would move flames that are currently where somebody put
-    /// them.
+    /// <c>ShipView</c> draws its engine glows from the same asset and reads this same constant now
+    /// too — an earlier pass left it untouched, reasoning the ship's own offsets were placed
+    /// against a plain centre and moving the origin would shift a flame away from where it was
+    /// authored. A play session found the flame reading as bottom-heavy exactly the way a light
+    /// here did before this constant existed, which is the same fault this exists to fix; see
+    /// <c>ShipView.RenderGlow</c>'s own remarks.
     /// </para>
     /// </remarks>
     public const float LightArtworkCentreFraction = 0.65f;

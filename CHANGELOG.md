@@ -23,11 +23,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   The opening's eight breadcrumb arrows were drawn at a fixed strength regardless of where the
   player had actually flown to, cluttering the view of the debris they exist to help someone
   survive. `HelpArrowView` (new) draws them instead of `RegionView`, fading each one by its own
-  distance to the ship every frame — full strength beyond `HelpArrowView.FullyVisibleDistance`,
-  gone within `HelpArrowView.HiddenDistance`. Nothing latches: flying past one and doubling back
-  brings it back exactly as a first approach would, because what is tracked is only "how far away
-  right now," never "already seen." `RegionView` now skips the `"UI"` layer the arrows live on, so
+  distance to the ship — full strength beyond `HelpArrowView.FullyVisibleDistance`, gone within
+  `HelpArrowView.HiddenDistance`. `RegionView` now skips the `"UI"` layer the arrows live on, so
   the two views never draw the same body.
+
+  **Two more playtesting rounds against this same pair.** The engine flame rendered from a plain
+  canvas centre, reading as bottom-heavy against its mount the same way the field's own lights did
+  before `RegionView.LightArtworkCentreFraction` existed — an earlier pass deliberately left the
+  ship's glow off that correction, reasoning its offsets were authored against the uncorrected
+  origin; a play session found that reasoning backwards, and `ShipView.RenderGlow` now anchors from
+  the same constant every other light in the game does. And the arrows' fade was pure distance,
+  recomputed fresh every frame — fly past one, double back, and it read as though the guidance had
+  never registered. Reaching one is permanent now: `HelpArrowView` remembers which arrows it has
+  already faded to nothing, in a set only `Reset()` clears, called by `GameScreen.Enter()` alongside
+  the other per-flight state it resets — a resumed or restarted game starts a fresh approach to the
+  field, not a continuation of the one that last reached these arrows.
 
 - **The title screen has a sky behind it.** `MenuScreen` draws `space` as a sixth layer, first and
   behind the other five, from the new `MenuScreen.BackgroundAssetKey`. The composition already had

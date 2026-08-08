@@ -173,12 +173,26 @@ public sealed class ShipView(ICamera camera) : IShipView
     /// Draws one engine glow, in the ship's frame rather than the world's.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Every number the glow carries is read against the ship: its offset is turned by the
     /// heading before it is added to the ship's position, and its own angle is added to the
     /// heading before the camera is asked what that looks like. That pair is the whole of being
     /// parented — a glow whose offset was added in world axes would swing round to the wrong side
     /// of the hull as the ship came about, and one drawn at its own angle alone would go on
     /// pointing the way it was authored while the ship turned underneath it.
+    /// </para>
+    /// <para>
+    /// <b>The origin is <see cref="RegionView.LightArtworkCentreFraction"/> down the file, the
+    /// same as every other light drawn from this asset — not the middle of the canvas.</b> An
+    /// earlier pass left this one at a plain centre, reasoning that the offsets above were placed
+    /// against that origin and moving it would shift a flame away from where it was authored. A
+    /// play session against the real game found the opposite fault worth trading for: drawn from
+    /// the canvas centre, the lit part of <c>glow.png</c> — which sits two thirds of the way down
+    /// its own file — renders visibly low against the point it is anchored to, reading as an
+    /// engine flame hanging off the bottom of its mount rather than burning from it. The offsets
+    /// were placed by eye against a picture that was already wrong, not against a number worth
+    /// preserving.
+    /// </para>
     /// </remarks>
     void RenderGlow(IRenderer renderer, ITexture texture, ShipEngineGlow glow)
     {
@@ -190,7 +204,7 @@ public sealed class ShipView(ICamera camera) : IShipView
             texture,
             camera.WorldToScreen(Pose.Position + Turn(glow.Offset, Pose.Heading), renderer.ViewportSize),
             camera.WorldToScreenRotation(Pose.Heading + own),
-            new Vector2(texture.Width, texture.Height) / 2f,
+            new Vector2(texture.Width / 2f, texture.Height * RegionView.LightArtworkCentreFraction),
 
             // One texture pixel to one world unit at the scale the content was authored against,
             // with the authored stretch on top. Sized this way rather than from a length in world

@@ -5,9 +5,10 @@ namespace BattleForce2249.Tests;
 
 /// <summary>
 /// Covers <see cref="HelpArrowView"/>: it draws exactly the bodies on the <c>"UI"</c> layer, at
-/// the position and rotation <see cref="RegionView"/> would draw them at, and fades each one out
-/// as the ship gets close to it rather than drawing it at a fixed strength regardless of where
-/// the player has actually flown to.
+/// the position and rotation <see cref="RegionView"/> would draw them at, fades each one out as
+/// the ship gets close to it rather than drawing it at a fixed strength regardless of where the
+/// player has actually flown to, and keeps it gone once reached rather than bringing it back on a
+/// return trip.
 /// </summary>
 public sealed class HelpArrowViewTests
 {
@@ -90,17 +91,12 @@ public sealed class HelpArrowViewTests
     }
 
     [Fact]
-    public void ClosingIn_FadesTheArrowOut_RatherThanLatchingItGoneForever()
+    public void OnceReached_AnArrowStaysGone_EvenAfterTheShipMovesAway()
     {
-        // Proximity this frame, not a flag that remembers a player flew past once — turning round
-        // and flying away has to bring the arrow back exactly as it would on a first approach.
+        // A return trip through the same stretch must not bring an already-reached arrow back —
+        // it did its job once, and finding it again reads as the guidance never having registered.
         HelpArrowView view = new(Camera()) { Bodies = [Arrow(0, 200)] };
         RecordingRenderer renderer = new();
-
-        view.ShipPosition = new Vector2(0, 200 - (float)HelpArrowView.FullyVisibleDistance);
-        view.Render(renderer);
-        float far = renderer.Single().Colour.Alpha;
-        renderer.Clear();
 
         view.ShipPosition = new Vector2(0, 200);
         view.Render(renderer);
@@ -108,7 +104,29 @@ public sealed class HelpArrowViewTests
 
         view.ShipPosition = new Vector2(0, 200 - (float)HelpArrowView.FullyVisibleDistance);
         view.Render(renderer);
-        Assert.Equal(far, renderer.Single().Colour.Alpha);
+        Assert.Empty(renderer.Drawn);
+    }
+
+    [Fact]
+    public void Reset_BringsEveryReachedArrowBack()
+    {
+        // Called by a fresh flight — a resumed or restarted game is a new approach to the field,
+        // not a continuation of the one that last reached these arrows.
+        HelpArrowView view = new(Camera())
+        {
+            Bodies = [Arrow(0, 200)],
+            ShipPosition = new Vector2(0, 200),
+        };
+        RecordingRenderer renderer = new();
+
+        view.Render(renderer);
+        Assert.Empty(renderer.Drawn);
+
+        view.Reset();
+        view.ShipPosition = new Vector2(0, 200 - (float)HelpArrowView.FullyVisibleDistance);
+        view.Render(renderer);
+
+        Assert.Single(renderer.Drawn);
     }
 
     [Fact]

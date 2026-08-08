@@ -17,12 +17,14 @@ namespace BattleForce2249;
 /// twice as large is drawn twice as large here too.
 /// </para>
 /// <para>
-/// <b>Fading is proximity to the ship this frame, not time on screen or a flag that latches.</b>
-/// A player who doubles back past an arrow they already flew by sees it again rather than finds
-/// it gone for the rest of the flight — nothing here remembers which arrows have already been
-/// passed, only how far the ship stands from each one right now. That is also what keeps this
-/// stateless enough to read a region's bodies straight, the same way
-/// <c>CollisionDebugView.Bodies</c> does.
+/// <b>Once an arrow has been reached, it stays gone — the fade does not undo itself.</b> A first
+/// pass computed the fade fresh from distance every frame, so a player who doubled back past an
+/// arrow saw it reappear exactly as it read on the way out. A play session called that out: the
+/// point of taking an arrow down is that it has done its job, and finding it again on a return
+/// trip through the same stretch reads as the guidance never having registered rather than as
+/// anything the player earned by flying further. <see cref="Reset"/> is the one door this state
+/// opens through, called by whatever starts a fresh flight — a resumed or restarted game is a new
+/// approach to the same field, not a continuation of one already flown.
 /// </para>
 /// </remarks>
 /// <param name="camera">The camera the world is drawn through — the same one everything else uses.</param>
@@ -58,6 +60,14 @@ public sealed class HelpArrowView(ICamera camera) : IRenderable
     readonly Dictionary<string, ITexture> _textures = new(StringComparer.Ordinal);
 
     /// <summary>
+    /// Every arrow the ship has already come within <see cref="HiddenDistance"/> of, at any point
+    /// since the last <see cref="Reset"/> — kept by value, since a <see cref="SceneBody"/> record
+    /// with the same fields <em>is</em> the same arrow as far as this is concerned. Reaching one
+    /// once is permanent for the rest of the flight; only <see cref="Reset"/> clears it.
+    /// </summary>
+    readonly HashSet<SceneBody> _reached = [];
+
+    /// <summary>
     /// Gets or sets where the ship is, so an arrow can be faded by how close it already is rather
     /// than drawn at a fixed strength regardless of where the player has actually flown to.
     /// </summary>
@@ -70,6 +80,14 @@ public sealed class HelpArrowView(ICamera camera) : IRenderable
     /// </summary>
     public IReadOnlyList<SceneBody> Bodies { get; set; } = [];
 
+    /// <summary>
+    /// Forgets every arrow reached so far, so a fresh flight starts with all of them showing
+    /// again. Called on entering the game screen, the same moment <c>GameScreen</c> clears its
+    /// own per-flight state — a resumed or restarted game is a new approach to the field, not a
+    /// continuation of the one that last reached these arrows.
+    /// </summary>
+    public void Reset() => _reached.Clear();
+
     /// <inheritdoc />
     public void Render(IRenderer renderer)
     {
@@ -80,13 +98,22 @@ public sealed class HelpArrowView(ICamera camera) : IRenderable
                 continue;
             }
 
-            Vector2 world = new((float)body.X, (float)body.Y);
-            float alpha = AlphaAt(Vector2.Distance(ShipPosition, world));
-
-            if (alpha <= 0f)
+            if (_reached.Contains(body))
             {
-                // Nothing left to draw, and no reason to spend a draw call finding that out again
-                // at the device — this is the "already passed it" case doing the least work.
+                // Already earned its fade on some earlier frame — a return trip does not restore
+                // it, and there is nothing left to compute.
+                continue;
+            }
+
+            Vector2 world = new((float)body.X, (float)body.Y);
+            float distance = Vector2.Distance(ShipPosition, world);
+
+            if (distance <= HiddenDistance)
+            {
+                // Reached for the first time this frame: remembered from here on, and this frame
+                // draws nothing for it either — the same outcome a later frame would compute, done
+                // once rather than every frame from now on.
+                _reached.Add(body);
                 continue;
             }
 
@@ -106,7 +133,7 @@ public sealed class HelpArrowView(ICamera camera) : IRenderable
                 Origin: new Vector2(texture.Width, texture.Height) / 2f,
                 Scale: authored * camera.PixelsPerUnit / RegionView.AuthoredPixelsPerUnit)
             {
-                Colour = Colour.White.WithAlpha(alpha),
+                Colour = Colour.White.WithAlpha(AlphaAt(distance)),
             });
         }
     }

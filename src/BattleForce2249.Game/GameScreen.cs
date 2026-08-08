@@ -128,6 +128,10 @@ public sealed class GameScreen(
         // place, not a resumption of one — nothing about a light is progress.
         _secondsInRegion = 0;
 
+        // Likewise: a fresh flight has reached none of the help arrows yet, whatever an earlier
+        // one reached before it.
+        helpArrows.Reset();
+
         // A ship built for a game already entered has whatever obstacles that game's region put
         // in it; a ship this Enter is about to build has none, and needs the field it flies into
         // seeded again. Cleared here rather than inferred from the ship changing, because the

@@ -770,17 +770,31 @@ positive lights the mains, negative lights the bow thrusters, and coasting light
 texture is still loaded unconditionally on first draw regardless of what is currently lit, so the
 first frame a key is pressed is not the one paying for a texture load.
 
-**Help arrows fade by the ship's distance to them, not by a flag that remembers one was passed.**
-The debris field's opening stretch carries eight `Icon_Example02` bodies on a `"UI"` layer, authored
-as a breadcrumb trail out. Drawn at a fixed strength they clutter the view of exactly the debris a
-new pilot most needs to be looking at, once they have already been shown the way past a given one.
-`HelpArrowView` draws them instead — `RegionView.Scene` filters `"UI"`-layer bodies out of what it
-sorts and draws, with a remark pointing at why, so the two never draw the same body — computing each
-arrow's alpha fresh every frame from `Vector2.Distance(ShipPosition, body)`: full strength beyond
-`HelpArrowView.FullyVisibleDistance`, gone within `HelpArrowView.HiddenDistance`, and a straight
-fade between. Nothing here latches: a player who flies past an arrow and doubles back sees it fade
-back in exactly as it would on a first approach, because "passed" is not a fact this keeps, only
-"how far away, right now." The two distances are reasoned against the arrows' own authored spacing
+**An engine glow is anchored where its artwork actually is, the same as every other light drawn
+from the asset.** Parenting the glow left its origin at a plain canvas centre, reasoning that the
+ship's own offsets were placed against that origin and moving it would shift a flame away from
+where it was authored — deliberately different from `RegionView`, which anchors every light at
+`LightArtworkCentreFraction` down the file, where `glow.png`'s own lit pixels actually sit. A play
+session found the reasoning backwards: drawn from the canvas centre, the flame read as hanging off
+the bottom of its mount rather than burning from it, the same fault `LightArtworkCentreFraction`
+exists to fix. `ShipView.RenderGlow` now reads that same constant, and the offsets that were placed
+against the wrong picture move with the origin that was wrong, not preserved against it.
+
+**Help arrows fade by the ship's distance to them, and stay gone once reached.** The debris field's
+opening stretch carries eight `Icon_Example02` bodies on a `"UI"` layer, authored as a breadcrumb
+trail out. Drawn at a fixed strength they clutter the view of exactly the debris a new pilot most
+needs to be looking at, once they have already been shown the way past a given one. `HelpArrowView`
+draws them instead — `RegionView.Scene` filters `"UI"`-layer bodies out of what it sorts and draws,
+with a remark pointing at why, so the two never draw the same body — computing each arrow's alpha
+from `Vector2.Distance(ShipPosition, body)`: full strength beyond `HelpArrowView.FullyVisibleDistance`,
+gone within `HelpArrowView.HiddenDistance`, and a straight fade between. **Reaching one is
+permanent**, held in `HelpArrowView`'s own `_reached` set rather than recomputed fresh every frame —
+a first pass faded purely on distance, so a player who doubled back past an arrow saw it come back,
+which a play session called out as reading like the guidance never registered rather than as
+anything progress-shaped. `Reset()` is the one door out of that set, called by `GameScreen.Enter()`
+alongside the other per-flight state it already clears (`_secondsInRegion`, `_obstacleShip`) — a
+resumed or restarted game is a new approach to the field, not a continuation of the one that last
+reached these arrows. The two distances are reasoned against the arrows' own authored spacing
 rather than measured against a play session, in the same spirit `GameScreen.BackdropBrightness` is.
 
 `Vignette` is the frame over the top of it: one sprite stretched across the whole window, drawn

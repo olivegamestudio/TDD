@@ -209,6 +209,35 @@ public sealed class GameScreenTests : HostTestBase
     }
 
     [Fact]
+    public void EnteringTheScreen_BringsBackEveryHelpArrowTheLastFlightReached()
+    {
+        // A resumed or restarted game is a new approach to the field, not a continuation of the
+        // one that last reached these arrows — the same reasoning the light's clock resets by.
+        // Exercised directly against the shared HelpArrowView instance, rather than through
+        // GameScreen.Render, because that always re-reads Bodies from the real loaded region and
+        // there is no seam here to feed it a body of this test's own choosing.
+        Camera2D camera = new();
+        HelpArrowView helpArrows = new(camera);
+        SceneBody arrow = new("Arrow", "Icon_Example02", 0, 0, 0, 1, 1, HelpArrowView.Layer, 0);
+        GameScreen screen = ScreenFor(camera, new StubShipView(), helpArrows: helpArrows);
+
+        helpArrows.Bodies = [arrow];
+        helpArrows.ShipPosition = Vector2.Zero;
+        helpArrows.Render(new RecordingRenderer());
+
+        RecordingRenderer stillReached = new();
+        helpArrows.ShipPosition = new Vector2(0, (float)HelpArrowView.FullyVisibleDistance);
+        helpArrows.Render(stillReached);
+        Assert.Empty(stillReached.Drawn);
+
+        screen.Enter();
+
+        RecordingRenderer afterReentering = new();
+        helpArrows.Render(afterReentering);
+        Assert.Single(afterReentering.Drawn);
+    }
+
+    [Fact]
     public void TheFrame_TakesNothingFromWhatIsUnderIt()
     {
         // The overlay is non-interactive: a frame with it drawn flies exactly the ship a frame
