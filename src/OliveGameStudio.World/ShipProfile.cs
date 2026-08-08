@@ -58,10 +58,43 @@ public sealed record ShipProfile(
     /// </exception>
     public int CargoSlots { get; } = Validated(CargoSlots);
 
+    /// <summary>
+    /// How much of a circle the hull fills, for colliding with the world.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="ShipMovement"/> refuses the same values, but only once a <see cref="Ship"/> is
+    /// built from the profile. Refusing them here is what puts the complaint next to the content
+    /// that caused it: the exception names <c>HullRadius</c>, the field an author wrote, rather
+    /// than the constructor parameter of a type they have never heard of.
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// The radius is not a positive, finite number. A hull with no size collides with nothing and
+    /// flies through the world unharmed; one with an infinite size collides with everything,
+    /// everywhere, at once.
+    /// </exception>
+    public double HullRadius { get; } = Validated(HullRadius);
+
     static int Validated(int cargoSlots)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(cargoSlots, nameof(cargoSlots));
 
         return cargoSlots;
+    }
+
+    static double Validated(double hullRadius)
+    {
+        // Named before it is ranged: every comparison against NaN is false, so a NaN walks straight
+        // past ThrowIfNegativeOrZero and only surfaces as a ship that collides with nothing.
+        if (!double.IsFinite(hullRadius))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(HullRadius),
+                hullRadius,
+                "A hull has to be a finite size to collide with the world.");
+        }
+
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(hullRadius, nameof(HullRadius));
+
+        return hullRadius;
     }
 }
