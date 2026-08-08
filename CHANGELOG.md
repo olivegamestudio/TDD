@@ -455,6 +455,33 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **The ship no longer flies out of its own engine glow.** The glow was authored into
+  `debris-field.json` as six `glow` bodies — `FrontEngine`, `FrontEngine2`, `FrontEngine3` and the
+  three `RearEngine` ones — sitting at the world origin on the `Characters` layer, which is where
+  the ship starts. Standing still it looked right, and that is what made it survive: the fault only
+  appears once the player touches the throttle, and what they see then is the ship leaving its
+  engines burning at the spawn point.
+
+  The six bodies are out of the region, and `ShipView` draws them itself, beneath the hull: new
+  `ShipEngineGlow` (offset, rotation and the two authored scale factors) and
+  `ShipView.EngineGlows`, read in the ship's own frame. Each glow's offset is turned by the ship's
+  heading before it is added to the ship's position, and its own angle is added to the heading
+  before the camera is asked what that looks like — both halves of being parented, and each has its
+  own failing test if it goes: an offset added in world axes puts the port engine off the starboard
+  bow the moment the ship comes about, and an angle drawn on its own leaves the plume pointing where
+  it was authored while the ship turns underneath it.
+
+  **The numbers are the authored ones, unchanged**, including the authored `scaleX`/`scaleY` pair —
+  which `Sprite.Stretch` can now carry, so a glow is drawn as the plume it was authored as rather
+  than as the averaged blob `RegionView` has to settle for. This fixes *where* the glow is drawn and
+  deliberately decides nothing about how it looks: whether it sits right against a hull that has
+  since been resized to 30 world units is a judgement for a human at a screen.
+
+  `DebrisFieldRegionTests` now holds the region to carrying nothing on the `Characters` layer at
+  all, so a re-import that brings the bodies back fails rather than quietly drawing a second glow;
+  `ShippedRegionContentTests` holds the ship's own asset keys — hull and glow — to being in the
+  content build, which the region check could not see now that the ship names them in code.
+
 - **A countdown can no longer be ticked backwards, which silently un-elapsed a finished timer.**
   `Countdown.Tick` took its interval on trust, so a negative `TimeSpan` added time back rather than
   taking it away. That is not a slow countdown, it is a rearmed one: `IsElapsed` is meant to go one

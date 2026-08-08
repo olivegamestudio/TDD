@@ -16,30 +16,42 @@ public sealed class ShipViewTests
         return new ShipView(camera);
     }
 
+    /// <summary>
+    /// The hull: the last sprite the ship draws, because it is drawn over the glow its own
+    /// engines cast. See <see cref="ShipEngineGlowTests"/> for the sprites drawn before it.
+    /// </summary>
+    static Sprite Hull(RecordingRenderer renderer) => renderer.Drawn[^1];
+
     [Fact]
-    public void Render_DrawsTheShip_Once()
+    public void Render_DrawsTheHull_Once()
     {
         ShipView view = CreateView(out _);
         RecordingRenderer renderer = new();
+        renderer.Textures.SetSize(ShipView.DefaultAssetKey, 512, 512);
+        renderer.Textures.SetSize(ShipView.EngineGlowAssetKey, 16, 16);
 
         view.Render(renderer);
 
-        Assert.Single(renderer.Drawn);
+        Assert.Single(renderer.Drawn, sprite => sprite.Texture.Width == 512);
     }
 
     [Fact]
     public void Render_DrawsTheShipsOwnSprite()
     {
+        // The hull first, then the glow it is drawn over: what a ship is drawn with is its own
+        // asset key, and the glow is the same picture whichever ship is flying.
         ShipView view = CreateView(out _);
         RecordingRenderer renderer = new();
 
         view.Render(renderer);
 
-        Assert.Equal([ShipView.DefaultAssetKey], renderer.Textures.Requested);
+        Assert.Equal(
+            [ShipView.DefaultAssetKey, ShipView.EngineGlowAssetKey],
+            renderer.Textures.Requested);
     }
 
     [Fact]
-    public void Render_LoadsTheTextureOnce_HoweverManyFramesAreDrawn()
+    public void Render_LoadsTheTexturesOnce_HoweverManyFramesAreDrawn()
     {
         // loading is on first draw, not on construction; it must not also be on every draw
         ShipView view = CreateView(out _);
@@ -49,7 +61,9 @@ public sealed class ShipViewTests
         view.Render(renderer);
         view.Render(renderer);
 
-        Assert.Single(renderer.Textures.Requested);
+        Assert.Equal(
+            [ShipView.DefaultAssetKey, ShipView.EngineGlowAssetKey],
+            renderer.Textures.Requested);
     }
 
     [Fact]
@@ -63,7 +77,7 @@ public sealed class ShipViewTests
 
         view.Render(renderer);
 
-        Assert.Equal(new Vector2(512f, 256f), renderer.Single().Origin);
+        Assert.Equal(new Vector2(512f, 256f), Hull(renderer).Origin);
     }
 
     [Fact]
@@ -76,7 +90,7 @@ public sealed class ShipViewTests
         view.Render(renderer);
 
         // the camera is looking at the origin here, so the ship draws 40 right and 90 up
-        Assert.Equal(renderer.ViewportCentre + new Vector2(40f, -90f), renderer.Single().Position);
+        Assert.Equal(renderer.ViewportCentre + new Vector2(40f, -90f), Hull(renderer).Position);
         Assert.Equal(Vector2.Zero, camera.Target);              // the view does not move the camera
     }
 
@@ -90,7 +104,7 @@ public sealed class ShipViewTests
 
         view.Render(renderer);
 
-        Assert.Equal(renderer.ViewportCentre, renderer.Single().Position);
+        Assert.Equal(renderer.ViewportCentre, Hull(renderer).Position);
     }
 
     [Theory]
@@ -108,7 +122,7 @@ public sealed class ShipViewTests
 
         view.Render(renderer);
 
-        Assert.Equal(heading, renderer.Single().Rotation);
+        Assert.Equal(heading, Hull(renderer).Rotation);
     }
 
     [Theory]
@@ -127,7 +141,7 @@ public sealed class ShipViewTests
 
         view.Render(renderer);
 
-        Assert.Equal(0f, renderer.Single().Rotation);
+        Assert.Equal(0f, Hull(renderer).Rotation);
     }
 
     [Fact]
@@ -143,7 +157,7 @@ public sealed class ShipViewTests
 
         view.Render(renderer);
 
-        Assert.Equal(1.25f, renderer.Single().Rotation, 4);
+        Assert.Equal(1.25f, Hull(renderer).Rotation, 4);
     }
 
     [Fact]
@@ -160,8 +174,8 @@ public sealed class ShipViewTests
 
         view.Render(renderer);
 
-        Assert.Equal(renderer.ViewportCentre.X, renderer.Single().Position.X, 2);
-        Assert.Equal(renderer.ViewportCentre.Y, renderer.Single().Position.Y, 2);
+        Assert.Equal(renderer.ViewportCentre.X, Hull(renderer).Position.X, 2);
+        Assert.Equal(renderer.ViewportCentre.Y, Hull(renderer).Position.Y, 2);
     }
 
     [Fact]
@@ -175,7 +189,7 @@ public sealed class ShipViewTests
 
         view.Render(renderer);
 
-        Sprite sprite = renderer.Single();
+        Sprite sprite = Hull(renderer);
         Assert.Equal(ShipView.LengthInWorldUnits, sprite.Scale * sprite.Texture.Height, 4);
     }
 
@@ -188,7 +202,7 @@ public sealed class ShipViewTests
 
         view.Render(renderer);
 
-        Sprite sprite = renderer.Single();
+        Sprite sprite = Hull(renderer);
         Assert.Equal(ShipView.LengthInWorldUnits, sprite.Scale * sprite.Texture.Height, 4);
     }
 
@@ -203,7 +217,7 @@ public sealed class ShipViewTests
 
         view.Render(renderer);
 
-        Sprite sprite = renderer.Single();
+        Sprite sprite = Hull(renderer);
         Assert.Equal(ShipView.LengthInWorldUnits * 3f, sprite.Scale * sprite.Texture.Height, 4);
     }
 
@@ -247,7 +261,7 @@ public sealed class ShipViewTests
 
         view.Render(renderer);
 
-        Assert.Equal(["ship2"], renderer.Textures.Requested);
+        Assert.Equal(["ship2", ShipView.EngineGlowAssetKey], renderer.Textures.Requested);
     }
 
     [Fact]
@@ -260,7 +274,9 @@ public sealed class ShipViewTests
         view.AssetKey = "ship2";
         view.Render(renderer);
 
-        Assert.Equal([ShipView.DefaultAssetKey, "ship2"], renderer.Textures.Requested);
+        Assert.Equal(
+            [ShipView.DefaultAssetKey, ShipView.EngineGlowAssetKey, "ship2"],
+            renderer.Textures.Requested);
     }
 
     [Fact]
@@ -278,7 +294,7 @@ public sealed class ShipViewTests
         renderer.Clear();
         view.Render(renderer);
 
-        Sprite sprite = renderer.Single();
+        Sprite sprite = Hull(renderer);
         Assert.Equal(ShipView.LengthInWorldUnits, sprite.Scale * sprite.Texture.Height, 4);
     }
 
@@ -293,7 +309,9 @@ public sealed class ShipViewTests
         view.AssetKey = ShipView.DefaultAssetKey;
         view.Render(renderer);
 
-        Assert.Single(renderer.Textures.Requested);
+        Assert.Equal(
+            [ShipView.DefaultAssetKey, ShipView.EngineGlowAssetKey],
+            renderer.Textures.Requested);
     }
 
     [Theory]

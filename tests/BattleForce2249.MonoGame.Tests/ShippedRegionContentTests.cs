@@ -1,3 +1,4 @@
+using BattleForce2249;
 using OliveGameStudio;
 
 namespace BattleForce2249.MonoGame.Tests;
@@ -83,6 +84,18 @@ public sealed class ShippedRegionContentTests
         ];
 
         Assert.Empty(missing);
+    }
+
+    [Fact]
+    public void EverySpriteTheShipNames_IsInTheContentBuild()
+    {
+        // The ship names its own assets in code rather than in a region — the hull it is drawn
+        // with and the glow its engines cast — so the check above cannot see them. Unbuilt, they
+        // fail exactly as a region's would: an exception the first time the player is drawn.
+        HashSet<string> built = BuiltAssetKeys();
+
+        Assert.Contains(ShipView.DefaultAssetKey, built);
+        Assert.Contains(ShipView.EngineGlowAssetKey, built);
     }
 
     [Fact]
