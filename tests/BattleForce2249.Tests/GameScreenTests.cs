@@ -22,6 +22,8 @@ public sealed class GameScreenTests : HostTestBase
 
         public float Thrust { get; set; }
 
+        public float Strafe { get; set; }
+
         public void Render(IRenderer renderer) => Rendered++;
     }
 

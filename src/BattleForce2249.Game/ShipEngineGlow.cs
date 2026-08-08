@@ -19,6 +19,18 @@ public enum EngineGroup
     /// engine in the class does.
     /// </summary>
     Aft,
+
+    /// <summary>
+    /// A lateral thruster: it fires when the ship is asked to strafe to port, expelling exhaust to
+    /// starboard so the ship goes the other way.
+    /// </summary>
+    StrafePort,
+
+    /// <summary>
+    /// A lateral thruster: it fires when the ship is asked to strafe to starboard, expelling
+    /// exhaust to port so the ship goes the other way.
+    /// </summary>
+    StrafeStarboard,
 }
 
 /// <summary>
@@ -43,6 +55,16 @@ public enum EngineGroup
 /// <para>
 /// It is a game type rather than an engine one, for the reason the ship's asset key is: where a
 /// ship's engines sit is content, and the engine ships no content.
+/// </para>
+/// <para>
+/// <b>The two <see cref="EngineGroup.StrafePort"/>/<see cref="EngineGroup.StrafeStarboard"/>
+/// entries in <see cref="ShipView.EngineGlows"/> are not carried over from anywhere — they are
+/// invented.</b> Strafing arrived with no lateral-thruster art or placement authored for it at
+/// all, unlike the other six, which at least started life as somebody's real decision about where
+/// an engine sits. Their offset, rotation and scale are a first pass, reasoned to sit near the
+/// existing engine cluster and to point across the hull rather than along it, not measured against
+/// the ship's own artwork the way <c>DisgracedShip.HullRadius</c> was — the thing to revisit once a
+/// human at a screen has actually looked at where they land on <c>ship1.png</c>.
 /// </para>
 /// </remarks>
 /// <param name="Offset">

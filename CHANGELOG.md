@@ -22,8 +22,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   always did. A gamepad's previously-unread right stick now carries strafe on its X axis, with the
   same dead zone the left stick's axes get.
 
-  No new engine glow: the ship's six glow points all face forward or aft, and there is no
-  authored lateral-thruster art or placement to draw one from yet.
+  **A playtest asked for the glow too, so it followed** — `EngineGroup.StrafePort`/
+  `StrafeStarboard` join `Fore`/`Aft` in `ShipView.EngineGlows`, gated on `ShipView.Strafe`'s sign
+  the same way the other two gate on thrust, independently — burning ahead while strafing lights
+  both groups at once. Unlike the other six, these two are a guess rather than an authored
+  placement: strafing had no lateral-thruster art at all, so the offset, rotation and scale are a
+  first pass, reasoned rather than measured against `ship1.png`, and worth revisiting once someone
+  has actually looked at where they land on the art.
 
 - **The engine glow answers the keypress, and the opening's help arrows fade as the ship reaches
   them.** Two playtesting reports against the debris field.

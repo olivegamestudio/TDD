@@ -40,4 +40,15 @@ public interface IShipView : IRenderable
     /// there — set once per frame by whatever flies the ship, the same as <see cref="Pose"/>.
     /// </remarks>
     float Thrust { get; set; }
+
+    /// <summary>
+    /// How hard the ship is being asked to strafe this frame, in the same range and sense as
+    /// <c>ShipControls.Strafe</c>: <c>1</c> is full to starboard, <c>-1</c> is full to port,
+    /// <c>0</c> is none.
+    /// </summary>
+    /// <remarks>
+    /// What lights the lateral-thruster glow, independently of <see cref="Thrust"/> — a ship can
+    /// burn its main engine and strafe in the same frame, and both read on the hull at once.
+    /// </remarks>
+    float Strafe { get; set; }
 }

@@ -55,9 +55,13 @@ public sealed class ShipView(ICamera camera) : IShipView
     /// somewhere else.
     /// </para>
     /// <para>
-    /// Three of each: the bow thrusters (<see cref="EngineGroup.Fore"/>) that fire astern, and the
-    /// mains (<see cref="EngineGroup.Aft"/>) that fire ahead — see <see cref="Thrust"/> for what
-    /// decides which set is actually drawn on a given frame.
+    /// Three each of four groups: the bow thrusters (<see cref="EngineGroup.Fore"/>) that fire
+    /// astern and the mains (<see cref="EngineGroup.Aft"/>) that fire ahead, both authored with the
+    /// ship; then a pair of lateral thrusters (<see cref="EngineGroup.StrafePort"/>/
+    /// <see cref="EngineGroup.StrafeStarboard"/>) that fire when the ship strafes, which were not —
+    /// see <see cref="ShipEngineGlow"/>'s own remarks on why those two are a first guess rather
+    /// than an authored placement. See <see cref="Thrust"/> and <see cref="Strafe"/> for what
+    /// decides which of the four is actually drawn on a given frame.
     /// </para>
     /// </remarks>
     public static readonly IReadOnlyList<ShipEngineGlow> EngineGlows =
@@ -68,6 +72,16 @@ public sealed class ShipView(ICamera camera) : IShipView
         new(new Vector2(0f, 0f), 180f, 4.5f, 18f, EngineGroup.Aft),
         new(new Vector2(-6.75f, 4.5f), 190f, 2.25f, 9f, EngineGroup.Aft),
         new(new Vector2(6.75f, 4.5f), 170f, 2.25f, 9f, EngineGroup.Aft),
+
+        // Exhaust points across the hull rather than along it: a thruster's own exhaust goes the
+        // opposite way to the push it gives the ship, so the one that fires to push the ship to
+        // starboard (90) is the one whose flame points to port, and the mirror (270) fires to
+        // push to port with its own flame pointing to starboard. Set beside the existing cluster
+        // at Y=0 rather than spread toward the bow and stern, on the reasoning that a real
+        // placement will replace both numbers together once someone measures against the art
+        // rather than half-fixing one against a guess for the other.
+        new(new Vector2(0f, 0f), 90f, 2.25f, 9f, EngineGroup.StrafeStarboard),
+        new(new Vector2(0f, 0f), 270f, 2.25f, 9f, EngineGroup.StrafePort),
     ];
 
     string _assetKey = DefaultAssetKey;
@@ -109,6 +123,12 @@ public sealed class ShipView(ICamera camera) : IShipView
     public float Thrust { get; set; }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// Defaults to <c>0</c> — no strafe — for the same reason <see cref="Thrust"/> does.
+    /// </remarks>
+    public float Strafe { get; set; }
+
+    /// <inheritdoc />
     public void Render(IRenderer renderer)
     {
         // Loaded on first draw rather than up front: the graphics device the texture belongs to
@@ -127,7 +147,7 @@ public sealed class ShipView(ICamera camera) : IShipView
         // has to answer to the keypress that is supposedly driving it, not just to the ship's pose.
         foreach (ShipEngineGlow glow in EngineGlows)
         {
-            if (!Fires(glow.Group, Thrust))
+            if (!Fires(glow.Group, Thrust, Strafe))
             {
                 continue;
             }
@@ -155,17 +175,22 @@ public sealed class ShipView(ICamera camera) : IShipView
     }
 
     /// <summary>
-    /// Whether an engine group is burning at the given thrust.
+    /// Whether an engine group is burning at the given thrust and strafe.
     /// </summary>
     /// <remarks>
-    /// Exactly the sign of <see cref="Thrust"/> and nothing softer: the glow is a readout of the
+    /// Exactly the sign of the relevant axis and nothing softer: the glow is a readout of the
     /// keypress, not a physics quantity of its own, so a nudge off dead centre lights the engine
-    /// the same as a full press does. Coasting fires neither group.
+    /// the same as a full press does. <see cref="EngineGroup.Fore"/>/<see cref="EngineGroup.Aft"/>
+    /// answer only to <paramref name="thrust"/> and the two strafe groups answer only to
+    /// <paramref name="strafe"/> — the axes are independent, so a ship burning ahead while also
+    /// strafing lights both at once rather than one crowding the other out.
     /// </remarks>
-    static bool Fires(EngineGroup group, float thrust) => group switch
+    static bool Fires(EngineGroup group, float thrust, float strafe) => group switch
     {
         EngineGroup.Aft => thrust > 0f,
         EngineGroup.Fore => thrust < 0f,
+        EngineGroup.StrafeStarboard => strafe > 0f,
+        EngineGroup.StrafePort => strafe < 0f,
         _ => false,
     };
 

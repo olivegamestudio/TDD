@@ -155,9 +155,18 @@ arrow keys are untouched, so Left/Right still turn and the four-key scheme they 
 means exactly what it did before. A gamepad's left stick is unchanged — thrust and turn, as before —
 and its right stick, previously unread by anything, now carries strafe on its X axis;
 `ShipControls.FromStick` takes a fourth, defaulted argument for it, and applies the same dead zone
-to it as to the other two. Nothing draws a strafe-specific engine glow: the ship's six glow points
-are all authored facing forward or aft, and inventing lateral thruster art or placement was not this
-change's call to make.
+to it as to the other two.
+
+**Strafing lights a glow too, though a guessed one rather than an authored one.**
+`EngineGroup.StrafePort`/`StrafeStarboard` join `Fore`/`Aft` in `ShipView.EngineGlows`, gated on
+`ShipView.Strafe`'s sign the same way the other two gate on `Thrust` — both axes light
+independently, so a ship burning ahead while also strafing shows both at once rather than one
+group crowding the other out. Unlike the other six, these two were not carried over from anything:
+strafing has no lateral-thruster art or placement authored for it at all, so the offset, rotation
+and scale are a first pass — reasoned to sit near the existing engine cluster and to point across
+the hull rather than along it, not measured against `ship1.png` the way the hull radius was. See
+`ShipEngineGlow`'s own remarks for the reasoning and for what a real placement would need to
+replace.
 
 **The ship carries a hull fixture, so it has something to collide with.** The ship's own hull stays
 a circle, given to its body at construction, sized from `ShipProfile.HullRadius`. `FixedRotation` is

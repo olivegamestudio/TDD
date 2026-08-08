@@ -193,10 +193,11 @@ public sealed class GameScreen(
 
         // and last, what the frame produced is handed to the drawing side. The pose is the whole
         // of what the two stages agree about: the physics has no idea a screen exists, and the
-        // view has no idea physics does. The thrust travels the same way, so the engine glow reads
-        // the same keypress the physics just flew on rather than a second, independent guess at it.
+        // view has no idea physics does. Thrust and strafe travel the same way, so the engine glow
+        // reads the same keypress the physics just flew on rather than a second, independent guess.
         view.Pose = PoseOf(session.Player.Position, ship.Heading);
         view.Thrust = (float)controls.Thrust;
+        view.Strafe = (float)controls.Strafe;
 
         // The first frame of a game snaps rather than eases. There is nothing to ease from — the
         // camera has never been anywhere — so lagging it would swing the world round from due

@@ -31,25 +31,39 @@ public sealed class ShipEngineGlowTests
         [.. renderer.Drawn.SkipLast(1)];
 
     /// <summary>
-    /// Renders the view once ahead full and once astern full, and stitches the two passes back
-    /// together in <see cref="ShipView.EngineGlows"/>' own order — fore engines only ever fire
-    /// astern, aft engines only ever fire ahead, so no single thrust value draws every glow at
-    /// once. This is for the tests below that are about each glow's own placement, rotation, scale
-    /// or colour rather than about which group a given thrust lights.
+    /// The thrust and strafe that lights each group — the one pass that fires it and no other, so
+    /// rendering with these values in turn draws every glow exactly once each.
+    /// </summary>
+    static (float Thrust, float Strafe) Controls(EngineGroup group) => group switch
+    {
+        EngineGroup.Fore => (-1f, 0f),
+        EngineGroup.Aft => (1f, 0f),
+        EngineGroup.StrafeStarboard => (0f, 1f),
+        EngineGroup.StrafePort => (0f, -1f),
+        _ => (0f, 0f),
+    };
+
+    /// <summary>
+    /// Renders the view once per group, each time with the one thrust/strafe combination that
+    /// lights that group and no other, and stitches the passes back together in
+    /// <see cref="ShipView.EngineGlows"/>' own order — no single frame's controls light every glow
+    /// at once, since firing ahead and firing astern are mutually exclusive, and so are strafing
+    /// each way. This is for the tests below that are about each glow's own placement, rotation,
+    /// scale or colour rather than about which group a given frame's controls light.
     /// </summary>
     static IReadOnlyList<Sprite> AllGlows(ShipView view, RecordingRenderer renderer)
     {
-        view.Thrust = -1f;
-        renderer.Clear();
-        view.Render(renderer);
-        Queue<Sprite> fore = new(Glows(renderer));
+        Dictionary<EngineGroup, Queue<Sprite>> byGroup = [];
 
-        view.Thrust = 1f;
-        renderer.Clear();
-        view.Render(renderer);
-        Queue<Sprite> aft = new(Glows(renderer));
+        foreach (EngineGroup group in Enum.GetValues<EngineGroup>())
+        {
+            (view.Thrust, view.Strafe) = Controls(group);
+            renderer.Clear();
+            view.Render(renderer);
+            byGroup[group] = new Queue<Sprite>(Glows(renderer));
+        }
 
-        return [.. ShipView.EngineGlows.Select(glow => glow.Group == EngineGroup.Fore ? fore.Dequeue() : aft.Dequeue())];
+        return [.. ShipView.EngineGlows.Select(glow => byGroup[glow.Group].Dequeue())];
     }
 
     [Fact]
@@ -98,6 +112,52 @@ public sealed class ShipEngineGlowTests
         Assert.Equal(
             ShipView.EngineGlows.Count(glow => glow.Group == EngineGroup.Fore),
             Glows(renderer).Count);
+    }
+
+    [Fact]
+    public void StrafeStarboard_LightsOnlyTheStrafeStarboardThruster()
+    {
+        ShipView view = CreateView(out _);
+        view.Strafe = 1f;
+        RecordingRenderer renderer = new();
+
+        view.Render(renderer);
+
+        Assert.Equal(
+            ShipView.EngineGlows.Count(glow => glow.Group == EngineGroup.StrafeStarboard),
+            Glows(renderer).Count);
+    }
+
+    [Fact]
+    public void StrafePort_LightsOnlyTheStrafePortThruster()
+    {
+        ShipView view = CreateView(out _);
+        view.Strafe = -1f;
+        RecordingRenderer renderer = new();
+
+        view.Render(renderer);
+
+        Assert.Equal(
+            ShipView.EngineGlows.Count(glow => glow.Group == EngineGroup.StrafePort),
+            Glows(renderer).Count);
+    }
+
+    [Fact]
+    public void ThrustAndStrafeTogether_LightBothGroupsAtOnce()
+    {
+        // burning ahead while strafing is a real combination the ship can fly, and both axes have
+        // to read on the hull rather than one crowding the other out
+        ShipView view = CreateView(out _);
+        view.Thrust = 1f;
+        view.Strafe = 1f;
+        RecordingRenderer renderer = new();
+
+        view.Render(renderer);
+
+        int expected =
+            ShipView.EngineGlows.Count(glow => glow.Group == EngineGroup.Aft) +
+            ShipView.EngineGlows.Count(glow => glow.Group == EngineGroup.StrafeStarboard);
+        Assert.Equal(expected, Glows(renderer).Count);
     }
 
     [Fact]
