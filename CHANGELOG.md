@@ -9,6 +9,26 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The title screen has a sky behind it.** `MenuScreen` draws `space` as a sixth layer, first and
+  behind the other five, from the new `MenuScreen.BackgroundAssetKey`. The composition already had
+  its figures, its horizon band, its logo and its button; what it did not have was the "dark space"
+  the screen was specified with, so everything above the 3.4:1 horizon band was literally black —
+  the last strip of the black boot this screen exists to end.
+
+  **Covered, not fitted, and not stretched.** The scale is taken from whichever axis needs the
+  larger one, so the 4096² asset reaches both edges of any window and the overspill falls off the
+  screen; fitting it would leave a bare strip on every window that is not square, which is the black
+  the layer was added to remove. Uniform rather than stretched, unlike `Vignette` — that is a mask
+  which has to meet the window's edges exactly, whereas this is a picture of stars, and a stretched
+  star is an oval on every window but one. Cropping costs nothing because a star field has no
+  subject to cut in half. Four window shapes are held to covering, including one taller than it is
+  wide and one absurdly wide, because a cover rule written as a minimum passes the widescreen case
+  and fails both of those.
+
+  The unused `Image("BACKGROUND")` placeholder that stood for this is gone. A backdrop takes no
+  focus and answers no press, so it is a sprite rather than an element in the controller's tree —
+  left there it would only have given the player something to tab onto.
+
 - **The ship has a hull, and the debris field has something to hit it with.** `ShipMovement`'s
   Aether body now carries a circle fixture sized from the new `ShipProfile.HullRadius`, and
   `AddObstacle(Position, width, height, rotation)` seeds static rectangular obstacles into the same
