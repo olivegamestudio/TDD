@@ -16,23 +16,26 @@ public sealed class MenuScreen : IMenuScreen, IActivatable, IRenderable
     /// asset keys are never translated.
     /// </summary>
     /// <remarks>
-    /// The figures are drawn first and the button last, so each layer covers the one behind it.
+    /// The backdrop is drawn first and the button last, so each layer covers the one behind it.
     /// The lone figure stands behind the pair deliberately, and the horizon is drawn over both —
     /// so the planet cuts across their feet and they stand <em>in</em> the scene rather than in
     /// front of a picture of one.
     /// </remarks>
+    public const string BackgroundAssetKey = "space";
+
+    /// <inheritdoc cref="BackgroundAssetKey" />
     public const string HorizonAssetKey = "title-earth";
 
-    /// <inheritdoc cref="HorizonAssetKey" />
+    /// <inheritdoc cref="BackgroundAssetKey" />
     public const string LoneCharacterAssetKey = "character";
 
-    /// <inheritdoc cref="HorizonAssetKey" />
+    /// <inheritdoc cref="BackgroundAssetKey" />
     public const string CharacterPairAssetKey = "characters";
 
-    /// <inheritdoc cref="HorizonAssetKey" />
+    /// <inheritdoc cref="BackgroundAssetKey" />
     public const string TitleAssetKey = "titlelogo";
 
-    /// <inheritdoc cref="HorizonAssetKey" />
+    /// <inheritdoc cref="BackgroundAssetKey" />
     public const string StartButtonAssetKey = "StartButton";
 
     /// <summary>
@@ -43,8 +46,10 @@ public sealed class MenuScreen : IMenuScreen, IActivatable, IRenderable
     /// <remarks>
     /// The horizon is the exception: it is sized to the screen's <em>width</em> and pinned to the
     /// bottom edge, because it is a horizon band rather than a wallpaper. At 3.4:1 it covers only
-    /// the lower part of a 16:9 window, and the space above it is meant to stay black — the band's
-    /// own top edge is already near-black, so the two meet without a seam.
+    /// the lower part of a 16:9 window, and what shows above it is the backdrop — the band's own
+    /// top edge is already near-black, so it meets the star field without a seam. Until the
+    /// backdrop was drawn that space was literally black, which is the gap this screen existed to
+    /// close and the last part of it to be closed.
     /// </remarks>
     public const float LoneCharacterHeightFraction = 1.13f;
 
@@ -135,6 +140,7 @@ public sealed class MenuScreen : IMenuScreen, IActivatable, IRenderable
     /// </summary>
     public const float DisabledButtonOpacity = 0.35f;
 
+    ITexture? _backdrop;
     ITexture? _horizon;
     ITexture? _loneCharacter;
     ITexture? _characterPair;
@@ -149,6 +155,7 @@ public sealed class MenuScreen : IMenuScreen, IActivatable, IRenderable
     /// </remarks>
     public void Render(IRenderer renderer)
     {
+        _backdrop ??= renderer.Textures.Load(BackgroundAssetKey);
         _horizon ??= renderer.Textures.Load(HorizonAssetKey);
         _loneCharacter ??= renderer.Textures.Load(LoneCharacterAssetKey);
         _characterPair ??= renderer.Textures.Load(CharacterPairAssetKey);
@@ -156,6 +163,9 @@ public sealed class MenuScreen : IMenuScreen, IActivatable, IRenderable
         _startButtonTexture ??= renderer.Textures.Load(StartButtonAssetKey);
 
         Vector2 viewport = renderer.ViewportSize;
+
+        // The backdrop first, because everything else is set against it.
+        DrawBackdrop(renderer, viewport);
 
         // The characters go down before the horizon, so the planet is drawn over their feet and
         // they stand behind it rather than on top of it. It is what puts them in the scene instead
@@ -165,6 +175,37 @@ public sealed class MenuScreen : IMenuScreen, IActivatable, IRenderable
         DrawHorizon(renderer, viewport);
         DrawTitle(renderer, viewport);
         DrawStartButton(renderer, viewport);
+    }
+
+    /// <summary>
+    /// Draws the star field behind everything else, covering the whole window.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Covered, not fitted.</b> The scale is taken from whichever axis needs the larger one, so
+    /// the texture reaches both edges and the overspill on the other axis falls off the screen.
+    /// Fitting it — the smaller of the two — would leave a bare strip on every window whose shape
+    /// is not the asset's own, and a bare strip on the title screen is exactly the black this
+    /// screen exists to get rid of.
+    /// </para>
+    /// <para>
+    /// <b>Uniformly, unlike the vignette</b>, which stretches to the window because it is a mask
+    /// that has to meet its edges exactly. This is a picture of stars, and a stretched star is an
+    /// oval on every window but one. Cropping costs nothing here because the field has no
+    /// composition to lose — there is no subject in it to cut in half.
+    /// </para>
+    /// </remarks>
+    void DrawBackdrop(IRenderer renderer, Vector2 viewport)
+    {
+        float scale = Math.Max(viewport.X / _backdrop!.Width, viewport.Y / _backdrop.Height);
+
+        renderer.Draw(new Sprite(
+            Texture: _backdrop,
+            Position: viewport / 2f,
+            Rotation: 0f,
+            // Placed by its own middle, so what the cover crops comes evenly off both sides.
+            Origin: new Vector2(_backdrop.Width, _backdrop.Height) / 2f,
+            Scale: scale));
     }
 
     /// <summary>
@@ -246,7 +287,9 @@ public sealed class MenuScreen : IMenuScreen, IActivatable, IRenderable
 
     readonly IUIController _controller;
     readonly ISaveProgressService _saveProgressService;
-    readonly Image _background = new("BACKGROUND");
+    // No element stands in for the backdrop. It was a placeholder Image until this screen actually
+    // drew one, and a backdrop is not a UI element: it takes no focus and answers no press, so
+    // putting one in the controller's tree would only give the player something to tab onto.
     readonly Button _startButton = new("START");
     
     /// <summary>
