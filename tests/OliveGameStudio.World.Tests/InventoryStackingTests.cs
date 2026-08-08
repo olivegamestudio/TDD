@@ -162,6 +162,48 @@ public sealed class InventoryStackingTests
     }
 
     [Fact]
+    public void AskingWhetherThereIsRoomForOneIdAuthoredTwice_IsRefusedTheWayAddingItIs()
+    {
+        // HasRoomFor exists to say what Add would do without doing it, so the two have to agree on
+        // every item — including the one Add refuses outright. Answering "no room" here would be
+        // the wrong no: the caller would leave the item in the world, read that as an ordinary full
+        // hold, and never find out the content is misauthored.
+        Inventory inventory = new(slots: 4);
+        inventory.Add(Ore);
+
+        Item sameIdDifferentStats = new("ore.iron", new ItemStats(EquipSlot.Weapon, StackLimit: 99));
+
+        Assert.Throws<ArgumentException>(() => inventory.HasRoomFor(sameIdDifferentStats));
+    }
+
+    [Fact]
+    public void AnItemAuthoredTwice_IsRefusedEvenWhenThereIsAnEmptySlotToOpen()
+    {
+        // the free slot is what hid this: HasRoomFor answered from FreeSlots before it ever looked
+        // at what was already held, so a hold with room said yes to an item Add would throw on
+        Inventory inventory = new(slots: 4);
+        inventory.Add(Ore);
+
+        Item sameIdDifferentStats = new("ore.iron", new ItemStats(EquipSlot.Weapon, StackLimit: 99));
+
+        Assert.True(inventory.FreeSlots > 0);
+        Assert.Throws<ArgumentException>(() => inventory.HasRoomFor(sameIdDifferentStats));
+        Assert.Throws<ArgumentException>(() => inventory.Add(sameIdDifferentStats));
+    }
+
+    [Fact]
+    public void AnItemOfAnotherId_IsUnaffectedByWhatIsAlreadyHeld()
+    {
+        // the mismatch check keys off the id, so an item that shares nothing with what is held is
+        // still answered on room alone
+        Inventory inventory = new(slots: 1);
+        inventory.Add(Ore);
+
+        Assert.False(inventory.HasRoomFor(Cell));
+        Assert.True(inventory.HasRoomFor(Ore));
+    }
+
+    [Fact]
     public void AHoldWithNoSlotsAtAll_HoldsNothingAndSaysSo()
     {
         // a legitimate thing for content to author, and every question asked of it has an answer

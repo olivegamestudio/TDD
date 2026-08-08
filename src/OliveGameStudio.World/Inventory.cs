@@ -139,6 +139,48 @@ public sealed class Inventory
     {
         ArgumentNullException.ThrowIfNull(item);
 
+        ItemStack? withRoom = StackWithRoomFor(item);
+
+        if (withRoom is not null)
+        {
+            withRoom.Add(1);
+            return true;
+        }
+
+        if (FreeSlots <= 0)
+        {
+            return false;
+        }
+
+        _stacks.Add(new ItemStack(item, count: 1));
+        return true;
+    }
+
+    /// <summary>
+    /// The first slot already holding this item that will take another, or <c>null</c> when none
+    /// does — either because none holds it or because every one that does is full.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The one place an item is measured against what is already held, shared by <see cref="Add"/>
+    /// and <see cref="HasRoomFor"/> rather than written out in each. <see cref="HasRoomFor"/>
+    /// promises to say what <see cref="Add"/> would do, and a promise like that is kept by the two
+    /// asking the same question rather than by two pieces of code being written to agree: they had
+    /// drifted exactly once, and the check below is what they drifted over.
+    /// </para>
+    /// <para>
+    /// The first stack with room is what is handed back, so a hold fills its part-filled slots
+    /// before opening new ones and does not fragment into part-filled slots of the same thing while
+    /// the player watches it run out of room.
+    /// </para>
+    /// </remarks>
+    /// <param name="item">The item being made room for.</param>
+    /// <exception cref="ArgumentException">
+    /// An item with this id is already held, authored with different stats — see <see cref="Add"/>
+    /// for why that is refused rather than reconciled.
+    /// </exception>
+    ItemStack? StackWithRoomFor(Item item)
+    {
         ItemStack? held = null;
         ItemStack? withRoom = null;
 
@@ -165,19 +207,7 @@ public sealed class Inventory
                 nameof(item));
         }
 
-        if (withRoom is not null)
-        {
-            withRoom.Add(1);
-            return true;
-        }
-
-        if (FreeSlots <= 0)
-        {
-            return false;
-        }
-
-        _stacks.Add(new ItemStack(item, count: 1));
-        return true;
+        return withRoom;
     }
 
     /// <summary>
@@ -254,10 +284,28 @@ public sealed class Inventory
     /// <param name="item">The item to make room for.</param>
     /// <returns><c>true</c> when <see cref="Add"/> would take it.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="item"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException">
+    /// An item with this id is already held, authored with different stats — the same refusal
+    /// <see cref="Add"/> makes, because this says what <see cref="Add"/> would do and what
+    /// <see cref="Add"/> does with that item is throw.
+    /// <para>
+    /// It throws rather than answering <c>false</c>, even though a query answering a question is
+    /// the usual shape, because <c>false</c> here would be the wrong no. A caller guarding an
+    /// <see cref="Add"/> with this — the pattern it exists for — reads <c>false</c> as an ordinary
+    /// full hold and leaves the item in the world, which is the right thing to do about a hold with
+    /// no room and a silent grave for a misauthored item: the mistake would never be added, never
+    /// throw, and never be seen. <see cref="Add"/> is loud about two authorings of one id because
+    /// this is the first place the two are ever seen side by side, and answering the same question
+    /// quietly would undo that.
+    /// </para>
+    /// </exception>
     public bool HasRoomFor(Item item)
     {
         ArgumentNullException.ThrowIfNull(item);
 
-        return FreeSlots > 0 || _stacks.Any(stack => stack.Item.Equals(item) && !stack.IsFull);
+        // Asked before the free-slot count rather than after, because it is the half that can
+        // refuse: a hold with room would otherwise short-circuit to true and never look at what it
+        // is already holding, which is exactly how this and Add came apart.
+        return StackWithRoomFor(item) is not null || FreeSlots > 0;
     }
 }
