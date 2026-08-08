@@ -82,6 +82,10 @@ public static class BattleForceServiceCollectionExtensions
             .AddSingleton<RegionView>()
             .AddSingleton<RegionLoader>()
 
+            // Likewise: it reads the camera and nothing else, and draws the one layer RegionView
+            // deliberately leaves for it — see both types' own remarks.
+            .AddSingleton<HelpArrowView>()
+
             // Likewise registered as itself: it reads the viewport and nothing else, and nothing
             // outside the drawing has anything to say to it.
             .AddSingleton<Vignette>()

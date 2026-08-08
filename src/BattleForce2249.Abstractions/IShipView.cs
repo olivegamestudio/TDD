@@ -29,4 +29,15 @@ public interface IShipView : IRenderable
     /// the ship; a pose left alone simply draws the ship where it was.
     /// </summary>
     ShipPose Pose { get; set; }
+
+    /// <summary>
+    /// How hard the engines are being asked to burn this frame, in the same range and sense as
+    /// <c>ShipControls.Thrust</c>: <c>1</c> is full ahead, <c>-1</c> is full astern, <c>0</c> coasts.
+    /// </summary>
+    /// <remarks>
+    /// What lights the engine glow. A ship coasting or idle burns nothing, so the pilot's own
+    /// keypress is what the player reads on the hull rather than a glow that is simply always
+    /// there — set once per frame by whatever flies the ship, the same as <see cref="Pose"/>.
+    /// </remarks>
+    float Thrust { get; set; }
 }

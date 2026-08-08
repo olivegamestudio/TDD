@@ -18,20 +18,28 @@ namespace BattleForce2249;
 /// a ship exists; it draws what is in the world at wherever the camera is pointed, so it stays
 /// correct the day something else is being followed.
 /// </para>
+/// <para>
+/// One exception, and it is the reason the sentence above is worth stating rather than assuming:
+/// bodies on the <c>"UI"</c> layer — today, the arrows that guide a new pilot out of the debris
+/// field — are read and skipped here, because <see cref="HelpArrowView"/> draws them instead, and
+/// it <em>does</em> know the ship exists, fading each one as the ship gets close. Drawing them
+/// here too would put a second, un-fading copy underneath its own fade.
+/// </para>
 /// </remarks>
 /// <param name="camera">The camera the world is drawn through — the same one the ship uses.</param>
 public sealed class RegionView(ICamera camera) : IRenderable
 {
     /// <summary>
-    /// The order the layers are drawn in, furthest first.
+    /// The order the layers this draws are drawn in, furthest first.
     /// </summary>
     /// <remarks>
     /// Named here rather than sorted alphabetically or taken in file order, because "which is
     /// behind which" is a decision rather than an accident of naming. A body in a layer this does
     /// not name is drawn last, so content that invents a layer appears rather than vanishing while
-    /// nothing says why.
+    /// nothing says why. <c>"UI"</c> is deliberately not among them — bodies on it are filtered out
+    /// in <see cref="Scene"/> before sorting ever sees them, so it never has an order to hold here.
     /// </remarks>
-    public static readonly string[] LayerOrder = ["Parallax", "Default", "Environment", "Characters", "UI"];
+    public static readonly string[] LayerOrder = ["Parallax", "Default", "Environment", "Characters"];
 
     readonly Dictionary<string, ITexture> _textures = new(StringComparer.Ordinal);
 
@@ -187,6 +195,7 @@ public sealed class RegionView(ICamera camera) : IRenderable
         {
             _scene = value;
             _ordered = [.. value.Bodies
+                .Where(body => !string.Equals(body.Layer, HelpArrowView.Layer, StringComparison.Ordinal))
                 .OrderBy(body => LayerIndex(body.Layer))
                 .ThenBy(body => body.Order)];
         }

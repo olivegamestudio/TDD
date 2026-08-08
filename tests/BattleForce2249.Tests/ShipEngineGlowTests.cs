@@ -23,11 +23,34 @@ public sealed class ShipEngineGlowTests
     }
 
     /// <summary>
-    /// What the ship drew before the hull — one sprite per engine glow, in the order they are
-    /// declared.
+    /// What the ship drew before the hull — one sprite per <em>lit</em> engine glow, in the order
+    /// they are declared. Not every engine draws every frame any more — see the gating tests below
+    /// — so this is however many of <see cref="ShipView.EngineGlows"/> the current thrust fires.
     /// </summary>
     static IReadOnlyList<Sprite> Glows(RecordingRenderer renderer) =>
         [.. renderer.Drawn.SkipLast(1)];
+
+    /// <summary>
+    /// Renders the view once ahead full and once astern full, and stitches the two passes back
+    /// together in <see cref="ShipView.EngineGlows"/>' own order — fore engines only ever fire
+    /// astern, aft engines only ever fire ahead, so no single thrust value draws every glow at
+    /// once. This is for the tests below that are about each glow's own placement, rotation, scale
+    /// or colour rather than about which group a given thrust lights.
+    /// </summary>
+    static IReadOnlyList<Sprite> AllGlows(ShipView view, RecordingRenderer renderer)
+    {
+        view.Thrust = -1f;
+        renderer.Clear();
+        view.Render(renderer);
+        Queue<Sprite> fore = new(Glows(renderer));
+
+        view.Thrust = 1f;
+        renderer.Clear();
+        view.Render(renderer);
+        Queue<Sprite> aft = new(Glows(renderer));
+
+        return [.. ShipView.EngineGlows.Select(glow => glow.Group == EngineGroup.Fore ? fore.Dequeue() : aft.Dequeue())];
+    }
 
     [Fact]
     public void TheShip_HasEnginesToGlow()
@@ -37,11 +60,53 @@ public sealed class ShipEngineGlowTests
     }
 
     [Fact]
-    public void Render_DrawsAGlowForEveryEngine_BeneathTheHull()
+    public void Coasting_LightsNoEngineAtAll()
+    {
+        // The bug this exists to catch: a glow that is always on is not answering the keypress,
+        // it is decoration. A ship sitting dead in space burns nothing.
+        ShipView view = CreateView(out _);
+        RecordingRenderer renderer = new();
+
+        view.Render(renderer);
+
+        Assert.Empty(Glows(renderer));
+    }
+
+    [Fact]
+    public void ThrustAhead_LightsOnlyTheAftEngines()
+    {
+        ShipView view = CreateView(out _);
+        view.Thrust = 1f;
+        RecordingRenderer renderer = new();
+
+        view.Render(renderer);
+
+        Assert.Equal(
+            ShipView.EngineGlows.Count(glow => glow.Group == EngineGroup.Aft),
+            Glows(renderer).Count);
+    }
+
+    [Fact]
+    public void ThrustAstern_LightsOnlyTheForeEngines()
+    {
+        ShipView view = CreateView(out _);
+        view.Thrust = -1f;
+        RecordingRenderer renderer = new();
+
+        view.Render(renderer);
+
+        Assert.Equal(
+            ShipView.EngineGlows.Count(glow => glow.Group == EngineGroup.Fore),
+            Glows(renderer).Count);
+    }
+
+    [Fact]
+    public void Render_DrawsAGlowForEveryLitEngine_BeneathTheHull()
     {
         // Beneath, because the glow is light spilling out from under the ship rather than a
         // decal on top of it — drawn after the hull it would wash the artwork out.
         ShipView view = CreateView(out _);
+        view.Thrust = 1f;
         RecordingRenderer renderer = new();
 
         // Sized apart so the two can be told from each other in what was drawn.
@@ -50,7 +115,8 @@ public sealed class ShipEngineGlowTests
 
         view.Render(renderer);
 
-        Assert.Equal(ShipView.EngineGlows.Count + 1, renderer.Drawn.Count);
+        int aftCount = ShipView.EngineGlows.Count(glow => glow.Group == EngineGroup.Aft);
+        Assert.Equal(aftCount + 1, renderer.Drawn.Count);
         Assert.All(Glows(renderer), glow => Assert.Equal(16, glow.Texture.Width));
         Assert.Equal(512, renderer.Drawn[^1].Texture.Width);
     }
@@ -89,9 +155,7 @@ public sealed class ShipEngineGlowTests
         camera.Orientation = heading;
         camera.PixelsPerUnit = 2f;
 
-        view.Render(renderer);
-
-        IReadOnlyList<Sprite> glows = Glows(renderer);
+        IReadOnlyList<Sprite> glows = AllGlows(view, renderer);
 
         for (int engine = 0; engine < ShipView.EngineGlows.Count; engine++)
         {
@@ -119,9 +183,7 @@ public sealed class ShipEngineGlowTests
         // to starboard of it is the world's -Y.
         view.Pose = new ShipPose(Vector2.Zero, MathF.PI / 2f);
 
-        view.Render(renderer);
-
-        IReadOnlyList<Sprite> glows = Glows(renderer);
+        IReadOnlyList<Sprite> glows = AllGlows(view, renderer);
 
         for (int engine = 0; engine < ShipView.EngineGlows.Count; engine++)
         {
@@ -146,9 +208,7 @@ public sealed class ShipEngineGlowTests
         RecordingRenderer renderer = new();
         view.Pose = new ShipPose(Vector2.Zero, heading);
 
-        view.Render(renderer);
-
-        IReadOnlyList<Sprite> glows = Glows(renderer);
+        IReadOnlyList<Sprite> glows = AllGlows(view, renderer);
 
         for (int engine = 0; engine < ShipView.EngineGlows.Count; engine++)
         {
@@ -169,9 +229,9 @@ public sealed class ShipEngineGlowTests
         RecordingRenderer renderer = new();
         renderer.Textures.SetSize(ShipView.EngineGlowAssetKey, 240, 180);
 
-        view.Render(renderer);
+        IReadOnlyList<Sprite> glows = AllGlows(view, renderer);
 
-        Assert.All(Glows(renderer), glow => Assert.Equal(new Vector2(120f, 90f), glow.Origin));
+        Assert.All(glows, glow => Assert.Equal(new Vector2(120f, 90f), glow.Origin));
     }
 
     [Fact]
@@ -184,9 +244,7 @@ public sealed class ShipEngineGlowTests
         renderer.Textures.SetSize(ShipView.EngineGlowAssetKey, 200, 100);
         camera.PixelsPerUnit = 1f;
 
-        view.Render(renderer);
-
-        IReadOnlyList<Sprite> glows = Glows(renderer);
+        IReadOnlyList<Sprite> glows = AllGlows(view, renderer);
 
         for (int engine = 0; engine < ShipView.EngineGlows.Count; engine++)
         {
@@ -215,14 +273,14 @@ public sealed class ShipEngineGlowTests
         RecordingRenderer far = new();
 
         camera.PixelsPerUnit = 4f;
-        view.Render(close);
+        IReadOnlyList<Sprite> closeGlows = AllGlows(view, close);
 
         camera.PixelsPerUnit = 1f;
-        view.Render(far);
+        IReadOnlyList<Sprite> farGlows = AllGlows(view, far);
 
         for (int engine = 0; engine < ShipView.EngineGlows.Count; engine++)
         {
-            Assert.Equal(4f * Glows(far)[engine].Scale, Glows(close)[engine].Scale, 4);
+            Assert.Equal(4f * farGlows[engine].Scale, closeGlows[engine].Scale, 4);
         }
     }
 
@@ -234,8 +292,8 @@ public sealed class ShipEngineGlowTests
         ShipView view = CreateView(out _);
         RecordingRenderer renderer = new();
 
-        view.Render(renderer);
+        IReadOnlyList<Sprite> glows = AllGlows(view, renderer);
 
-        Assert.All(Glows(renderer), glow => Assert.Equal(Colour.White, glow.Colour));
+        Assert.All(glows, glow => Assert.Equal(Colour.White, glow.Colour));
     }
 }

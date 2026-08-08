@@ -9,6 +9,26 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The engine glow answers the keypress, and the opening's help arrows fade as the ship reaches
+  them.** Two playtesting reports against the debris field.
+
+  The engine glow was parented to the ship in an earlier pass, which fixed it staying at the spawn
+  point — but all six lights still burned constantly, at every thrust, which read as decoration
+  rather than as an engine responding to anything. `ShipEngineGlow` now carries an `EngineGroup`
+  (`Fore`, the three bow thrusters; `Aft`, the three mains), and `ShipView.Thrust` — set by
+  `GameScreen` from the same `ShipControls` that flies the ship, read once and shared rather than
+  asked for twice — decides which group is actually lit: ahead lights the mains, astern lights the
+  bow thrusters, coasting lights neither.
+
+  The opening's eight breadcrumb arrows were drawn at a fixed strength regardless of where the
+  player had actually flown to, cluttering the view of the debris they exist to help someone
+  survive. `HelpArrowView` (new) draws them instead of `RegionView`, fading each one by its own
+  distance to the ship every frame — full strength beyond `HelpArrowView.FullyVisibleDistance`,
+  gone within `HelpArrowView.HiddenDistance`. Nothing latches: flying past one and doubling back
+  brings it back exactly as a first approach would, because what is tracked is only "how far away
+  right now," never "already seen." `RegionView` now skips the `"UI"` layer the arrows live on, so
+  the two views never draw the same body.
+
 - **The title screen has a sky behind it.** `MenuScreen` draws `space` as a sixth layer, first and
   behind the other five, from the new `MenuScreen.BackgroundAssetKey`. The composition already had
   its figures, its horizon band, its logo and its button; what it did not have was the "dark space"

@@ -759,6 +759,30 @@ keep its phase when the region is loaded again, which a number handed out in dra
 A time that is negative or not finite is refused at the setter, on the same reasoning as the
 camera's guards above.
 
+**An engine glow answers the keypress, not the ship's pose.** Parenting the glow to the ship (above)
+fixed *where* it was drawn; it was still drawn always, all six at once, whatever the pilot was
+doing — which reads as decoration rather than as an engine, and is not what "based on the keypress"
+asks for. `ShipEngineGlow` now carries an `EngineGroup`: `Fore` for the three bow thrusters, `Aft`
+for the three mains, matching the `FrontEngine`/`RearEngine` split the content shipped with.
+`ShipView.Thrust` — set by `GameScreen` from the same `ShipControls` it hands `ShipMovement.Update`,
+read once and passed to both rather than asked for twice — decides which group actually fires:
+positive lights the mains, negative lights the bow thrusters, and coasting lights neither. The glow
+texture is still loaded unconditionally on first draw regardless of what is currently lit, so the
+first frame a key is pressed is not the one paying for a texture load.
+
+**Help arrows fade by the ship's distance to them, not by a flag that remembers one was passed.**
+The debris field's opening stretch carries eight `Icon_Example02` bodies on a `"UI"` layer, authored
+as a breadcrumb trail out. Drawn at a fixed strength they clutter the view of exactly the debris a
+new pilot most needs to be looking at, once they have already been shown the way past a given one.
+`HelpArrowView` draws them instead — `RegionView.Scene` filters `"UI"`-layer bodies out of what it
+sorts and draws, with a remark pointing at why, so the two never draw the same body — computing each
+arrow's alpha fresh every frame from `Vector2.Distance(ShipPosition, body)`: full strength beyond
+`HelpArrowView.FullyVisibleDistance`, gone within `HelpArrowView.HiddenDistance`, and a straight
+fade between. Nothing here latches: a player who flies past an arrow and doubles back sees it fade
+back in exactly as it would on a first approach, because "passed" is not a fact this keeps, only
+"how far away, right now." The two distances are reasoned against the arrows' own authored spacing
+rather than measured against a play session, in the same spirit `GameScreen.BackdropBrightness` is.
+
 `Vignette` is the frame over the top of it: one sprite stretched across the whole window, drawn
 after everything else, clear in the middle and closing to dark at the corners. It **intercepts
 nothing, by construction** — a sprite is a drawing instruction, and the type answers nothing but

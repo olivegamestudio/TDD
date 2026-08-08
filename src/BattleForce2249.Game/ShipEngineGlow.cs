@@ -3,6 +3,25 @@ using System.Numerics;
 namespace BattleForce2249;
 
 /// <summary>
+/// Which end of the ship an engine glow belongs to, and so which way the pilot has to be burning
+/// for it to light.
+/// </summary>
+public enum EngineGroup
+{
+    /// <summary>
+    /// A bow thruster: it fires when the ship is asked astern, pushing the nose back the way it
+    /// came.
+    /// </summary>
+    Fore,
+
+    /// <summary>
+    /// A main engine: it fires when the ship is asked ahead, pushing from the stern the way every
+    /// engine in the class does.
+    /// </summary>
+    Aft,
+}
+
+/// <summary>
 /// One of the glows the ship's engines cast, placed against the ship rather than against the
 /// world.
 /// </summary>
@@ -46,8 +65,13 @@ namespace BattleForce2249;
 /// <paramref name="ScaleAcross"/> because that is what makes a round glow into a plume, and a
 /// single averaged factor draws every engine as a blob.
 /// </param>
+/// <param name="Group">
+/// Which end of the ship this glow belongs to, and so which way the pilot has to be burning for
+/// it to light — see <see cref="EngineGroup"/>.
+/// </param>
 public readonly record struct ShipEngineGlow(
     Vector2 Offset,
     float RotationDegrees,
     float ScaleAcross,
-    float ScaleAlong);
+    float ScaleAlong,
+    EngineGroup Group);

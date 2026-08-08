@@ -20,6 +20,8 @@ public sealed class GameScreenTests : HostTestBase
 
         public ShipPose Pose { get; set; }
 
+        public float Thrust { get; set; }
+
         public void Render(IRenderer renderer) => Rendered++;
     }
 
@@ -73,6 +75,7 @@ public sealed class GameScreenTests : HostTestBase
         IGameSession? session = null,
         IShipInput? pilot = null,
         RegionView? region = null,
+        HelpArrowView? helpArrows = null,
         CollisionDebugView? collisionDebug = null) =>
         new(session ?? new StubGameSession(),
             pilot ?? new NeutralShipInput(),
@@ -83,6 +86,7 @@ public sealed class GameScreenTests : HostTestBase
             region ?? new RegionView(camera),
             new RegionLoader(Path.Combine(AppContext.BaseDirectory, RegionLoader.FolderName)),
             new Vignette(),
+            helpArrows ?? new HelpArrowView(camera),
             // Disabled unless a test is specifically about it: these tests assert on draw order
             // and draw count, and a developer overlay defaulting to drawn would be extra sprites
             // neither was written expecting.
@@ -410,12 +414,29 @@ public sealed class GameScreenTests : HostTestBase
     {
         // frames arrive while the save is still being read; there is no position to draw yet, and
         // drawing the ship at the origin would put it somewhere the player has never been
-        StubShipView view = new() { Pose = new ShipPose(new Vector2(7f, 8f), 0.5f) };
+        StubShipView view = new() { Pose = new ShipPose(new Vector2(7f, 8f), 0.5f), Thrust = 0.75f };
         GameScreen screen = ScreenFor(new Camera2D(), view, new StubGameSession { IsReady = false });
 
         screen.Update(TimeSpan.FromSeconds(1));
 
         Assert.Equal(new ShipPose(new Vector2(7f, 8f), 0.5f), view.Pose);
+        Assert.Equal(0.75f, view.Thrust);
+    }
+
+    [Fact]
+    public void Update_PutsThePilotsThrustOnTheView()
+    {
+        // the engine glow reads this, and it has to be the burn that actually flew the ship this
+        // frame — not a second, later read of a pilot whose controls could have moved on already
+        StubShipView view = new();
+        GameScreen screen = ScreenFor(
+            new Camera2D(),
+            view,
+            pilot: new FixedShipInput { Controls = new ShipControls(thrust: -1, turn: 0) });
+
+        screen.Update(TimeSpan.FromSeconds(1 / 60.0));
+
+        Assert.Equal(-1f, view.Thrust);
     }
 
     [Fact]

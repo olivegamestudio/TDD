@@ -18,6 +18,7 @@ namespace BattleForce2249;
 /// <param name="region">The scenery of the place being flown through.</param>
 /// <param name="regions">Where an authored region is read from.</param>
 /// <param name="frame">The overlay the play area is framed with.</param>
+/// <param name="helpArrows">The arrows that guide a new pilot out of the field, faded as the ship reaches each one.</param>
 /// <param name="collisionDebug">The developer overlay that draws collision shapes over everything.</param>
 public sealed class GameScreen(
     IGameSession session,
@@ -29,6 +30,7 @@ public sealed class GameScreen(
     RegionView region,
     RegionLoader regions,
     Vignette frame,
+    HelpArrowView helpArrows,
     CollisionDebugView collisionDebug)
     : IGameScreen, IActivatable, IRenderable
 {
@@ -174,16 +176,23 @@ public sealed class GameScreen(
             _obstacleShip = shipEntity;
         }
 
+        // read once rather than twice: a second call further down the frame is not guaranteed to
+        // answer the same way the first one did, and the engine glow has to agree with the burn
+        // that actually moved the ship rather than with whatever the pilot is asking a moment later
+        ShipControls controls = pilot.Read();
+
         // the ship flies first, so the quests are measured against where the player got to this
         // frame rather than where they were at the end of the last one
-        ship.Update(session.Player, pilot.Read(), frameTime);
+        ship.Update(session.Player, controls, frameTime);
 
         questProximity.Update(session.Quests, began, session.Player.Position);
 
         // and last, what the frame produced is handed to the drawing side. The pose is the whole
         // of what the two stages agree about: the physics has no idea a screen exists, and the
-        // view has no idea physics does.
+        // view has no idea physics does. The thrust travels the same way, so the engine glow reads
+        // the same keypress the physics just flew on rather than a second, independent guess at it.
         view.Pose = PoseOf(session.Player.Position, ship.Heading);
+        view.Thrust = (float)controls.Thrust;
 
         // The first frame of a game snaps rather than eases. There is nothing to ease from — the
         // camera has never been anywhere — so lagging it would swing the world round from due
@@ -298,6 +307,13 @@ public sealed class GameScreen(
         // this is where the frame's results reach the drawing side.
         region.SecondsElapsed = _secondsInRegion;
         region.Render(renderer);
+
+        // Same layer the region's own scenery draws this over — see RegionView's remarks on why
+        // the arrows themselves are not among what it just drew — and still beneath the ship, so
+        // the ship reads as flying over an arrow rather than under one.
+        helpArrows.ShipPosition = view.Pose.Position;
+        helpArrows.Bodies = region.Scene.Bodies;
+        helpArrows.Render(renderer);
 
         view.Render(renderer);
 

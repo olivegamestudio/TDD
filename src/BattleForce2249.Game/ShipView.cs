@@ -54,15 +54,20 @@ public sealed class ShipView(ICamera camera) : IShipView
     /// is one ship to draw and is the thing to revisit the day a second ship has engines
     /// somewhere else.
     /// </para>
+    /// <para>
+    /// Three of each: the bow thrusters (<see cref="EngineGroup.Fore"/>) that fire astern, and the
+    /// mains (<see cref="EngineGroup.Aft"/>) that fire ahead — see <see cref="Thrust"/> for what
+    /// decides which set is actually drawn on a given frame.
+    /// </para>
     /// </remarks>
     public static readonly IReadOnlyList<ShipEngineGlow> EngineGlows =
     [
-        new(new Vector2(0f, 0f), 0f, 4.5f, 18f),
-        new(new Vector2(-5.625f, 0f), 20f, 2.25f, 9f),
-        new(new Vector2(5.625f, 0f), 340f, 2.25f, 9f),
-        new(new Vector2(0f, 0f), 180f, 4.5f, 18f),
-        new(new Vector2(-6.75f, 4.5f), 190f, 2.25f, 9f),
-        new(new Vector2(6.75f, 4.5f), 170f, 2.25f, 9f),
+        new(new Vector2(0f, 0f), 0f, 4.5f, 18f, EngineGroup.Fore),
+        new(new Vector2(-5.625f, 0f), 20f, 2.25f, 9f, EngineGroup.Fore),
+        new(new Vector2(5.625f, 0f), 340f, 2.25f, 9f, EngineGroup.Fore),
+        new(new Vector2(0f, 0f), 180f, 4.5f, 18f, EngineGroup.Aft),
+        new(new Vector2(-6.75f, 4.5f), 190f, 2.25f, 9f, EngineGroup.Aft),
+        new(new Vector2(6.75f, 4.5f), 170f, 2.25f, 9f, EngineGroup.Aft),
     ];
 
     string _assetKey = DefaultAssetKey;
@@ -97,16 +102,36 @@ public sealed class ShipView(ICamera camera) : IShipView
     public ShipPose Pose { get; set; }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// Defaults to <c>0</c> — coasting — so a ship nobody has flown yet, or one drawn between the
+    /// screen loading and the first frame reaching it, burns nothing.
+    /// </remarks>
+    public float Thrust { get; set; }
+
+    /// <inheritdoc />
     public void Render(IRenderer renderer)
     {
         // Loaded on first draw rather than up front: the graphics device the texture belongs to
         // does not exist until the platform host has a window, which is after this is built.
         _texture ??= renderer.Textures.Load(_assetKey);
+
+        // Loaded whether or not any engine is currently lit, so the first frame a key is pressed
+        // is not the one that pays for a texture load — a glow that stutters in on its first use
+        // reads as a rendering bug rather than as the engine catching.
         _glowTexture ??= renderer.Textures.Load(EngineGlowAssetKey);
 
-        // The engines first, so the hull is drawn over its own glow rather than under it.
+        // The engines first, so the hull is drawn over its own glow rather than under it. Only the
+        // group the current thrust actually fires is drawn — a bow thruster glowing while the ship
+        // is under main power, or every engine burning at a dead stop, is exactly the "floating and
+        // do not follow the ship" report this glow was already rebuilt once for, one layer up: it
+        // has to answer to the keypress that is supposedly driving it, not just to the ship's pose.
         foreach (ShipEngineGlow glow in EngineGlows)
         {
+            if (!Fires(glow.Group, Thrust))
+            {
+                continue;
+            }
+
             RenderGlow(renderer, _glowTexture, glow);
         }
 
@@ -128,6 +153,21 @@ public sealed class ShipView(ICamera camera) : IShipView
             origin,
             LengthInWorldUnits * camera.PixelsPerUnit / _texture.Height));
     }
+
+    /// <summary>
+    /// Whether an engine group is burning at the given thrust.
+    /// </summary>
+    /// <remarks>
+    /// Exactly the sign of <see cref="Thrust"/> and nothing softer: the glow is a readout of the
+    /// keypress, not a physics quantity of its own, so a nudge off dead centre lights the engine
+    /// the same as a full press does. Coasting fires neither group.
+    /// </remarks>
+    static bool Fires(EngineGroup group, float thrust) => group switch
+    {
+        EngineGroup.Aft => thrust > 0f,
+        EngineGroup.Fore => thrust < 0f,
+        _ => false,
+    };
 
     /// <summary>
     /// Draws one engine glow, in the ship's frame rather than the world's.

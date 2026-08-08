@@ -287,6 +287,28 @@ public sealed class RegionViewTests
     }
 
     [Fact]
+    public void ABodyOnTheUILayer_IsNotDrawnHere()
+    {
+        // HelpArrowView owns the "UI" layer and draws it faded by the ship's proximity — drawn
+        // here too, a player would see an arrow's full-strength picture bleeding through its own
+        // fade to nothing.
+        RegionView view = new(Camera())
+        {
+            Scene = new SceneDefinition("test",
+            [
+                new SceneBody("arrow", "Icon_Example02", 0, 0, 0, 1, 1, "UI", 0),
+                new SceneBody("rock", "rock1", 0, 0, 0, 1, 1, "Environment", 0),
+            ], []),
+        };
+
+        RecordingRenderer renderer = new();
+
+        view.Render(renderer);
+
+        Assert.Equal(renderer.Textures.Load("rock1"), renderer.Single().Texture);
+    }
+
+    [Fact]
     public void Scenery_IsDrawnFurthestLayerFirst()
     {
         RegionView view = new(Camera())
