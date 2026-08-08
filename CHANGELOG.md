@@ -455,6 +455,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A hull whose size it could not collide at is refused where it was authored.**
+  `ShipProfile.HullRadius`'s own param doc has said since it landed that the value "must be a
+  positive, finite number", but the record stored whatever it was given — `0`, `-5`, `NaN` and
+  `Infinity` all made a profile that could be built, stored and passed around. `ShipMovement`
+  caught them, but only once a `Ship` was built from the profile, and the exception it threw named
+  `hullRadius` — its own constructor parameter — leaving whoever wrote the content to work out
+  which of the profile's numbers that was. `HullRadius` is now a validated property alongside
+  `CargoSlots`, throwing `ArgumentOutOfRangeException` named for the profile's own member.
+  Not-finite is named before the sign is ranged, because every comparison against `NaN` is false
+  and a `NaN` radius otherwise walks past a range check to become a ship that collides with
+  nothing.
+
 - **The debris field's lights hang where they were placed, and they flicker.** Both halves were
   reported from the same play session. `RegionView` drew every body about the middle of its own
   texture, which is right for a rock filling its canvas and wrong for `glow.png`: the lit part of

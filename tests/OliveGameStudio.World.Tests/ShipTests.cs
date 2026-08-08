@@ -174,6 +174,30 @@ public sealed class ShipTests
             () => new ShipProfile(Handling, Health: 80, Durability: 40, CargoSlots: -1, Loadout: [], HullRadius: 1));
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public void AHullWithASizeItCouldNotCollideAt_IsRejectedWhereItIsAuthored(double hullRadius)
+    {
+        // ShipMovement already refuses these, but only once a Ship is built — far enough from the
+        // profile that the exception names hullRadius rather than the content that carried it.
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new ShipProfile(Handling, Health: 80, Durability: 40, CargoSlots: 16, Loadout: [], HullRadius: hullRadius));
+    }
+
+    [Fact]
+    public void AHullRejectedForItsSize_NamesTheProfilesOwnParameter()
+    {
+        // the point of validating here rather than leaving it to ShipMovement: whoever authored the
+        // profile is told which of the profile's numbers was wrong
+        ArgumentOutOfRangeException rejected = Assert.Throws<ArgumentOutOfRangeException>(
+            () => new ShipProfile(Handling, Health: 80, Durability: 40, CargoSlots: 16, Loadout: [], HullRadius: 0));
+
+        Assert.Equal(nameof(ShipProfile.HullRadius), rejected.ParamName);
+    }
+
     [Fact]
     public void TwoShipsOffTheSameProfile_AreTwoShips()
     {
