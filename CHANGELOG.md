@@ -455,6 +455,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A hull's authored loadout is copied, not kept.** `ShipProfile` stored the `Loadout` it was
+  given as its own backing list, so a caller that passed a `List<Item>` and went on adding to it
+  changed what the profile reported — against the type's own remarks, which say a profile "is
+  authored and never changes". `IReadOnlyList<Item>` was doing the work it can do, stopping the
+  profile's *readers* mutating the loadout, and none of the work it cannot: it says nothing about
+  whoever still holds the list the profile was made from. `Loadout` is now a copying property
+  alongside `CargoSlots` and `HullRadius`, the same defensive copy `Orbs` and `Shielding` already
+  make of what they are fitted with — `ShipProfile` was the last authored-content type without one.
+
 - **A hull whose size it could not collide at is refused where it was authored.**
   `ShipProfile.HullRadius`'s own param doc has said since it landed that the value "must be a
   positive, finite number", but the record stored whatever it was given — `0`, `-5`, `NaN` and

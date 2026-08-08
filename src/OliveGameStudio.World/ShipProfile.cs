@@ -59,6 +59,18 @@ public sealed record ShipProfile(
     public int CargoSlots { get; } = Validated(CargoSlots);
 
     /// <summary>
+    /// What the hull comes fitted with, as items to be slotted into the ship's
+    /// <see cref="OliveGameStudio.Loadout"/>.
+    /// </summary>
+    /// <remarks>
+    /// Copied rather than kept, for the same reason <see cref="Orbs"/> and <see cref="Shielding"/>
+    /// copy what they are fitted with: <see cref="IReadOnlyList{T}"/> stops the profile's readers
+    /// mutating the loadout, but it does not stop whoever authored the list from carrying on
+    /// changing it — and a profile that changes after it is authored is no longer authored.
+    /// </remarks>
+    public IReadOnlyList<Item> Loadout { get; } = [.. Loadout];
+
+    /// <summary>
     /// How much of a circle the hull fills, for colliding with the world.
     /// </summary>
     /// <remarks>
