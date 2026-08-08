@@ -455,6 +455,27 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **`Inventory.HasRoomFor` no longer promises room for an item `Add` refuses outright.** It is
+  documented as saying what `Add` would do without doing it, and callers use it exactly that way —
+  loot that has to stay in the world if it cannot be taken asks before the attempt. But it answered
+  from the free-slot count and a match on `Item.Equals`, which compares ids alone, while `Add`
+  additionally refuses an id already held under different authored `ItemStats`. So a hold with a
+  free slot said "yes, room" for a misauthored item and then threw `ArgumentException` the moment
+  the caller acted on the answer.
+
+  The stats check now lives in one place — a private `StackWithRoomFor` both `Add` and `HasRoomFor`
+  go through — so the two cannot state different rules again. `HasRoomFor` consults it *before* the
+  free-slot count, because a hold with room would otherwise short-circuit to `true` without ever
+  looking at what it already holds, which is how the two came apart.
+
+  **It throws rather than answering `false`**, which is the less obvious half. Returning `false`
+  keeps the query a query, but it is the wrong no: a caller guarding an `Add` reads `false` as an
+  ordinary full hold and leaves the item in the world — correct for a hold with no room, and a
+  silent grave for a misauthored one, which would then never be added, never throw and never be
+  seen. `Add` is deliberately loud about two authorings of one id because it is the first place the
+  two are ever seen side by side; answering the same question quietly would undo that.
+  ([#192](https://github.com/olivegamestudio/TDD/issues/192))
+
 - **The ship no longer flies out of its own engine glow.** The glow was authored into
   `debris-field.json` as six `glow` bodies — `FrontEngine`, `FrontEngine2`, `FrontEngine3` and the
   three `RearEngine` ones — sitting at the world origin on the `Characters` layer, which is where
