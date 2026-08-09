@@ -475,6 +475,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **An orb whose rate and time overflow together is refused, rather than placed nowhere.**
+  `Orbs.PlaceAround` guarded its two inputs separately and neither guard was enough: `OrbStats`
+  refuses an `AngularSpeed` that is not finite, `PlaceAround` refuses a `secondsFlown` that is not
+  finite, and two large finite numbers still multiply past what a double holds. The bearing came
+  back as infinity, `Math.Sin` of it as `NaN`, and the orb was placed at `(NaN, NaN)` — silently,
+  because nothing downstream checks a returned position and every distance check, drawing transform
+  and collision test against a `NaN` quietly turns `NaN` too. The bearing is now checked once it is
+  computed and refused on the same terms an infinite time already was: this is the same
+  orb-placed-nowhere failure, reached by two values that each pass their own guard. A merely large
+  bearing is untouched — a bearing is periodic, `Math.Sin` reduces it itself, and a tracker's rate
+  of zero cannot overflow at any time at all, so both stay ordinary answers.
+
+  Reducing the product with `% Math.Tau` instead was considered and does not work: by the time
+  there is a product to reduce it is already infinity, and `infinity % Math.Tau` is `NaN`. Reducing
+  the rate *before* multiplying is not the same number — with `a = k·τ + r`, the discarded `k·τ·t`
+  is only a whole number of turns when `t` is, so it would answer a bearing it had invented rather
+  than the one that was asked for.
+
 - **A hull's health and durability are refused where they were authored, like its size already
   was.** `ShipProfile` validated `HullRadius` and `CargoSlots` in its own constructor and passed
   `Health` and `Durability` straight through, so `NaN`, a negative pool and an infinite one all made

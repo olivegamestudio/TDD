@@ -113,6 +113,14 @@ public sealed class Orbs
     /// nothing — which is the failure the camera's own guards exist to turn into a stack trace.
     /// Time before the game began is not a shorter answer to where an orb is; it is a caller that
     /// subtracted the wrong way round.
+    /// <para>
+    /// Also when <paramref name="secondsFlown"/> and a fitted orb's
+    /// <see cref="OrbStats.AngularSpeed"/> are each finite but multiply past what a double holds.
+    /// That is the same orb-placed-nowhere failure reached by two values that each pass their own
+    /// guard, so it is refused on the same terms rather than returned as a position of
+    /// <see cref="double.NaN"/>. A merely large bearing is not refused: a bearing is periodic, so
+    /// going round a great many times is an ordinary answer.
+    /// </para>
     /// </exception>
     public IReadOnlyList<Position> PlaceAround(Position ship, double secondsFlown)
     {
@@ -132,6 +140,21 @@ public sealed class Orbs
         {
             OrbStats orb = _fitted[slot];
             double bearing = (slot * 2 * Math.PI / Slots) + (orb.AngularSpeed * secondsFlown);
+
+            // The rate is finite and the time is finite, and their product still need not be: two
+            // large finite numbers multiply past what a double holds and come back as infinity. The
+            // sine of that is NaN, so this is the orb-placed-nowhere failure the guard above already
+            // refuses a NaN time for, arriving one line later — and a NaN position is worse than a
+            // loud one, because every distance check and drawing transform downstream quietly turns
+            // NaN as well and nothing reports where it started.
+            if (!double.IsFinite(bearing))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(secondsFlown),
+                    secondsFlown,
+                    $"An orb turning at {orb.AngularSpeed} radians a second has no bearing after this "
+                        + "long: the rate and the time multiply past what a number can hold.");
+            }
 
             placed[slot] = ship.Offset(
                 orb.Radius * Math.Sin(bearing),

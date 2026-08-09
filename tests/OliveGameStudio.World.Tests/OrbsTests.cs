@@ -165,4 +165,46 @@ public sealed class OrbsTests
 
         Assert.Single(orbs.PlaceAround(Ship, secondsFlown: 0));
     }
+
+    [Theory]
+    [InlineData(double.MaxValue / 2, 3.0)]
+    [InlineData(double.MaxValue, 2.0)]
+    public void ARateAndATimeThatOnlyOverflowTogether_AreRefusedRatherThanDrawnNowhere(
+        double angularSpeed, double secondsFlown)
+    {
+        // Each is a finite number and each passes the guard it is written against — the rate at the
+        // stats, the time here. It is their product that is not a number a double can hold, and the
+        // sine of an endless bearing is not a number, which is the same orb-placed-nowhere failure
+        // an endless time is already refused for. Refusing it one step later is the same rule, not
+        // a new one.
+        Orbs orbs = new(OrbStats.Orbiting(radius: 30, angularSpeed));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => orbs.PlaceAround(Ship, secondsFlown));
+    }
+
+    [Fact]
+    public void ALongFlightThatDoesNotOverflow_IsStillSomewhereRatherThanNowhere()
+    {
+        // The guard is on what overflows, not on what is merely large: a bearing is periodic, so
+        // going round a great many times is an ordinary answer and Math.Sin reduces it itself.
+        Orbs orbs = new(OrbStats.Orbiting(radius: 30, angularSpeed: 2));
+
+        Position placed = Assert.Single(orbs.PlaceAround(Ship, secondsFlown: 1e12));
+
+        Assert.True(double.IsFinite(placed.X), $"Expected a finite X but got {placed.X}");
+        Assert.True(double.IsFinite(placed.Y), $"Expected a finite Y but got {placed.Y}");
+    }
+
+    [Fact]
+    public void ATrackerAtAnyTimeAtAll_HasABearingBecauseItDoesNotTurn()
+    {
+        // A tracker's rate is zero, so nothing multiplies up however long has been flown. The guard
+        // must not turn the one orb that cannot overflow into a refusal.
+        Orbs orbs = new(OrbStats.Tracking(radius: 45));
+
+        Position placed = Assert.Single(orbs.PlaceAround(Ship, secondsFlown: double.MaxValue));
+
+        Assert.True(double.IsFinite(placed.X), $"Expected a finite X but got {placed.X}");
+        Assert.True(double.IsFinite(placed.Y), $"Expected a finite Y but got {placed.Y}");
+    }
 }
