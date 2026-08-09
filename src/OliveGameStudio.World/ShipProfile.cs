@@ -18,11 +18,11 @@ namespace OliveGameStudio;
 /// <param name="Handling">How the hull flies — the numbers <see cref="ShipMovement"/> is built on.</param>
 /// <param name="Health">
 /// How much damage the hull itself absorbs before it is destroyed, before anything fitted to it is
-/// counted.
+/// counted. Must be a non-negative, finite number.
 /// </param>
 /// <param name="Durability">
-/// How much wear the hull can take. Distinct from health: health is what a fight costs and
-/// durability is what time and use cost.
+/// How much wear the hull can take, as a non-negative, finite number. Distinct from health: health
+/// is what a fight costs and durability is what time and use cost.
 /// </param>
 /// <param name="CargoSlots">
 /// How much the hull can carry, counted in inventory slots. A fighter carries less than a hauler
@@ -47,6 +47,33 @@ public sealed record ShipProfile(
     IReadOnlyList<Item> Loadout,
     double HullRadius)
 {
+    /// <summary>
+    /// How much damage the hull itself absorbs before it is destroyed.
+    /// </summary>
+    /// <remarks>
+    /// Validated here for the reason <see cref="HullRadius"/> is: <see cref="Meter"/> refuses the
+    /// same values, but only once a <see cref="Ship"/> is built from the profile, and by then the
+    /// complaint names <c>maximum</c> — a constructor parameter of a type the content author has
+    /// never heard of — rather than the field they actually wrote.
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// The pool is negative, not a number, or infinite. A negative pool is empty before anything
+    /// touches it, so the hull arrives destroyed; an infinite one can never be emptied, so it cannot
+    /// be destroyed at all. Zero is allowed, exactly as <see cref="Meter"/> allows it.
+    /// </exception>
+    public double Health { get; } = ValidatedPool(Health, nameof(Health));
+
+    /// <summary>
+    /// How much wear the hull can take.
+    /// </summary>
+    /// <remarks>
+    /// Validated on the same terms as <see cref="Health"/>, and for the same reason.
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// The pool is negative, not a number, or infinite — see <see cref="Health"/>.
+    /// </exception>
+    public double Durability { get; } = ValidatedPool(Durability, nameof(Durability));
+
     /// <summary>
     /// How much the hull can carry, counted in inventory slots.
     /// </summary>
@@ -85,6 +112,27 @@ public sealed record ShipProfile(
     /// everywhere, at once.
     /// </exception>
     public double HullRadius { get; } = Validated(HullRadius);
+
+    // Takes the name rather than hard-coding one, because two of the profile's fields are the same
+    // pool measured against the same rule and only differ in what they are called.
+    static double ValidatedPool(double pool, string name)
+    {
+        // Named before it is ranged, for the reason the hull radius is: every comparison against a
+        // NaN is false, so ThrowIfNegative stops the standard NaN only because its sign bit happens
+        // to be set, and one whose sign bit is clear walks straight past. Refusing every non-finite
+        // value here also covers positive infinity, which no sign check would have caught.
+        if (!double.IsFinite(pool))
+        {
+            throw new ArgumentOutOfRangeException(
+                name,
+                pool,
+                "A hull's pools have to be finite numbers.");
+        }
+
+        ArgumentOutOfRangeException.ThrowIfNegative(pool, name);
+
+        return pool;
+    }
 
     static int Validated(int cargoSlots)
     {

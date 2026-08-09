@@ -112,6 +112,15 @@ ship.
 | `CharacterTemplate` — id, translated name, hull, start location, starting inventory | `Character` — template, `Progression`, credits, `Reputation`, `Inventory`, `QuestLog`, current `Ship` |
 | `ShipProfile` — handling, health, durability, cargo slots, fitted items | `Ship` — `Handling`, `Loadout`, `Shielding`, `Orbs`, `Health`, `Shield`, `Durability`, `Movement` |
 
+**A profile refuses its own numbers, so the complaint names the field an author wrote.** Every one
+of `ShipProfile`'s numbers is validated in the profile — `HullRadius` positive and finite,
+`CargoSlots` non-negative, and `Health` and `Durability` on exactly the line `Meter` draws: negative,
+`NaN` and either infinity refused, zero allowed. The downstream types refuse the same values anyway,
+but only once a `Ship` is built, and by then the exception names `maximum` or `hullRadius` —
+constructor parameters of types the content author has never heard of. Validating at the profile is
+what puts the refusal next to the content that caused it, and it is the rule for anything added to
+the profile later rather than a property of the three fields that happen to have it.
+
 `ICharacterRoster` / `BattleForceRoster` is the seam the game supplies characters through, exactly
 as `ICampaign` supplies quests: the roster is a singleton and builds its templates on each read,
 because the names are translated and a list built in a field initialiser would freeze the player's

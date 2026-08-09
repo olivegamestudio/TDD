@@ -475,6 +475,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A hull's health and durability are refused where they were authored, like its size already
+  was.** `ShipProfile` validated `HullRadius` and `CargoSlots` in its own constructor and passed
+  `Health` and `Durability` straight through, so `NaN`, a negative pool and an infinite one all made
+  a profile that could be built, stored and passed around. `Meter` refused every one of them, but
+  only once a `Ship` was built from the profile — and the complaint then named `maximum`, a
+  constructor parameter of a type the content author has never heard of, rather than the field they
+  actually wrote. That is the same gap, and the same argument, the profile's own doc comment already
+  makes for `HullRadius`: refusing here is what puts the complaint next to the content that caused
+  it. `Health` and `Durability` are now validated properties naming themselves, on exactly the line
+  `Meter` draws — negative, `NaN` and either infinity are refused, and zero is still accepted,
+  because an empty pool is a thing content may legitimately author and refusing it would refuse a
+  hull that builds perfectly well today. The one existing test that asserted the refusal happened at
+  `new Ship(profile)` now asserts it happens before a ship is ever built.
+
 - **A mirrored rock collides at the size it is, not at a negative one.** `RegionObstacles.SizeOf`
   multiplied a sprite's pixel size straight through `SceneBody.ScaleX` and `ScaleY`, signs and all.
   A negative scale mirrors a body — ordinary content, and the cheapest way to make one rock read as
