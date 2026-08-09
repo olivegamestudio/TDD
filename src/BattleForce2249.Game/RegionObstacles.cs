@@ -68,11 +68,24 @@ public static class RegionObstacles
     /// rather than answering with a guess.
     /// </exception>
     /// <remarks>
+    /// <para>
     /// <see cref="Seed"/> and anything drawing a collision shape to check one against the eye —
     /// <c>CollisionDebugView</c>, today — read the same number through this rather than each
     /// keeping their own copy of how a scale and a sprite become a size. Width scales with
     /// <see cref="SceneBody.ScaleX"/> and height with <see cref="SceneBody.ScaleY"/> independently,
     /// matching how <see cref="RegionView"/> draws the same body.
+    /// </para>
+    /// <para>
+    /// Only the <em>magnitude</em> of each scale is read. A negative one mirrors the body, which is
+    /// ordinary content — turning one rock round is the cheapest way to make it read as two — and a
+    /// rock is the same size whichever way it faces. Taken across signed, a mirrored body comes out
+    /// with a negative width, <see cref="ShipMovement.AddObstacle"/> rightly refuses it, and the
+    /// cost is not one mis-sized rock: <see cref="Seed"/> stops at the first body it cannot size, so
+    /// a single mirrored rock takes its whole region's collision with it and the ship flies through
+    /// everything authored after it. The rotation needs no such correction — mirroring a rectangle
+    /// about its own axis leaves the same rectangle, so the body's authored angle still describes
+    /// it.
+    /// </para>
     /// </remarks>
     public static ObstacleSize SizeOf(SceneBody body)
     {
@@ -87,8 +100,8 @@ public static class RegionObstacles
         double unitsPerPixel = 1 / RegionView.AuthoredPixelsPerUnit;
 
         return new ObstacleSize(
-            pixels.Width * unitsPerPixel * body.ScaleX,
-            pixels.Height * unitsPerPixel * body.ScaleY);
+            pixels.Width * unitsPerPixel * Math.Abs(body.ScaleX),
+            pixels.Height * unitsPerPixel * Math.Abs(body.ScaleY));
     }
 
     /// <summary>
