@@ -198,6 +198,66 @@ public sealed class ShipTests
         Assert.Equal(nameof(ShipProfile.HullRadius), rejected.ParamName);
     }
 
+    [Theory]
+    [InlineData(-10)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void AHullWithAHealthPoolItCouldNotHold_IsRejectedWhereItIsAuthored(double health)
+    {
+        // Meter already refuses every one of these, but only once a Ship is built from the profile —
+        // and by then the complaint names `maximum`, a parameter of a type the content author has
+        // never heard of. This is the same reasoning HullRadius is validated on.
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new ShipProfile(Handling, health, Durability: 40, CargoSlots: 16, Loadout: [], HullRadius: 1));
+    }
+
+    [Theory]
+    [InlineData(-10)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void AHullWithADurabilityPoolItCouldNotHold_IsRejectedWhereItIsAuthored(double durability)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new ShipProfile(Handling, Health: 80, durability, CargoSlots: 16, Loadout: [], HullRadius: 1));
+    }
+
+    [Fact]
+    public void AHullRejectedForItsHealth_NamesTheProfilesOwnParameter()
+    {
+        // the whole point of refusing here: the author is told `Health`, the field they wrote,
+        // rather than `maximum`, which appears nowhere in the content
+        ArgumentOutOfRangeException rejected = Assert.Throws<ArgumentOutOfRangeException>(
+            () => new ShipProfile(
+                Handling, Health: double.NaN, Durability: 40, CargoSlots: 16, Loadout: [], HullRadius: 1));
+
+        Assert.Equal(nameof(ShipProfile.Health), rejected.ParamName);
+    }
+
+    [Fact]
+    public void AHullRejectedForItsDurability_NamesTheProfilesOwnParameter()
+    {
+        ArgumentOutOfRangeException rejected = Assert.Throws<ArgumentOutOfRangeException>(
+            () => new ShipProfile(
+                Handling, Health: 80, Durability: double.NaN, CargoSlots: 16, Loadout: [], HullRadius: 1));
+
+        Assert.Equal(nameof(ShipProfile.Durability), rejected.ParamName);
+    }
+
+    [Fact]
+    public void AHullAuthoredWithEmptyPools_IsStillAccepted()
+    {
+        // Zero is not the mistake the guard is looking for, and the line is drawn exactly where
+        // Meter draws it: an empty pool is a thing content may legitimately author, and refusing it
+        // here would refuse a hull that Ship builds perfectly well today.
+        Ship ship = new(new ShipProfile(
+            Handling, Health: 0, Durability: 0, CargoSlots: 16, Loadout: [], HullRadius: 1));
+
+        Assert.Equal(0, ship.Health.Maximum);
+        Assert.Equal(0, ship.Durability.Maximum);
+    }
+
     [Fact]
     public void AHullsAuthoredLoadout_IsNotTheCallersToChangeAfterwards()
     {
@@ -251,16 +311,17 @@ public sealed class ShipTests
     }
 
     [Fact]
-    public void AHullWithAPoolNothingCouldEmpty_IsRejectedWhereItIsBuilt()
+    public void AHullWithAPoolNothingCouldEmpty_IsRejectedBeforeAShipIsEverBuilt()
     {
-        ShipProfile indestructible = new(
+        // This used to be asserted against `new Ship(profile)`, because that was the first thing
+        // that looked at the number. The refusal has moved to the profile itself, so the hull that
+        // could never be destroyed no longer gets as far as being built.
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ShipProfile(
             Handling,
             Health: double.PositiveInfinity,
             Durability: 40,
             CargoSlots: 16,
             Loadout: [],
-            HullRadius: 1);
-
-        Assert.Throws<ArgumentOutOfRangeException>(() => new Ship(indestructible));
+            HullRadius: 1));
     }
 }
