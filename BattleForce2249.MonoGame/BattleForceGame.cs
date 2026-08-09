@@ -47,7 +47,11 @@ public class BattleForceGame : Game
         // were doing last frame. Every device is read once, here, and handed over together: the
         // game decides which of them it is being played on, and it cannot make that decision from
         // readings taken at different moments.
-        _host.Input(new InputFrame(DesktopKeyboard.Read(), DesktopGamePad.Read(), DesktopTouch.Read()));
+        _host.Input(new InputFrame(
+            DesktopKeyboard.Read(),
+            DesktopGamePad.Read(),
+            DesktopTouch.Read(),
+            DesktopMouse.Read()));
 
         _host.Update(gameTime.ElapsedGameTime);
         base.Update(gameTime);

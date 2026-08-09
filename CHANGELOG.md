@@ -9,6 +9,39 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A drag is one gesture, whether a mouse or a thumb is doing it.** `PointerDrag` reports where a
+  pointer was pressed, where it is being carried and where it was let go, as a `Drag` carrying a
+  `DragPhase` and two window positions. It is the gesture half of the drag-and-drop the hold and the
+  loadout are worked with, and it knows nothing about slots or items: it answers two places, and
+  which slot those places name is for whoever laid the screen out — the same split that already has
+  `TouchOverlay` handed its circles rather than deciding where they go. That is what lets it be
+  covered without a window.
+
+  The engine can see a mouse at all for the first time. `MouseFrame` — present, a position in window
+  pixels, and whether the primary button is held — joins `InputFrame` beside the touch frame, and
+  `DesktopMouse` reads it on the MonoGame host. `Present` is carried rather than inferred, on the
+  reasoning `GamePadFrame.Connected` already uses: a host with no mouse and a mouse parked in the
+  corner report the same numbers, and taking a press off the first would pick up whatever is drawn
+  at the top-left of the window.
+
+  `Pointer` and `PointerId` are where the two devices stop being different. A mouse says whether its
+  button is down; a finger says nothing, because being reported at all *is* it being down — and
+  everything past that difference is the same gesture, so flattening it here keeps the difference
+  from reaching a screen, exactly as `ShipControls` keeps a stick and a key apart from the physics.
+
+  **The drag captures its pointer**, as the overlay's helm captures the thumb that took it: a second
+  finger landing mid-drag cannot take the item out of the first one's hand, and neither can the mouse
+  on a machine with both. The captured pointer is followed by its identifier and never by where it
+  is. **The drop is an edge** and is reported on exactly one frame, so `Read` is called once a frame
+  — the same obligation `InputRouter` already carries for a press; a drag in progress reads the same
+  however many times its frame is read.
+
+  What this deliberately does not do: **nothing routes a pointer**. `InputRouter` still reads the
+  keyboard and the pad, and `ControlDevice` still names those two, because a pointer cannot press a
+  menu that holds no positions. **Nothing hit-tests a drag**, because no screen draws a slot to test
+  against, and **nothing moves an item** as a result of one — `Loadout.TryEquip` and `Unequip` are
+  still the only ways in and out of a slot.
+
 - **A quest can be gated on what is true, not only on what happens.** `QuestCondition` is the
   second half of what moves a quest: **conditions gate, triggers fire**. A trigger is something that
   happens — the player arrives somewhere — and it moves the quest when it does; a condition is a
