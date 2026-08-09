@@ -48,9 +48,13 @@ corrected once already — a quest library that owns a player and a position is 
 **The model declares the rule; the presentation applies it.**
 
 - `QuestDefinition` — authored content: a stable `Id`, a translated `Title`, a start trigger and
-  an end trigger. Never changes at runtime.
+  an end trigger, the conditions gating each end, and the `Level` the quest is meant to be. Never
+  changes at runtime.
 - `QuestTrigger` — a `QuestTriggerKind` (today only `Proximity`) and a distance. Data, not
   behaviour.
+- `QuestCondition` — a `QuestConditionKind` (`Character`, `Faction`, `Level`,
+  `QuestPrerequisite`), what it names, and the least that will do. Data, not behaviour, on exactly
+  the same terms as `QuestTrigger`.
 - `Quest` — the lifecycle `NotStarted → Active → Completed`, driven only through `Start()` and
   `Complete()`. Both are safe to call every frame; `Started` and `Completed` are raised once per
   quest, not once per frame spent on a marker. `Restore` reinstates a saved state silently,
@@ -70,14 +74,60 @@ corrected once already — a quest library that owns a player and a position is 
   `Restore` tolerates a file that does not, and says which entry wins.
 - `ICampaign` — the seam a game supplies quests through.
 
+**Conditions gate; triggers fire.** A trigger is something that *happens* and moves the quest when
+it does; a condition is a state that has to *hold*, and it never fires on its own — it is asked.
+Both are lists, and both ends of a quest carry both, so a quest reads as *"available once you are
+level five and have finished the last one; starts when you reach the marker"*. Collapsing them into
+one list would have meant either conditions that pretend to fire or triggers that quietly also mean
+"and check this".
+
+Two consequences the model gets for free, and both replace a field that was going to exist:
+
+- **Scope is a condition.** A shared quest names no character, a character-specific one names its
+  character, and a quest for two of the four names both — which is more than a two-valued
+  shared/specific field could express. The same goes for a quest belonging to a faction.
+- **A chain is a condition.** `QuestCondition.AfterCompleting` is the whole of prerequisites, so
+  gating a quest behind three others is authoring rather than a feature.
+
+`QuestDefinition.Level` is the difficulty the player is shown and is deliberately *not* a gate —
+gating on level is a separate `AtLeastLevel` condition content may or may not author beside it.
+That is `docs/DESIGN.md`'s "danger gates the space; content gates the story": a quest above the
+player's weight is one they are told about and allowed to attempt.
+
+A condition list is copied and checked when the definition is built, because a definition is
+content that never changes at runtime and a list still in the caller's hands is one that can gain
+an entry after it was checked. Everything refused is refused where the quest is authored — an
+identifier naming nobody, a level below the one a character begins at — rather than on the frame
+that happens to ask, which is the rule `QuestTrigger`'s distance guard already follows.
+
+Pilgrimage never learns what a level or a faction *is*. A condition stores a kind and a value, and
+the game side answers it, exactly as `QuestProximityWatcher` measures a distance the library only
+states.
+
 The game side supplies where things actually are:
 
 - `IWorld` / `BattleForceWorld` — the player's start position, each quest's `QuestMarkers`, and
   `Introduce`, which brings a ship into the world at a named place. Forward travel is along the
   positive Y axis.
+- `QuestConditions` — answers a `QuestCondition` against the `Character` being played: which
+  template it is, what each group makes of them, how far they have come, and what they have
+  finished. Everything it reads hangs off the character rather than the ship, which is pillar 4's
+  split doing its job — a quest earned into stays open after the hull it was earned in is lost.
+  Every condition has to hold, and a quest nobody gated is one anybody can play. A prerequisite
+  naming a quest this build no longer ships does *not* hold: a chain whose first link has been
+  dropped stays shut rather than opening a quest the player was never meant to reach.
 - `QuestProximityWatcher` — measures the player against the markers each frame and calls the
-  quest API when a trigger fires. It keeps no memory of what it has already fired; the quest
-  model absorbs repeat calls.
+  quest API when a trigger fires *and* the conditions for that end hold. It keeps no memory of what
+  it has already fired; the quest model absorbs repeat calls. It takes the `Character` rather than
+  a bare `QuestLog`, because conditions are read off the character and the log is the character's
+  anyway — passing both would allow a pair that do not belong together.
+
+  Conditions and triggers have to be satisfied on the *same frame*, which is what makes a condition
+  a state rather than a second kind of trigger: flying over a marker under-levelled leaves nothing
+  remembered, and the quest begins when the player comes back ready rather than the moment they
+  level up somewhere else. The two lists are asked separately at each end, so a quest that opened to
+  a character who has since fallen out of favour still finishes — availability and turn-in are
+  different questions.
 
   What it measures is the *journey* the frame covered — `Position.DistanceToSegment`, closest
   approach — rather than the point the frame ended at. Sampling one point a frame makes a trigger
@@ -1067,6 +1117,18 @@ says nothing gets — a default so a game composes flyable, not a measurement of
   seventh, and it is a change to the shipped physics that has not been decided.
 - Nothing displays a quest title. There is no HUD or quest log; that is a separate `ENGINE`
   issue. `IGameSession.SaveError` is unread for the same reason — there is nowhere to say it.
+  `QuestDefinition.Level` joins them: the model holds the difficulty a quest is meant to be and
+  there is nowhere on screen to show it (#141).
+- **No shipped quest is gated.** `BattleForceCampaign` is one quest long and authors no conditions,
+  so the machinery above is exercised by tests rather than by content. A chain needs a second quest,
+  which is content nobody has written.
+- **A quest still has one trigger at each end, not a list of them.** The condition half of #139 has
+  landed and the trigger half has not: `QuestTriggerKind` still knows only `Proximity`, so
+  destroy-N, collect-N and multi-objective quests are not expressible. That is not only model work —
+  `QuestMarkers` holds one start and one end marker per quest, so several proximity triggers in one
+  step would have no way to name which marker each measures against, and naming markers per trigger
+  is a change to the world's data format (#116). Rewards and quest givers from #139 are outstanding
+  too, and both wait on decisions of their own: drop tables (#146) and NPCs (#140).
 - Nothing selects a language. Translations are reachable only through the machine's own culture.
 - **The persistent record exists but is not persisted.** `Character` holds experience, credits,
   standing, possessions and quest history, and it survives losing the ship — but `SaveGame` still

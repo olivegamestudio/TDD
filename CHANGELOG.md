@@ -9,6 +9,50 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A quest can be gated on what is true, not only on what happens.** `QuestCondition` is the
+  second half of what moves a quest: **conditions gate, triggers fire**. A trigger is something that
+  happens — the player arrives somewhere — and it moves the quest when it does; a condition is a
+  state that has to hold, and it never fires on its own. Four kinds, each built through a factory so
+  a condition can only ever be one that makes sense: `PlayedAs` (the character being played),
+  `StandingWith` (a group's standing), `AtLeastLevel` (how far the character has come) and
+  `AfterCompleting` (a quest that has to come first).
+
+  `QuestDefinition` carries `StartConditions` and `EndConditions` — lists, so a quest gated on three
+  things at once needs nothing new from the model, and **every one of them has to hold**. Both ends
+  are asked separately, because availability and turn-in are different questions: a quest that opened
+  to a character who has since fallen out of favour still finishes. It also carries a `Level`, the
+  indicative difficulty the player is shown, which is deliberately *not* a gate — gating on level is
+  an `AtLeastLevel` condition content may or may not author beside it, because danger gates the space
+  and content gates the story.
+
+  Two features arrive as consequences rather than as mechanisms. **Quest chains and prerequisites**
+  are `AfterCompleting`, so gating a quest behind three others is authoring. And **shared versus
+  character-specific scope** is `PlayedAs` — a shared quest names no character, a specific one names
+  its character, and a quest for two of the four names both, which is more than the scope field it
+  replaces could have said. The same goes for a quest belonging to a faction.
+
+  `QuestConditions` on the game side is what answers them, because a level and a faction are game
+  concepts Pilgrimage holds no knowledge of — the same split that already has the library state a
+  distance and the game measure it. Everything it reads hangs off the `Character` rather than the
+  ship, so a quest earned into survives losing the hull it was earned in.
+  `QuestProximityWatcher.Update` therefore takes the character rather than a bare `QuestLog`, and
+  requires the conditions and the trigger to be satisfied **on the same frame** — which is what makes
+  a condition a state rather than a trigger that fired once. Flying over a marker under-levelled
+  leaves nothing remembered; the quest begins when the player comes back ready.
+
+  A prerequisite naming a quest this build no longer ships does not hold, which is the safe answer of
+  the two: a chain whose first link has been dropped stays shut rather than opening a quest the
+  player was never meant to reach. Condition lists are copied and checked when the definition is
+  built, so an entry that is not there fails where the quest is authored rather than on the frame
+  that happens to ask.
+
+  Three things this deliberately does not do. **No shipped quest is gated** — the campaign is one
+  quest long and authors no conditions, so a chain waits on a second quest being written.
+  **A quest still has one trigger at each end**: destroy-N and collect-N objectives are not
+  expressible, and that is not only model work, since the world holds one marker per end and several
+  proximity triggers would have no way to name which marker each measures against. **Nothing shows a
+  quest's level**, because there is no HUD.
+
 - **The title screen has a sky behind it.** `MenuScreen` draws `space` as a sixth layer, first and
   behind the other five, from the new `MenuScreen.BackgroundAssetKey`. The composition already had
   its figures, its horizon band, its logo and its button; what it did not have was the "dark space"

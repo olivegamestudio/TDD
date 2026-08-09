@@ -318,7 +318,7 @@ public sealed class ResumedPositionAdversarialTests
 
         QuestProximityWatcher watcher = new(
             new TestWorld(OffOrigin, new QuestMarkers("quest-1", OffOrigin, End)));
-        watcher.Update(session.Quests, session.Player.Position);
+        watcher.Update(session.Character, session.Player.Position);
 
         Assert.Equal(QuestState.Active, session.Quests.Find("quest-1")!.State);
     }

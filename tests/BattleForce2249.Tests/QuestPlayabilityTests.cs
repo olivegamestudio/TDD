@@ -75,7 +75,7 @@ public sealed class QuestPlayabilityTests
     /// </summary>
     static void FlyTo(GameSession session, QuestProximityWatcher watcher, Position target)
     {
-        watcher.Update(session.Quests, session.Player.Position);
+        watcher.Update(session.Character, session.Player.Position);
 
         for (int frame = 0; session.Player.Position.DistanceTo(target) > UnitsPerFrame; frame++)
         {
@@ -87,7 +87,7 @@ public sealed class QuestPlayabilityTests
                 (target.X - at.X) / distance * UnitsPerFrame,
                 (target.Y - at.Y) / distance * UnitsPerFrame);
 
-            watcher.Update(session.Quests, session.Player.Position);
+            watcher.Update(session.Character, session.Player.Position);
         }
     }
 
@@ -195,7 +195,7 @@ public sealed class QuestPlayabilityTests
         // and the frames that follow do not hand it back to the player to play again
         for (int frame = 0; frame < 10; frame++)
         {
-            watcher.Update(resumed.Quests, resumed.Player.Position);
+            watcher.Update(resumed.Character, resumed.Player.Position);
         }
 
         Assert.Equal(QuestState.Completed, quest.State);
@@ -246,7 +246,7 @@ public sealed class QuestPlayabilityTests
 
         for (int frame = 0; frame < 100; frame++)
         {
-            watcher.Update(session.Quests, session.Player.Position);
+            watcher.Update(session.Character, session.Player.Position);
             session.Player.MoveBy(0, UnitsPerFrame);
         }
 

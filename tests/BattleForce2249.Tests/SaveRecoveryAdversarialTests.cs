@@ -295,13 +295,13 @@ public class SaveRecoveryAdversarialTests
         QuestProximityWatcher watcher = new(new World());
 
         await session.Continue();
-        watcher.Update(session.Quests, session.Player.Position);
+        watcher.Update(session.Character, session.Player.Position);
         Assert.True(session.Quests.Find("quest-1")!.IsActive);
 
         for (int frame = 0; frame < 200 && !session.Quests.Find("quest-1")!.IsCompleted; frame++)
         {
             session.Player.MoveBy(0, 10);
-            watcher.Update(session.Quests, session.Player.Position);
+            watcher.Update(session.Character, session.Player.Position);
         }
 
         await session.PendingSave;
