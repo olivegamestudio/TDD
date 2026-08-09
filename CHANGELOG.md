@@ -475,6 +475,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A mirrored rock collides at the size it is, not at a negative one.** `RegionObstacles.SizeOf`
+  multiplied a sprite's pixel size straight through `SceneBody.ScaleX` and `ScaleY`, signs and all.
+  A negative scale mirrors a body — ordinary content, and the cheapest way to make one rock read as
+  several — so it produced a negative width or height, and `ShipMovement.AddObstacle` rightly
+  refused it. The cost was never one mis-sized rock: `Seed` stops at the first body it cannot size,
+  so a single mirrored solid body took its whole region's collision with it and the ship flew
+  through every rock authored after it. Only the magnitude of each scale is read now; the sign
+  belongs to whoever draws the body. The rotation needs no matching correction, because mirroring a
+  rectangle about its own axis leaves the same rectangle.
+
 - **A hull's authored loadout is copied, not kept.** `ShipProfile` stored the `Loadout` it was
   given as its own backing list, so a caller that passed a `List<Item>` and went on adding to it
   changed what the profile reported — against the type's own remarks, which say a profile "is
