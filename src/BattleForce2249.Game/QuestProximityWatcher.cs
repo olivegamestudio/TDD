@@ -13,6 +13,11 @@ namespace BattleForce2249;
 /// <see cref="Quest.Complete"/> when it is satisfied. Both are safe to call every frame, so the
 /// watcher keeps no memory of what it has already fired.
 ///
+/// It applies the quest's <see cref="QuestCondition"/>s at the same time, through
+/// <see cref="QuestConditions"/>, for the same reason it applies its triggers: conditions are data
+/// the library states and the game answers. A trigger that fires while the gate is shut moves
+/// nothing.
+///
 /// It measures the journey the player made this frame, not the point they finished it at. A
 /// trigger a ship flies straight through is a bug against pillar 1 of <c>docs/DESIGN.md</c>
 /// rather than a tuning detail, and sampling one point a frame makes that trap a property of the
@@ -36,10 +41,10 @@ public sealed class QuestProximityWatcher(IWorld world)
     /// only ever measured against where they are. Callers that fly the player should pass where
     /// the frame began as well, so a marker cannot be stepped over.
     /// </remarks>
-    /// <param name="quests">The player's quests.</param>
+    /// <param name="character">The character being played, whose quests these are.</param>
     /// <param name="playerPosition">Where the player is this frame.</param>
-    public void Update(QuestLog quests, Position playerPosition) =>
-        Update(quests, playerPosition, playerPosition);
+    public void Update(Character character, Position playerPosition) =>
+        Update(character, playerPosition, playerPosition);
 
     /// <summary>
     /// Applies each quest's triggers for the journey the player made this frame. Called once per
@@ -51,11 +56,16 @@ public sealed class QuestProximityWatcher(IWorld world)
     /// sense of direction — it is a disc round a marker, and a player who reaches it flying
     /// backwards has still reached it — so the journey is measured, not the heading.
     /// </remarks>
-    /// <param name="quests">The player's quests.</param>
+    /// <param name="character">The character being played, whose quests these are.</param>
     /// <param name="from">Where the player was when the frame began.</param>
     /// <param name="to">Where the player is now the frame has ended.</param>
-    public void Update(QuestLog quests, Position from, Position to)
+    /// <exception cref="ArgumentNullException"><paramref name="character"/> is <c>null</c>.</exception>
+    public void Update(Character character, Position from, Position to)
     {
+        ArgumentNullException.ThrowIfNull(character);
+
+        QuestLog quests = character.Quests;
+
         foreach (QuestMarkers markers in world.QuestMarkers)
         {
             Quest? quest = quests.Find(markers.QuestId);
@@ -67,8 +77,14 @@ public sealed class QuestProximityWatcher(IWorld world)
 
             QuestDefinition definition = quest.Definition;
 
+            // The conditions are asked before the distance is measured, and both have to be
+            // satisfied on the same frame. A quest whose gate is shut is not "arrived at and
+            // remembered": the player can fly over its marker at level three and nothing happens,
+            // and it begins when they come back at level five — which is what makes a condition a
+            // state that holds rather than a second kind of trigger that fired once.
             if (quest.State is QuestState.NotStarted
                 && definition.AutoStarts
+                && QuestConditions.Hold(definition.StartConditions, character)
                 && HasFired(definition.Start, from, to, markers.Start))
             {
                 quest.Start();
@@ -77,6 +93,7 @@ public sealed class QuestProximityWatcher(IWorld world)
             // checked after the start above, so a frame that swept both markers — arriving on the
             // end marker, or flying through the whole quest at once — still finishes
             if (quest.State is QuestState.Active
+                && QuestConditions.Hold(definition.EndConditions, character)
                 && HasFired(definition.End, from, to, markers.End))
             {
                 quest.Complete();
