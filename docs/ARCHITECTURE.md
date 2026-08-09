@@ -22,11 +22,11 @@ to know about ships, quests or credits is on the wrong side of this line.
 | Project | Holds |
 | ------- | ----- |
 | `OliveGameStudio` | Engine composition and service registration. |
-| `OliveGameStudio.Abstractions` | `IHost`, `IScreen`, `IScreenDirector`, `ISaveProgressService`, and the shapes a platform host reports its devices in — `InputFrame`, `KeyboardFrame`, `GamePadFrame`, `TouchFrame`, `TouchPoint`, `ControlDevice`, `IInputRouter`. |
+| `OliveGameStudio.Abstractions` | `IHost`, `IScreen`, `IScreenDirector`, `ISaveProgressService`, and the shapes a platform host reports its devices in — `InputFrame`, `KeyboardFrame`, `GamePadFrame`, `TouchFrame`, `TouchPoint`, `MouseFrame`, `ControlDevice`, `IInputRouter`. |
 | `OliveGameStudio.Screen` | `ScreenDirector`, `LifecycleScreenDirector`. |
 | `OliveGameStudio.UI`, `.UI.Abstractions` | Menu and button navigation. Not ship control. |
 | `OliveGameStudio.FrameRate` | Frame time filtering, so a paused or slowed game holds still while frames keep arriving. |
-| `OliveGameStudio.Input` | `InputRouter` — where a frame of input goes, and which device the game is being played on. Also `TouchOverlay`, `TouchCircle` and `TouchControls`: the two circles a touch screen is played with, and what the fingers on them are asking for. |
+| `OliveGameStudio.Input` | `InputRouter` — where a frame of input goes, and which device the game is being played on. Also `TouchOverlay`, `TouchCircle` and `TouchControls`: the two circles a touch screen is played with, and what the fingers on them are asking for. And the pointer gesture a screen is worked with: `Pointer`, `PointerId`, `PointerDevice`, `PointerDrag`, `Drag`, `DragPhase`. |
 | `OliveGameStudio.Progress` | `LocalSaveProgressService`, persisting save text to a file. |
 | `OliveGameStudio.World` | `Position`, `Player`. The spatial model, plus the ship's physics and `IShipInput` — what an input means, never which device produced it. Also `Ship`, `ShipProfile`, `Meter`, `Item`, `ItemStats`, `EquipSlot`, `ItemStack`, `Inventory` and `Loadout`: a hull, the condition it is in, the things that can be held, and the slots they are held and fitted in. And what a hit costs it: `ShieldType`, `ShieldStats`, `Shielding`, `DamageOutcome`. And what flies alongside it: `OrbBehaviour`, `OrbStats`, `Orbs`. And how a dropped thing reaches its owner: `LootMagnet`, `LootDrop`, `Loot` — the mechanic only; what drops out of what is content. |
 | `OliveGameStudio.Rendering` | `Camera2D` — the world-to-screen transform, and the only place the world's axes and the screen's are reconciled. |
@@ -465,10 +465,10 @@ spending and the two have to be told apart wherever anything reports what a job 
   in a shield slot does not by itself give the ship a shield layer. Durability is not modelled at
   all, and the full item category list is still open.
 - **Nothing moves an item between slots.** `Loadout.TryEquip` is the auto-slot rule and
-  `Loadout.Unequip` takes something back out; the drag-and-drop that serves mouse and touch still
-  has nothing to be built on. `InputFrame` now carries a `TouchFrame`, so a finger has a position
-  the engine can read — but there is still no mouse, and no screen holds the positions a drag would
-  have to be dropped onto.
+  `Loadout.Unequip` takes something back out. The gesture the drag-and-drop is to be built on now
+  exists — `PointerDrag` reports a pick-up point, a carry position and a drop point, from a mouse or
+  a finger alike — but nothing joins it to the model, because no screen draws a slot for a drop to
+  be hit-tested against. What is missing is the layout and the art, not the gesture.
 - **Cargo bays are not modelled.** `ShipProfile.CargoSlots` is the hull's built-in capacity and the
   whole of it. Bays that couple to the pilot, the vendor swap and the ceiling they stop at are
   economy work.
@@ -998,12 +998,76 @@ carries the stick raw, with the platform's own dead zone turned off, plus whethe
 in at all: a disconnected pad and a pad being held still are the same numbers and are not the same
 thing.
 
-`TouchFrame` is the exception to *meaning-level*, and has to be: it carries every finger that is
-down as a `TouchPoint` — an identifier and a position in window pixels — because where a finger is
-has no meaning until something says what is drawn there. The identifier is carried for the same
-reason the pad carries `Connected`: two coordinates cannot say whether the finger that read 640
-this frame is the thumb that read 600 last frame or a second one that landed nearby, and a control
-that follows a finger cannot be built without knowing.
+`TouchFrame` and `MouseFrame` are the exception to *meaning-level*, and have to be: they carry
+positions in window pixels — every finger that is down as a `TouchPoint`, and the mouse's own
+pointer — because where a pointer is has no meaning until something says what is drawn there. A key
+can say *ahead* because a key is bound to an intent; a pointer is bound to a place, and the place is
+the screen's to interpret. The touch identifier is carried for the same reason the pad carries
+`Connected`: two coordinates cannot say whether the finger that read 640 this frame is the thumb
+that read 600 last frame or a second one that landed nearby, and a control that follows a finger
+cannot be built without knowing. `MouseFrame.Present` is carried for the literal same reason
+`GamePadFrame.Connected` is — a host with no mouse and a mouse parked in the corner of the window
+report the same three numbers, and something reading a press off the first would take hold of
+whatever is drawn at the top-left corner.
+
+The mouse reports one button. A second button means a second meaning — a context menu, a quick
+equip — and neither has been designed, so naming one would be a value every reader has to handle
+and none can act on. `DesktopMouse` passes the position on unclamped, including when the pointer
+has been dragged outside the window, for the reason the overlay's helm follows a thumb past the rim
+of its circle: there is nothing there for the player to feel, so clipping would put the item down
+somewhere they did not choose.
+
+### A drag is one gesture, whichever device is doing it
+
+`PointerDrag` is the gesture the hold and the loadout are worked with: it turns a frame of pointers
+into a `Drag` — a `DragPhase` plus where the pointer went down and where it is now. `Pointer` and
+`PointerId` are where the two devices stop being different, and the difference is real enough to be
+worth flattening: a mouse says whether its button is down, while a finger says nothing because
+being reported at all *is* it being down. Everything past that is the same gesture, so flattening
+it here keeps the difference from reaching a screen, exactly as `ShipControls` keeps a stick and a
+key apart from the physics. `PointerId` holds identity without position, because a control that
+follows a pointer has to ask "is this still the same one" every frame and comparing coordinates
+cannot answer it.
+
+**It answers two places and has no opinion about what is at either of them.** Which slot a pick-up
+point and a drop point name is a question for whoever laid the screen out; answering it here would
+put the inventory's layout inside the input system. That is the split `TouchCircle` already takes —
+the overlay is handed where its circles are rather than deciding — and it is what lets the gesture
+be covered without a window.
+
+**The drag captures its pointer**, exactly as the overlay's helm captures the thumb that took it,
+and for a reason of the same shape: an item being carried belongs to the hand carrying it. A second
+finger landing mid-drag — the other hand, a palm, the player steadying the device — must not take
+the item out of the first one's hand, and neither must the mouse on a machine that has both. The
+captured pointer is followed by its identifier and never by where it is, which is what keeps the
+drag alive when the platform reports another pointer ahead of it. When the drag is free the mouse is
+asked first: a machine with both has to pick one, neither is more right, and stating the order is
+what stops it depending on the order the platform happened to report things in.
+
+**The drop is an edge, so `Read` is called once a frame.** That is the same obligation `InputRouter`
+carries for a press, and for the same reason: the phase a gesture *enters* is not something the
+frame can be asked for twice. A screen that acted on a drop every frame would move the item into the
+slot and then keep moving it for as long as the player left the pointer where they dropped it. A
+drag *in progress* does read the same however many times its frame is read — only the drop is
+consumed. On the drop, the pointer's position is the last one it was seen at rather than one read
+from the frame the drop is reported on: a lifted finger is simply absent from the next frame and a
+released button says nothing about where the release happened, so the last sighting is not an
+approximation of the drop point — it is the drop point.
+
+A pointer the host could not place — a coordinate that is not a number — is carried through rather
+than refused, on the same reading `TouchCircle.Contains` takes: it drops on nothing, because an
+ordered comparison against `NaN` is false whichever way round it is written, so every hit-test the
+drop is put to answers "not this slot". Refusing it would take the game down on the frame path for
+one bad reading from a driver.
+
+What this deliberately does **not** do:
+
+- **Nothing routes a pointer.** `InputRouter` reads the keyboard and the pad, and `ControlDevice`
+  names those two. A pointer cannot press a menu that holds no positions, which is the same
+  prerequisite the touch overlay is waiting on below.
+- **Nothing hit-tests a drag**, because no screen draws a slot to test against, and **nothing moves
+  an item** as a result of one — `Loadout.TryEquip` and `Unequip` are still the only ways in and out
+  of a slot. What is missing is the layout and the art, not the gesture.
 
 ### Touch is two circles, and only the reading half exists
 
@@ -1096,10 +1160,10 @@ says nothing gets — a default so a game composes flyable, not a measurement of
 
 ## Known gaps
 
-- `Keyboard.GetState` and `GamePad.GetState` are static calls into MonoGame with no seam in front
-  of them, so nothing invokes `Read()` on a real device. What is untested is the few lines naming
-  the keys, the stick axes and the confirm buttons; everything they feed is engine code and is
-  covered. `tests/BattleForce2249.MonoGame.Tests` pins the shipped dead zone, which no other
+- `Keyboard.GetState`, `GamePad.GetState`, `TouchPanel.GetState` and `Mouse.GetState` are static
+  calls into MonoGame with no seam in front of them, so nothing invokes `Read()` on a real device.
+  What is untested is the few lines naming the keys, the stick axes, the confirm buttons and which
+  mouse button is the primary one; everything they feed is engine code and is covered. `tests/BattleForce2249.MonoGame.Tests` pins the shipped dead zone, which no other
   project can see, and drives the composed container's router end to end.
 - **A mis-ordered composition no longer fails loudly.** `AddDesktopPilot` above `AddBattleForce`
   used to leave the game with nobody at the controls, which a test could see. Both registrations
