@@ -300,6 +300,24 @@ public sealed class QuestLogTests
         Assert.Equal(QuestState.NotStarted, log.Find("quest-1")!.State);
     }
 
+    /// <summary>
+    /// A batch that is not there at all, as distinct from a batch holding an entry that is not
+    /// there. Both are refused, and both have to name <c>progress</c>: the spread that materialises
+    /// the batch already threw <see cref="ArgumentNullException"/> for null, but named
+    /// <c>source</c> — the framework collection's own parameter, which is no argument the caller
+    /// passed and no help in finding the one they did.
+    /// </summary>
+    [Fact]
+    public void Restore_RefusesProgressThatIsNotThere()
+    {
+        QuestLog log = new();
+
+        ArgumentNullException refusal =
+            Assert.Throws<ArgumentNullException>(() => log.Restore(null!));
+
+        Assert.Equal("progress", refusal.ParamName);
+    }
+
     // ---- a save that names the same quest twice ----
 
     [Fact]

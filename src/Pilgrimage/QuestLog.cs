@@ -185,6 +185,13 @@ public sealed class QuestLog
     /// </para>
     /// </remarks>
     /// <param name="progress">The saved quest states.</param>
+    /// <exception cref="ArgumentNullException">
+    /// The batch itself is <c>null</c> — not an entry within it, which is the refusal below. Asked
+    /// deliberately rather than left to the spread that materialises the batch: that already threw
+    /// this type, but named <c>source</c>, the framework collection's own parameter. A caller told
+    /// their <c>source</c> was null has nothing to look for, because <c>source</c> is not an
+    /// argument they passed.
+    /// </exception>
     /// <exception cref="ArgumentException">
     /// An entry is <c>null</c>. Checked across the whole batch before any of it is applied, so a
     /// caller that catches this still has the log it started with rather than half a save.
@@ -200,6 +207,11 @@ public sealed class QuestLog
     /// </exception>
     public void Restore(IEnumerable<QuestProgress> progress)
     {
+        // Ahead of the spread below, which throws this same type for null but names its own
+        // parameter rather than this method's. Named here so the refusal points at the argument the
+        // caller actually got wrong.
+        ArgumentNullException.ThrowIfNull(progress);
+
         // Materialised because the batch is read three times: twice to refuse it whole, once to
         // apply it.
         List<QuestProgress> entries = [.. progress];
