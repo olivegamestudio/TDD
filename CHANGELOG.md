@@ -552,6 +552,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A quest definition that is not there is refused by name, rather than dereferenced.**
+  `QuestLog.Register` read `definition.Id` before checking whether it had been handed a definition
+  at all, so a `null` argument came back as a `NullReferenceException` raised inside the log —
+  naming no parameter, and pointing at the identifier guard rather than at the call that got it
+  wrong. It now opens with `ArgumentNullException.ThrowIfNull`, the guard every other null-checked
+  method here uses, so the complaint names `definition`. It is a separate refusal from the
+  identifier guard beside it on purpose: a definition that is not there and a definition whose
+  identifier names nothing are two different mistakes, and only one of them is about the identifier.
+  This matters more in `Pilgrimage` than it would in the game, because it is a standalone library —
+  the caller getting the argument wrong is somebody else's campaign, and the stack trace is all they
+  get.
+
 - **An orb whose rate and time overflow together is refused, rather than placed nowhere.**
   `Orbs.PlaceAround` guarded its two inputs separately and neither guard was enough: `OrbStats`
   refuses an `AngularSpeed` that is not finite, `PlaceAround` refuses a `secondsFlown` that is not

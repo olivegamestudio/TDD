@@ -43,6 +43,14 @@ public sealed class QuestLog
     /// </summary>
     /// <param name="definition">The quest to register.</param>
     /// <returns>The runtime quest created for the definition.</returns>
+    /// <exception cref="ArgumentNullException">
+    /// The definition is <c>null</c>. Asked before anything is read off it, so a caller that passed
+    /// nothing is told which argument was nothing rather than being handed a
+    /// <see cref="NullReferenceException"/> naming a line inside the log. It is a separate refusal
+    /// from the one below on purpose: a definition that is not there and a definition whose
+    /// identifier names nothing are two different mistakes, and only one of them is about the
+    /// identifier.
+    /// </exception>
     /// <exception cref="ArgumentException">
     /// <para>
     /// The identifier names no quest — it is <c>null</c>, empty or nothing but whitespace. This is
@@ -67,6 +75,11 @@ public sealed class QuestLog
     /// </exception>
     public Quest Register(QuestDefinition definition)
     {
+        // Ahead of every other check, because all of them read the definition: without this the
+        // first one dereferences it and the caller's missing argument is reported as a
+        // NullReferenceException from inside the log.
+        ArgumentNullException.ThrowIfNull(definition);
+
         // Asked before the duplicate check because it is the more basic complaint: an identifier
         // that names nothing is not a candidate for being a second anything.
         if (string.IsNullOrWhiteSpace(definition.Id))
