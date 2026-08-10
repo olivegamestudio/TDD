@@ -41,6 +41,23 @@ public sealed class QuestLogTests
     }
 
     /// <summary>
+    /// A definition that is not there and one whose identifier names nothing are two different
+    /// mistakes, and the caller has to be able to tell them apart. Reading <c>definition.Id</c> off
+    /// a reference that is not there reports neither: a <see cref="NullReferenceException"/> names
+    /// no parameter and points at a line inside the log rather than at the call that got it wrong.
+    /// </summary>
+    [Fact]
+    public void Register_RefusesADefinitionThatIsNotThere()
+    {
+        QuestLog log = new();
+
+        ArgumentNullException refusal =
+            Assert.Throws<ArgumentNullException>(() => log.Register(null!));
+
+        Assert.Equal("definition", refusal.ParamName);
+    }
+
+    /// <summary>
     /// Every form of identifier that names nothing. A quest registered under one would be captured
     /// with its progress and then restored to nothing, because <see cref="QuestLog.Restore"/> skips
     /// exactly these — so the log refuses them at the door instead of accepting a quest it cannot
