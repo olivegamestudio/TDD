@@ -552,6 +552,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Saved progress that is not there is refused by this method's name, not the framework's.**
+  `QuestLog.Restore` had no guard on `progress`, so a `null` batch was refused by the collection
+  spread that materialises it. The exception type was already right — the spread throws
+  `ArgumentNullException` — but the `ParamName` was `source`, the framework collection's own
+  parameter. A caller told their `source` was `null` has nothing to go and look at, because `source`
+  is not an argument they passed. `ArgumentNullException.ThrowIfNull(progress)` now opens the method,
+  matching `Register` beside it, so the complaint names the argument that was wrong.
+
+  It is a separate refusal from the entry-that-is-not-there guard below it, which stays an
+  `ArgumentException`: a batch that was never handed over and a batch holding a line no `Capture`
+  wrote are two different mistakes, and only the second one is a save file. Nothing about which
+  saves load changes — the game's own reader already turns a `null` quest list into an empty one
+  before `Restore` sees it, so this is about what a caller getting it wrong is told, which in a
+  standalone library is all they get.
+
 - **A quest definition that is not there is refused by name, rather than dereferenced.**
   `QuestLog.Register` read `definition.Id` before checking whether it had been handed a definition
   at all, so a `null` argument came back as a `NullReferenceException` raised inside the log —
