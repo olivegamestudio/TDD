@@ -171,6 +171,13 @@ constructor parameters of types the content author has never heard of. Validatin
 what puts the refusal next to the content that caused it, and it is the rule for anything added to
 the profile later rather than a property of the three fields that happen to have it.
 
+`CharacterTemplate` follows it too, and for the same reason rather than by analogy: all five of its
+fields are refused when they are not there, so a template missing a hull or a starting inventory
+fails naming the field an author wrote, rather than surviving until `Character`'s constructor
+dereferences it and raises a `NullReferenceException` — which names nothing at all. Every authored
+type in the game validates what it is authored with; the template was the exception and is not one
+any more.
+
 `ICharacterRoster` / `BattleForceRoster` is the seam the game supplies characters through, exactly
 as `ICampaign` supplies quests: the roster is a singleton and builds its templates on each read,
 because the names are translated and a list built in a field initialiser would freeze the player's

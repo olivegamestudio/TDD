@@ -552,6 +552,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A character template refuses the fields nobody filled in, naming the field an author wrote.**
+  `CharacterTemplate` was the one authored-content type in the codebase with no validation at all:
+  five parameters, none of them guarded, while `ShipProfile` refuses all six of its numbers,
+  `ItemStats` refuses its stack limit and slot, and `QuestTrigger` refuses its distance. A `null`
+  hull or a `null` starting inventory made a template that built perfectly well and then destroyed
+  `Character`'s constructor with a `NullReferenceException` — an exception with no parameter to
+  name, raised in a type the content author has never heard of, about a field they wrote somewhere
+  else entirely. All five are now refused where the template is authored, with the name of the
+  field in the `ParamName`.
+
+  This is `ShipProfile`'s stated rule applied to the template that carries one, rather than five
+  new decisions: the refusal belongs next to the content that caused it. Empty stays a perfectly
+  good starting inventory and is the answer the shipping roster gives — owning nothing is a
+  decision content made, where a list that is not there is a field nobody filled in, and only the
+  second is a mistake.
+
 - **Saved progress that is not there is refused by this method's name, not the framework's.**
   `QuestLog.Restore` had no guard on `progress`, so a `null` batch was refused by the collection
   spread that materialises it. The exception type was already right — the spread throws
