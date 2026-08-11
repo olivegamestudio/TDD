@@ -12,6 +12,33 @@ public sealed class QuestTriggerTests
     }
 
     [Fact]
+    public void RejectsAnUndefinedKind()
+    {
+        // nothing evaluates a kind it does not know, so the trigger would silently never fire
+        Assert.Throws<ArgumentOutOfRangeException>(() => new QuestTrigger((QuestTriggerKind)99, 10));
+    }
+
+    [Fact]
+    public void NamesTheKindItRefused()
+    {
+        ArgumentOutOfRangeException refusal = Assert.Throws<ArgumentOutOfRangeException>(
+            () => new QuestTrigger((QuestTriggerKind)99, 10));
+
+        Assert.Equal("kind", refusal.ParamName);
+        Assert.Equal((QuestTriggerKind)99, refusal.ActualValue);
+    }
+
+    [Fact]
+    public void RefusesTheKindBeforeTheDistance()
+    {
+        // both are wrong; the kind is what the author got wrong first, so it is what they are told
+        ArgumentOutOfRangeException refusal = Assert.Throws<ArgumentOutOfRangeException>(
+            () => new QuestTrigger((QuestTriggerKind)99, -1));
+
+        Assert.Equal("kind", refusal.ParamName);
+    }
+
+    [Fact]
     public void RejectsANegativeDistance()
     {
         // no position could ever satisfy it, so it would silently never fire

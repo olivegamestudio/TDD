@@ -552,6 +552,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A quest trigger refuses a kind of trigger nothing knows how to fire.** `QuestTrigger` was the
+  last enum-taking constructor in the codebase with no `Enum.IsDefined` guard: it refused its
+  distance thoroughly — negative, infinite, `NaN` — and then took whatever `QuestTriggerKind` it
+  was handed, including one that does not exist. That is the quieter of the two defects. The
+  presentation asks which kind a trigger is and applies the rule for it, so a trigger of no known
+  kind is one no rule is ever applied to: `QuestProximityWatcher` matches `Proximity` and answers
+  `false` to everything else, the trigger silently never fires, and the quest it gates is stuck for
+  the rest of the save. Nothing raises anything at any point — the quest log simply reads as though
+  the player never reached the marker, which names no trigger and no frame to go and look at.
+
+  The kind is now refused where the quest is authored, ahead of the distance guards, with the kind
+  in the `ActualValue`. Ordering it first is the point rather than a detail: a trigger of no known
+  kind is not a trigger with a bad radius, so naming the radius would send the author to the
+  argument they got right. This is the rule `Quest.Restore` already applies to a state that is not
+  a state, reaching the other half of the model — an undefined condition kind was caught, loudly,
+  by `QuestConditions.Holds`, and an undefined trigger kind was the one that got through.
+
 - **A character template refuses the fields nobody filled in, naming the field an author wrote.**
   `CharacterTemplate` was the one authored-content type in the codebase with no validation at all:
   five parameters, none of them guarded, while `ShipProfile` refuses all six of its numbers,
