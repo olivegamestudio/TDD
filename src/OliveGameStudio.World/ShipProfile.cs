@@ -95,7 +95,17 @@ public sealed record ShipProfile(
     /// mutating the loadout, but it does not stop whoever authored the list from carrying on
     /// changing it — and a profile that changes after it is authored is no longer authored.
     /// </remarks>
-    public IReadOnlyList<Item> Loadout { get; } = [.. Loadout];
+    /// <exception cref="ArgumentNullException">
+    /// The list itself is not there. A hull that comes fitted with nothing is authored as an empty
+    /// list, so a list that is missing is a field nobody filled in rather than a bare hull.
+    /// </exception>
+    /// <exception cref="ArgumentException">
+    /// An entry in the list is not there. Checked here for the reason <see cref="HullRadius"/> and
+    /// the two pools are: <see cref="Ship"/> refuses the same entry, but only once a ship is built
+    /// from the profile, and by then the complaint names <c>profile</c> — leaving whoever wrote the
+    /// list to work out which of its entries was the empty one.
+    /// </exception>
+    public IReadOnlyList<Item> Loadout { get; } = Fitted(Loadout);
 
     /// <summary>
     /// How much of a circle the hull fills, for colliding with the world.
@@ -132,6 +142,25 @@ public sealed record ShipProfile(
         ArgumentOutOfRangeException.ThrowIfNegative(pool, name);
 
         return pool;
+    }
+
+    // Named for what it answers rather than for the check it makes, because unlike the guards below
+    // it it is also the copy: the list is materialised and then checked, in that order, so an entry
+    // cannot be added by whoever still holds the list after it has been looked at.
+    static IReadOnlyList<Item> Fitted(IReadOnlyList<Item> loadout)
+    {
+        ArgumentNullException.ThrowIfNull(loadout, nameof(Loadout));
+
+        Item[] copy = [.. loadout];
+
+        if (Array.Exists(copy, item => item is null))
+        {
+            throw new ArgumentException(
+                "A hull's loadout holds an item that is not there.",
+                nameof(Loadout));
+        }
+
+        return copy;
     }
 
     static int Validated(int cargoSlots)
