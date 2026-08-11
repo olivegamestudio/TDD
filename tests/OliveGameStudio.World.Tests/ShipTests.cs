@@ -273,6 +273,53 @@ public sealed class ShipTests
     }
 
     [Fact]
+    public void AHullFittedWithAnItemThatIsNotThere_IsRejectedWhereItIsAuthored()
+    {
+        // Every other slot-holding type refuses this where it is filled — Shielding and Orbs by
+        // Array.Exists, QuestDefinition by .Any — and the profile was the one that let it through.
+        // A null reached Ship instead, which blamed `profile` and left the author to work out which
+        // of the entries they wrote was the one that was not there.
+        Assert.Throws<ArgumentException>(() => new ShipProfile(
+            Handling, Health: 80, Durability: 40, CargoSlots: 16, Loadout: [null!], HullRadius: 1));
+    }
+
+    [Fact]
+    public void AHullRejectedForAnItemThatIsNotThere_NamesTheProfilesOwnParameter()
+    {
+        // the point of refusing here rather than at Ship: the complaint names `Loadout`, the field
+        // an author wrote, rather than `profile`, a constructor parameter of a downstream type
+        Item pulse = new("weapon.pulse", new ItemStats(EquipSlot.Weapon, StackLimit: 1));
+
+        ArgumentException rejected = Assert.Throws<ArgumentException>(() => new ShipProfile(
+            Handling, Health: 80, Durability: 40, CargoSlots: 16, Loadout: [pulse, null!], HullRadius: 1));
+
+        Assert.Equal(nameof(ShipProfile.Loadout), rejected.ParamName);
+    }
+
+    [Fact]
+    public void AHullWithNoLoadoutAtAll_IsRejectedWhereItIsAuthored()
+    {
+        // A hull fitted with nothing is authored as an empty list, so a list that is not there is a
+        // field nobody filled in rather than a hull that comes bare. It used to be refused by the
+        // copy that materialises it, which names no parameter at all.
+        ArgumentNullException refused = Assert.Throws<ArgumentNullException>(() => new ShipProfile(
+            Handling, Health: 80, Durability: 40, CargoSlots: 16, Loadout: null!, HullRadius: 1));
+
+        Assert.Equal(nameof(ShipProfile.Loadout), refused.ParamName);
+    }
+
+    [Fact]
+    public void AHullFittedWithNothing_IsStillAccepted()
+    {
+        // the line is drawn where Shielding and Orbs draw it: an empty loadout is what every hull
+        // ships with today, and only an entry that is not there is the mistake being looked for
+        ShipProfile profile = new(
+            Handling, Health: 80, Durability: 40, CargoSlots: 16, Loadout: [], HullRadius: 1);
+
+        Assert.Empty(profile.Loadout);
+    }
+
+    [Fact]
     public void TwoShipsOffTheSameProfile_AreTwoShips()
     {
         // a profile is authored and shared; damage is not. Two characters flying the same hull are

@@ -552,6 +552,29 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A hull refuses a loadout entry that is not there, where the loadout was written.** `ShipProfile`
+  copied its `Loadout` defensively and then passed whatever was in it straight through — the one
+  slot-holding type in the codebase that did not check its entries, while `Shielding` and `Orbs`
+  refuse a slot holding nothing and `QuestDefinition` refuses a condition that is not there. The
+  null was caught eventually, by `Ship`, and that was the defect: the complaint named `profile`, a
+  constructor parameter of a type the content author has never heard of, for a mistake made in a
+  list they wrote somewhere else entirely. An author reading it has to work backwards through the
+  ship to find which of their entries was empty.
+
+  It is refused at the profile now, naming `Loadout`. This is the rule the profile's own remarks
+  already stated for `Health`, `Durability` and `HullRadius` — each of them validated where the
+  content is, precisely so the exception names the field an author wrote rather than the downstream
+  parameter that happened to trip over it — applied to the one field that had been left out of it.
+  A missing list is refused separately, as `ArgumentNullException`: a hull that comes fitted with
+  nothing is authored as an empty list, so an empty list is an answer and a list that is not there
+  is a field nobody filled in. Empty stays perfectly good, and it is what every hull ships with
+  today.
+
+  `Ship`'s own null check on the entries has gone with it rather than being left to sit behind the
+  new one. A profile is the only way a loadout reaches a ship, so the guard could no longer fire —
+  and a guard that cannot fire is a claim about what this constructor refuses that is no longer
+  true.
+
 - **A quest trigger refuses a kind of trigger nothing knows how to fire.** `QuestTrigger` was the
   last enum-taking constructor in the codebase with no `Enum.IsDefined` guard: it refused its
   distance thoroughly — negative, infinite, `NaN` — and then took whatever `QuestTriggerKind` it

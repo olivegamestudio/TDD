@@ -36,10 +36,13 @@ public sealed class Ship
         Profile = profile;
 
         Loadout = new Loadout();
+
+        // Nothing checks the entries for null here any more. It used to, and the complaint named
+        // `profile` — a constructor parameter of this type — for a mistake made in a list somebody
+        // wrote somewhere else. ShipProfile refuses an entry that is not there where it is
+        // authored, and a profile is the only way a loadout reaches a ship.
         foreach (Item item in profile.Loadout)
         {
-            ArgumentNullException.ThrowIfNull(item, nameof(profile));
-
             if (!Loadout.TryEquip(item))
             {
                 // A hull authored with five weapons, or with something that fits no slot at all, is
