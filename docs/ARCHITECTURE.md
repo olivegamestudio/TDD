@@ -51,7 +51,10 @@ corrected once already — a quest library that owns a player and a position is 
   an end trigger, the conditions gating each end, and the `Level` the quest is meant to be. Never
   changes at runtime.
 - `QuestTrigger` — a `QuestTriggerKind` (today only `Proximity`) and a distance. Data, not
-  behaviour.
+  behaviour. Both halves are refused where the quest is authored: a distance that is not a
+  distance, and a kind this library does not have. Nothing evaluates a kind it does not know, so a
+  trigger naming none of them never fires and the quest it gates is stuck for good — the same
+  failure `Quest.Restore` refuses a state for, arriving through the other half of the model.
 - `QuestCondition` — a `QuestConditionKind` (`Character`, `Faction`, `Level`,
   `QuestPrerequisite`), what it names, and the least that will do. Data, not behaviour, on exactly
   the same terms as `QuestTrigger`.

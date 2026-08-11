@@ -28,6 +28,14 @@ public sealed record QuestTrigger
     /// <param name="kind">What fires the trigger.</param>
     /// <param name="distance">How close the player must get, in world units.</param>
     /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="kind"/> is not a kind of trigger this library has. Nothing evaluates a kind
+    /// it does not know: the presentation asks which kind a trigger is and applies the rule for it,
+    /// so a trigger naming none of them is one no rule is ever applied to. It silently never fires
+    /// and the quest it gates is stuck for good, with the log reading as though the player simply
+    /// never reached the marker — which names no trigger and no frame. It is refused where the
+    /// quest is authored, on the same terms as a distance that is not a distance.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">
     /// <paramref name="distance"/> is negative or is not a finite number. Both are refused for the
     /// same reason — a trigger that does not describe a place. A negative distance is one nothing
     /// could ever satisfy, so the trigger silently never fires; an infinite one is satisfied by
@@ -44,6 +52,16 @@ public sealed record QuestTrigger
     /// </remarks>
     public QuestTrigger(QuestTriggerKind kind, double distance)
     {
+        // Ordered before the distance guards because the kind is what decides whether the distance
+        // means anything: a trigger of no known kind is not a trigger with a bad radius, it is a
+        // trigger nothing will ever apply, and naming its radius would send the author looking at
+        // the argument they got right.
+        if (!Enum.IsDefined(kind))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(kind), kind, $"'{(int)kind}' is not a kind of quest trigger.");
+        }
+
         // Ordered before the negative guard so that negative infinity and NaN are named by the rule
         // they actually break. NaN is caught here rather than left to ThrowIfNegative, which stops it
         // only because the sign bit of double.NaN happens to be set — incidental behaviour to lean on
