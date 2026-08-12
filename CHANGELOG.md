@@ -552,6 +552,25 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A move of nothing no longer invents a group the character has dealt with.** `Reputation.Adjust`
+  wrote the standing back unconditionally, so `Adjust("miners", 0)` against a group nobody had ever
+  met listed them in `Standings` at zero — the one thing the property's own documentation says it
+  does not do. Two zeroes mean different things in this model: a stranger and a group the character
+  fell out with and made it up to read the same number, and `Standings` is the only place that tells
+  them apart. Spending that distinction on a call that changed nothing left every reader of the
+  property — save/load, a UI listing what the player has dealt with, a quest condition — seeing a
+  relationship that never happened.
+
+  It matters past the one call because the record outlives it. A save written after the spurious
+  entry carries the invention, and loading it brings the group back, so a zero-delta adjustment that
+  should have been a no-op becomes permanent history. That is the fourth pillar's rule about the
+  persistent record read from the other side: the record is not just protected from being discarded,
+  it is protected from being added to by something the player never did.
+
+  A zero delta against a group not already listed now returns zero and writes nothing. A group
+  already listed still stays listed and still keeps its standing: a zero move is not an erasure
+  either, and the history that put them there was earned.
+
 - **A hull refuses a loadout entry that is not there, where the loadout was written.** `ShipProfile`
   copied its `Loadout` defensively and then passed whatever was in it straight through — the one
   slot-holding type in the codebase that did not check its entries, while `Shielding` and `Orbs`

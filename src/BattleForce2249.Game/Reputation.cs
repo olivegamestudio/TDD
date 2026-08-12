@@ -58,6 +58,14 @@ public sealed class Reputation
     /// the model can express, and keeps the guarantee that matters — a positive delta can never
     /// leave a group less friendly than it found them, and a negative one can never leave them more.
     /// </para>
+    /// <para>
+    /// A move of nothing against a group the character has never dealt with leaves no trace, rather
+    /// than listing them at zero. The two zeroes mean different things — one is a stranger, the
+    /// other a group they fell out with and made it up to — and only <see cref="Standings"/> can
+    /// tell them apart. Writing the stranger in would spend that distinction on a call that changed
+    /// nothing, and a save written afterwards would carry the invention forward for good. A group
+    /// already listed stays listed: a zero move does not undo the history that put them there.
+    /// </para>
     /// </remarks>
     /// <param name="group">The group's identifier.</param>
     /// <param name="delta">How far to move it. Positive earns favour, negative loses it.</param>
@@ -66,6 +74,11 @@ public sealed class Reputation
     public int Adjust(string group, int delta)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(group);
+
+        if (delta == 0 && !_standings.ContainsKey(group))
+        {
+            return 0;
+        }
 
         // Widened before the addition rather than after it: the sum of two int values always fits
         // in a long, so there is no wrap to detect afterwards — by then the evidence is gone.
