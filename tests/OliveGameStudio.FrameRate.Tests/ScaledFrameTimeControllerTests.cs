@@ -72,6 +72,47 @@ public sealed class ScaledFrameTimeControllerTests
     }
 
     [Fact]
+    public void StretchesFrameTime_AtAScaleTooLargeToMultiply()
+    {
+        // the setter accepts any finite scale, so Filter has to have an answer for all of them:
+        // a frame the game cannot advance by is still not a frame that takes the game down
+        ScaledFrameTimeController frameTime = new() { TimeScale = double.MaxValue };
+
+        Assert.Equal(TimeSpan.MaxValue, frameTime.Filter(TimeSpan.FromMilliseconds(16)));
+    }
+
+    [Fact]
+    public void StretchesFrameTime_AtALargeScaleThatStillFits()
+    {
+        // saturation is the last resort and not a shortcut: a scale that multiplies out to a
+        // TimeSpan is still multiplied out, however large it is
+        ScaledFrameTimeController frameTime = new() { TimeScale = 1_000_000 };
+
+        Assert.Equal(TimeSpan.FromSeconds(16_000), frameTime.Filter(TimeSpan.FromMilliseconds(16)));
+    }
+
+    [Fact]
+    public void FreezesTime_AtAnEnormousScale_WhenNoTimeHasPassed()
+    {
+        // no time times any scale is still no time; the frame loop can hand Filter a zero frame
+        ScaledFrameTimeController frameTime = new() { TimeScale = double.MaxValue };
+
+        Assert.Equal(TimeSpan.Zero, frameTime.Filter(TimeSpan.Zero));
+    }
+
+    [Fact]
+    public void SaturatesBackwards_ForAFrameTimeThatRanBackwards()
+    {
+        // Filter is documented as taking elapsed time, so this is not a frame the loop produces.
+        // It is here because the saturation has to be the whole of the answer: the multiplication
+        // overflows in both directions, and only one of them being caught would leave the other
+        // throwing the OverflowException this replaced.
+        ScaledFrameTimeController frameTime = new() { TimeScale = double.MaxValue };
+
+        Assert.Equal(TimeSpan.MinValue, frameTime.Filter(TimeSpan.FromMilliseconds(-16)));
+    }
+
+    [Fact]
     public void KeepsFilteringAfterAScaleIsRefused()
     {
         // the refusal is the whole of it: the controller is still the one the frame loop had

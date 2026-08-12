@@ -36,6 +36,10 @@ public sealed class ScaledFrameTimeController : IFrameTimeController
         // "finite, and not negative" refuses all three where the value is written, which is the
         // same answer Camera2D gives for the same reason: a value that cannot be used is refused
         // at the setter, not diagnosed from the frame it eventually breaks.
+        //
+        // Finiteness is the whole of what it refuses, though. A finite scale large enough to
+        // overflow a particular frame time is not refused here, because whether it overflows is
+        // not a fact about the scale — see Filter, which is where both numbers are known.
         set => _timeScale = double.IsFinite(value) && value >= 0
             ? value
             : throw new ArgumentOutOfRangeException(
@@ -46,6 +50,37 @@ public sealed class ScaledFrameTimeController : IFrameTimeController
     /// Applies the current time scale to a frame time.
     /// </summary>
     /// <param name="frameTime">The real time that has elapsed since the last frame.</param>
-    /// <returns>The scaled frame time that the game should advance by.</returns>
-    public TimeSpan Filter(TimeSpan frameTime) => frameTime * _timeScale;
+    /// <returns>
+    /// The scaled frame time that the game should advance by, saturated at
+    /// <see cref="TimeSpan.MaxValue"/> — or <see cref="TimeSpan.MinValue"/> — when the scale asks
+    /// for more time than a <see cref="TimeSpan"/> can hold.
+    /// </returns>
+    /// <remarks>
+    /// The saturation lives here rather than in the setter because the setter cannot answer the
+    /// question. Whether a scale overflows depends on the frame time it is multiplied by, and the
+    /// setter has never seen one: a scale of a trillion is perfectly representable against a 16ms
+    /// frame and is not against a frame of a day. So the setter refuses what it can decide from
+    /// the value alone — a sign and a finiteness — and the frame time is where the rest is
+    /// decided, on the only line that knows both numbers.
+    /// </remarks>
+    public TimeSpan Filter(TimeSpan frameTime)
+    {
+        // TimeSpan's own operator * does this multiplication and then throws OverflowException
+        // past its range, which is the frame loop going down over a scale the game itself set.
+        // Rounding matches what that operator does, so the scales that always worked are
+        // unchanged; only the ones that used to throw come out anywhere different.
+        double ticks = Math.Round(frameTime.Ticks * _timeScale);
+
+        if (ticks >= TimeSpan.MaxValue.Ticks)
+        {
+            return TimeSpan.MaxValue;
+        }
+
+        if (ticks <= TimeSpan.MinValue.Ticks)
+        {
+            return TimeSpan.MinValue;
+        }
+
+        return new TimeSpan((long)ticks);
+    }
 }

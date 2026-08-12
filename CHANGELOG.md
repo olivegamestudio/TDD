@@ -552,6 +552,27 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A time scale the setter accepted no longer takes the frame loop down.**
+  `ScaledFrameTimeController.TimeScale` accepts any finite, non-negative number, and
+  `Filter` multiplied it straight into `TimeSpan` arithmetic — which throws `OverflowException`
+  past the range a `TimeSpan` holds. A large but finite scale therefore passed a guard whose own
+  comment says it exists to keep `Filter` from crashing, and then crashed `Filter` on the very next
+  frame, naming `TimeSpan.IntervalFromDoubleTicks` rather than the scale that caused it. It is the
+  worst place for it: the frame loop is every frame, so the game does not limp, it stops.
+
+  The guard was not made stricter, because the setter cannot answer the question. Whether a scale
+  overflows is not a fact about the scale — a scale of a trillion is perfectly representable against
+  a 16ms frame and is not against a frame of a day — so refusing at the setter would have to pick a
+  bound that is wrong in one direction or the other for every frame time that is not the one it
+  guessed. `Filter` saturates instead, at `TimeSpan.MaxValue` and, for a frame time that ran
+  backwards, at `TimeSpan.MinValue`. That is the split the setter was already keeping: it refuses
+  what the value alone decides — a sign, a finiteness — and the rest is decided on the one line that
+  knows both numbers.
+
+  Scales that always worked are untouched, rounding included: the saturation is a last resort, not a
+  shortcut, and a scale that multiplies out to a `TimeSpan` is still multiplied out however large it
+  is. ([#220](https://github.com/olivegamestudio/TDD/issues/220))
+
 - **A move of nothing no longer invents a group the character has dealt with.** `Reputation.Adjust`
   wrote the standing back unconditionally, so `Adjust("miners", 0)` against a group nobody had ever
   met listed them in `Standings` at zero — the one thing the property's own documentation says it
