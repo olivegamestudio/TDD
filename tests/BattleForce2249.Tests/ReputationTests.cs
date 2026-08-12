@@ -75,6 +75,71 @@ public sealed class ReputationTests
     }
 
     [Fact]
+    public void AMoveOfNothing_DoesNotInventAGroupTheCharacterHasDealtWith()
+    {
+        // asking what a move of nothing does to a stranger is not the same as meeting them. Listing
+        // the group here would make it indistinguishable from one they fell out with and made it up
+        // to — and a save written afterwards carries the invention forward for good.
+        Reputation reputation = new();
+
+        Assert.Equal(0, reputation.Adjust(Miners, 0));
+
+        Assert.Empty(reputation.Standings);
+    }
+
+    [Fact]
+    public void AMoveOfNothing_LeavesAGroupAlreadyDealtWithListed()
+    {
+        // the other half of it: a zero move is not an erasure either. History that was earned stays.
+        Reputation reputation = new();
+        reputation.Adjust(Miners, 10);
+        reputation.Adjust(Miners, -10);
+
+        Assert.Equal(0, reputation.Adjust(Miners, 0));
+
+        Assert.Equal([Miners], reputation.Standings.Keys);
+    }
+
+    [Fact]
+    public void AMoveOfNothing_LeavesAStandingWhereItWas()
+    {
+        Reputation reputation = new();
+        reputation.Adjust(Miners, 10);
+
+        Assert.Equal(10, reputation.Adjust(Miners, 0));
+
+        Assert.Equal(10, reputation.With(Miners));
+    }
+
+    [Fact]
+    public void RepeatedMovesOfNothing_LeaveNothingBehind()
+    {
+        // the pollution this guards against is cumulative: a caller that sweeps every known group
+        // with a zero delta would otherwise list the whole galaxy as dealt with
+        Reputation reputation = new();
+
+        reputation.Adjust(Miners, 0);
+        reputation.Adjust(Syndicate, 0);
+        reputation.Adjust(Miners, 0);
+
+        Assert.Empty(reputation.Standings);
+        Assert.Equal(0, reputation.With(Miners));
+        Assert.Equal(0, reputation.With(Syndicate));
+    }
+
+    [Fact]
+    public void AMoveOfNothingAgainstAStranger_LeavesEveryOtherGroupWhereItWas()
+    {
+        Reputation reputation = new();
+        reputation.Adjust(Miners, 10);
+
+        reputation.Adjust(Syndicate, 0);
+
+        Assert.Equal([Miners], reputation.Standings.Keys);
+        Assert.Equal(10, reputation.With(Miners));
+    }
+
+    [Fact]
     public void GroupsAreMatchedExactly_BecauseAnIdentifierIsNotText()
     {
         Reputation reputation = new();
