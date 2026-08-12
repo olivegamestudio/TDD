@@ -1,0 +1,32 @@
+name: CI
+
+# The verification gate the cloud agents cannot run themselves: agent containers have no .NET SDK
+# and no network to fetch one, so nothing an agent commits is built or tested until it reaches here.
+# Runs on every PR to main AND on every claude/** branch push, so an agent's work gets a real
+# build + test status check before anyone tries to merge it.
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore OliveGameStudio.slnx
+
+      - name: Build
+        run: dotnet build OliveGameStudio.slnx --no-restore
+
+      - name: Test
+        run: dotnet test OliveGameStudio.slnx --no-build
